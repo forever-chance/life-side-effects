@@ -60,6 +60,12 @@ function helpers() {
   window.__cat = name => { const roll = shelterRoll38('cat'); placePet79({ ...roll, id: 't-' + name, kind: 'cat', name, sex38: 'f', months: 30 }, 'shelter', 0); return s.pets.find(p => p.name === name); };
   window.__trip = (i = 0, extra = {}) => ({ country: s.country, city: cities[s.country].filter(c => c !== residenceCity())[i], days: 3, comfort: 'simple', companion: null, ...extra });
   window.__newTrip = before => travel52().trips.find(t => !before.includes(t.id));
+  // Записи ленты после отметки: __since(__mark()).
+  window.__mark = () => s.log[0];
+  window.__since = m => { const i = m ? s.log.indexOf(m) : -1; return (i < 0 ? s.log.slice(0, 20) : s.log.slice(0, i)).map(l => (l.title || l[0] || '') + ' | ' + (l.text || l[1] || '')); };
+  window.__esc = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Записи починки за всю жизнь.
+  window.__repairs = () => s.log.filter(l => (l.title || l[0]) === 'Дети снова живут с вами').length;
 }
 
 const results = [];
@@ -143,18 +149,22 @@ async function main() {
         // К другу в другой город.
         const mom = parents17()[0] || __adult('Мать', 66, list[1], 80, 'f'); mom.city18 = list[1]; mom.inner.trust = 80;
         const friend = __adult('Друг', 40, list[3], 70, 'm');
+        for (const k of kids) delete k.lastMove;
+        let m = __mark();
         moveHome('host', list[0], 'suburb', null, friend.id);
         ensureUX();
-        out.host = { city: residenceCity(), kids: kids.map(k => k.city18), mom: mom.city18 };
+        out.host = { city: residenceCity(), kids: kids.map(k => k.city18), mom: mom.city18, logs: __since(m), last: kids.map(k => k.lastMove?.initiator || null) };
         // «Вернуться к родителям» внутри страны.
         returnParentsMenu();
         out.parentsMenu = __modal();
+        m = __mark();
         __click(mom.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-        out.parents = { city: residenceCity(), mode: s.housing.mode, kids: kids.map(k => k.city18) };
+        out.parents = { city: residenceCity(), mode: s.housing.mode, kids: kids.map(k => k.city18), logs: __since(m) };
         // Аренда по объявлению в другом городе.
         const q = market41('rent', 'flat', list[0]).listings.find(q => validListing41(q, 'rent'));
+        m = __mark();
         const ok = q && rentHouse41(q);
-        out.listing = { ok, city: residenceCity(), kids: kids.map(k => k.city18) };
+        out.listing = { ok, city: residenceCity(), kids: kids.map(k => k.city18), logs: __since(m) };
         // Временное жильё у близкого в другом городе.
         const host = __adult('Друг', 42, list[4], 80, 'f');
         const offer42 = { id: 'aid42-test', personId: host.id, kind: 'stay', country: s.country, personCountry: host.country, created: s.clock.ticks, expires: s.clock.ticks + 2,
@@ -162,10 +172,13 @@ async function main() {
         housingState42().offers.push(offer42);
         aidOfferMenu42(offer42.id);
         out.stayMenu = __modal();
+        m = __mark();
         __click('^Согласиться и переехать');
-        out.stay = { city: residenceCity(), mode: s.housing.mode, kids: kids.map(k => k.city18) };
+        out.stay = { city: residenceCity(), mode: s.housing.mode, kids: kids.map(k => k.city18), logs: __since(m) };
+        out.repairs = __repairs();
         return out;
       });
+      const moved = logs => logs.some(l => l.startsWith('Дети переехали с вами')) && !logs.some(l => l.startsWith('Дети снова живут с вами'));
       check('переезд: в окне аренды видно, что дети едут, а партнёр остаётся', r.confirm.buttons.some(b => /^Снять и переехать/.test(b) && /С вами переезжают дети/.test(b) && /остаётся по прежнему адресу/.test(b)), r.confirm);
       check('переезд: аренда в другом городе — дети переехали с вами', r.rent.city === r.list[2] && r.rent.kids.every(c => c === r.list[2]) && r.rent.local.every(Boolean), r.rent);
       check('переезд: ваша кошка переехала с вами', r.rent.cat === true, r.rent);
@@ -177,6 +190,11 @@ async function main() {
       check('переезд: к родителям в другой город — дети тоже', r.parents.city === r.list[1] && r.parents.mode === 'parents' && r.parents.kids.every(c => c === r.list[1]), r.parents);
       check('переезд: временное жильё у близкого — видно, кто едет, дети тоже', /С вами переезжают дети/.test(r.stayMenu.text) && r.stay.city === r.list[4] && r.stay.mode === 'host' && r.stay.kids.every(c => c === r.list[4]), r);
       check('переезд: аренда по объявлению — дети тоже', r.listing.ok && r.listing.city === r.list[0] && r.listing.kids.every(c => c === r.list[0]), r.listing);
+      check('переезд: к другу (moveHome) — в ленте «Дети переехали с вами», отметка о переезде у детей', moved(r.host.logs) && r.host.last.every(x => x === 'family'), r.host);
+      check('переезд: к родителям — в ленте «Дети переехали с вами»', moved(r.parents.logs), r.parents.logs);
+      check('переезд: аренда по объявлению — в ленте «Дети переехали с вами»', moved(r.listing.logs), r.listing.logs);
+      check('переезд: временное жильё — в ленте «Дети переехали с вами»', moved(r.stay.logs), r.stay.logs);
+      check('переезд: ни одной записи починки «Дети снова живут с вами»', r.repairs === 0, r.repairs);
       check('переезд: без ошибок страницы', !errors.length, errors);
       await ctx.close();
     }
@@ -257,7 +275,13 @@ async function main() {
         out.dogPlan = journeyDraft57(__trip(0)).journey57.pets.map(p => p.pet).includes(dog.id);
         // Переезд за границу: мамина собака не в плане перевозки.
         out.movePlan = typeof petMovePlan183 === 'function' ? petMovePlan183({ country: 'nl' }, 'room', s.pets.filter(p => p.alive).map(p => p.id)).pets.map(p => p.id) : null;
-        out.dogId = dog?.id;
+        out.dogId = dog?.id; out.dogName = dog?.name;
+        // Мама умерла, вы снимаете жильё отдельно в том же городе: её собака вашей не становится.
+        __base(30);
+        moveHome('rent', personCity62(mom), 'center');
+        out.sepBefore = { live: livePets57().some(p => p.id === dog.id), atHome: petAtHome183(dog), city: residenceCity() === personCity62(mom) };
+        mom.alive = false;
+        out.sepAfter = { live: livePets57().some(p => p.id === dog.id), atHome: petAtHome183(dog), line: typeof familyMoveLine270 === 'function' ? familyMoveLine270() : '' };
         return out;
       });
       check('питомцы: подарок родителей — собака мамы, живёт дома', r.asked && r.keeper && r.atHome, r);
@@ -268,6 +292,7 @@ async function main() {
       check('питомцы: старая отложенная поездка с маминой собакой сама возвращается в план', r.heldBefore && ['away', 'completed'].includes(r.held.status) && !r.held.hold, r.held);
       check('питомцы: своя кошка по-прежнему в плане поездки, мамина собака — нет', r.catKeeper === 'player' && r.catPlan && !r.dogPlan, r);
       check('питомцы: мамина собака не в плане переезда за границу', !r.movePlan || !r.movePlan.includes(r.dogId), r.movePlan);
+      check('питомцы: собака умершей мамы не становится вашей (живёте отдельно в том же городе)', r.sepBefore.city && !r.sepBefore.live && !r.sepAfter.live && !r.sepAfter.atHome && !/питом/.test(r.sepAfter.line) && !r.sepAfter.line.includes(r.dogName), r);
       check('питомцы: без ошибок страницы', !errors.length, errors);
       await ctx.close();
     }
@@ -426,10 +451,168 @@ async function main() {
         if (st.dead) break;
       }
       const ours = [...issues.filter(x => x.kind === 'exception').map(x => x.detail), ...errors].filter(x => /family270|familyCare|familyMove|familyRepair|familyPet|familyHousehold/.test(x));
-      const state = await pg.evaluate(() => ({ age: s.age, kids: ownChildren55().map(childLocal55) }));
-      console.log('случайная игра: до ' + state.age + ' лет, исключений всего ' + issues.filter(x => x.kind === 'exception').length + ', ошибок страницы ' + errors.length);
+      const state = await pg.evaluate(() => ({ age: s.age, kids: ownChildren55().length, repairs: __repairs(),
+        moves: s.log.filter(l => (l.title || l[0]) === 'Дети переехали с вами').length,
+        homes: s.log.filter(l => (l.title || l[0]) === 'Новый адрес').length }));
+      console.log('случайная игра: до ' + state.age + ' лет, исключений всего ' + issues.filter(x => x.kind === 'exception').length + ', ошибок страницы ' + errors.length +
+        ', переездов ' + state.homes + ', записей «Дети переехали с вами» ' + state.moves);
       check('случайная игра: обёртки family270 не падают', !ours.length, ours.slice(0, 3));
-      check('случайная игра: несовершеннолетние дети живут с вами', state.kids.every(Boolean), state);
+      // Починка в ensureUX молчит, пока переезды сами забирают детей: запись «Дети снова живут с вами» в игре — признак
+      // пути, который оставил детей в старом городе.
+      check('случайная игра: ни одной записи починки «Дети снова живут с вами»', state.repairs === 0, state);
+      await ctx.close();
+    }
+
+    // 9. Переезды через окна игры: запись в ленте, отметка у детей, тексты подтверждений.
+    {
+      const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'ru' });
+      const r = await pg.evaluate(() => {
+        __base(40);
+        const list = cities[s.country];
+        moveHome('rent', list[1], 'center');
+        for (const q of parents17()) { q.age = 66; q.city18 = list[4]; q.inner.trust = 80; }
+        const out = { list };
+        // «Пригласить к себе» местного друга: город не меняется, город назван в записи.
+        const friend = __adult('Друг', 40, residenceCity(), 80, 'f');
+        householdMenu();
+        __click(__esc(friend.name) + ' · Друг');
+        out.localSub = __modal();
+        let m = __mark();
+        __click('^Пригласить к себе$');
+        out.local = { city: residenceCity(), occupant: s.housing.occupant === friend.id, fcity: friend.city18, logs: __since(m) };
+        s.housing.occupant = null; friend.cohabit = false; ensureHome();
+        // Только питомец, детей нет: подтверждение без «тоже».
+        const cat = __cat('Буся');
+        const offer = market41('rent', 'flat', list[2]).listings.find(q => validListing41(q, 'rent'));
+        housingOfferDetails41(offer);
+        out.petOnly = __modal(); closeModal();
+        // moveHome('rent', другой город) с двумя детьми: «Дети переехали с вами», а не починка.
+        const p = __adult('Партнер', 41, list[0], 80, 'm');
+        const kids = [8, 3].map(a => __kid(a, ['player', p.id]));
+        m = __mark();
+        moveHome('rent', list[2], 'center');
+        out.rent = { city: residenceCity(), kids: kids.map(k => k.city18), last: kids.map(k => k.lastMove?.initiator || null), logs: __since(m) };
+        // Через «С кем жить»: «Переехать к этому человеку» — партнёр в другом городе.
+        for (const k of kids) delete k.lastMove;
+        householdMenu();
+        __click(__esc(p.name) + ' · Партнер');
+        out.sub = __modal();
+        m = __mark();
+        __click('^Переехать к этому человеку');
+        out.toPartner = { city: residenceCity(), pcity: personCity62(p), mode: s.housing.mode, kids: kids.map(k => k.city18), last: kids.map(k => k.lastMove?.initiator || null), cat: petAtHome183(cat), logs: __since(m) };
+        ensureUX();
+        // Переезд по пути (relocation68) внутри страны: строка о питомцах есть; переезд завершается с записью о детях.
+        const mom = parents17()[0];
+        out.momCity = mom && personCity62(mom);
+        if (mom) {
+          moveConfirm68('family', mom.id, 'room');
+          out.pathConfirm = __modal();
+          m = __mark();
+          out.pathQueued = __click('^Запланировать переезд');
+          __month(2);
+          out.path = { city: residenceCity(), kids: kids.map(k => k.city18), logs: __since(m).filter(l => /^(Дети|Переезд|Живёте)/.test(l)) };
+        }
+        // Переезд за границу: питомцы выбираются отдельно, строки о них в подтверждении нет, дети — есть.
+        s.citizenships = [...new Set([...(s.citizenships || []), 'nl'])];
+        moveConfirm68('return', 'nl', 'room', null, [cat.id]);
+        out.abroadConfirm = __modal(); closeModal();
+        // Переезд в другую страну к близкому (relocateWithFamily): дети в городе игрока, запись о переезде.
+        cat.alive = false;
+        const aunt = __adult('Тетя', 50, cities.nl[1], 80, 'f'); aunt.country = 'nl'; aunt.city18 = cities.nl[1];
+        m = __mark();
+        out.relocated = relocateWithFamily('nl', aunt.id, 0);
+        ensureUX();
+        out.abroad = { country: s.country, city: residenceCity(), kids: kids.map(k => [k.country, k.city18]), logs: __since(m) };
+        out.repairs = __repairs();
+        return out;
+      });
+      const moved = logs => logs.some(l => l.startsWith('Дети переехали с вами')) && !logs.some(l => l.startsWith('Дети снова живут с вами'));
+      check('окна: «Пригласить к себе» местного друга — город прежний, город назван в записи', r.local.occupant && r.local.city === r.list[1] && r.local.fcity === r.list[1] && r.local.logs.some(l => l.includes('Ещё один комплект ключей') && l.includes(r.list[1])), r.local);
+      check('окна: только питомец — «С вами переезжает ваш питомец: Буся.», без «тоже»', r.petOnly.buttons.some(b => /С вами переезжает ваш питомец: Буся\./.test(b)) && !r.petOnly.buttons.some(b => /тоже/.test(b)), r.petOnly);
+      check('окна: moveHome в другой город — «Дети переехали с вами», отметка у детей', r.rent.city === r.list[2] && r.rent.kids.every(c => c === r.list[2]) && moved(r.rent.logs) && r.rent.last.every(x => x === 'family'), r.rent);
+      check('окна: «Обсудить совместную жизнь» — дети и питомец одной фразой', /Если переедете вы, с вами переезжают дети: [^.]+; ваш питомец тоже: Буся\./.test(r.sub.text), r.sub);
+      check('окна: «Переехать к этому человеку» — вы, дети и кошка у партнёра', r.toPartner.city === r.list[0] && r.toPartner.mode === 'host' && r.toPartner.kids.every(c => c === r.list[0]) && r.toPartner.cat === true, r.toPartner);
+      check('окна: «Переехать к этому человеку» — «Дети переехали с вами», отметка у детей', moved(r.toPartner.logs) && r.toPartner.last.every(x => x === 'family'), r.toPartner.logs);
+      check('окна: переезд по пути внутри страны — в подтверждении дети и питомец', /С вами переезжают дети: [^.]+; ваш питомец тоже: Буся\./.test(r.pathConfirm?.text || ''), r.pathConfirm);
+      check('окна: переезд по пути внутри страны — дети переехали, запись в ленте', r.pathQueued && r.path.city === r.momCity && r.path.kids.every(c => c === r.momCity) && moved(r.path.logs), r.path);
+      check('окна: переезд за границу — в подтверждении дети, без строки о питомцах', /С вами переезжают дети/.test(r.abroadConfirm.text) && !/питом[а-я]* тоже|ваш питомец|ваши питомцы/.test(r.abroadConfirm.text), r.abroadConfirm);
+      check('окна: переезд в другую страну — дети в вашем городе, запись в ленте', r.relocated && r.abroad.country === 'nl' && r.abroad.kids.every(([c, city]) => c === 'nl' && city === r.abroad.city) && moved(r.abroad.logs), r.abroad);
+      check('окна: ни одной записи починки «Дети снова живут с вами»', r.repairs === 0, r.repairs);
+      check('окна: без ошибок страницы', !errors.length, errors);
+      await ctx.close();
+    }
+
+    // 10. Поездки с детьми: командировка, лагерь в месяц отъезда, договорённость после переноса даты.
+    {
+      const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'de' });
+      const r = await pg.evaluate(() => {
+        __base(36);
+        const list = cities[s.country];
+        moveHome('rent', list[0], 'center');
+        for (const q of parents17()) { q.age = 62; q.city18 = list[3]; q.inner.trust = 80; q.inner.strain = 5; }
+        const p = __adult('Партнер', 37, residenceCity(), 70, 'm');
+        s.housing.occupant = p.id; p.cohabit = true; ensureHome();
+        const kids = [5, 9].map(a => __kid(a, ['player', p.id]));
+        const out = {};
+        // Командировка по-настоящему: работа в компании, предложение, согласие.
+        const prof = professions16.find(p => p.field === 'computing');
+        s.job = { title: prof.name || 'Разработчик', employer: 'Контур', professionId: prof.id, salary: c().wage, tenure: 1, format: 'office', language: country16[s.country][0], allowedCountries: [s.country], workplace: { country: s.country, city: residenceCity(), area: 'center' } };
+        const co = company18(); co.months = 12; co.budget = Math.max(co.budget || 0, 1e6);
+        const offer = () => { const R = Math.random; Math.random = () => 0.5; try { const q = offerBusiness54(); if (q) { q.country = s.country; q.city = list[2]; } return q; } finally { Math.random = R; } };
+        let q = offer();
+        out.offer = !!q && respondBusiness54(q.id, true);
+        let t = travel52().trips.find(x => x.business54 === q?.id);
+        __month(2);
+        out.withPartner = { status: t?.status, hold: t?.hold57?.reason || null, reason: t?.reason || null };
+        // Родитель-одиночка: командировка ждёт присмотра, после няни уезжает, няня оплачена.
+        p.cohabit = false; s.housing.occupant = null; p.city18 = list[3]; ensureHome();
+        events54().lastBusiness = -99; for (const b of events54().business) if (['offered', 'accepted'].includes(b.status)) b.status = 'done';
+        q = offer();
+        out.offer2 = !!q && respondBusiness54(q.id, true);
+        t = travel52().trips.find(x => x.business54 === q?.id);
+        __month(1);
+        out.single1 = { status: t?.status, hold: t?.hold57?.reason || null };
+        if (t?.status === 'planned') { childcareMenu86(tripDraft57(t)); out.sitterClick = __click('^Няня для всех'); }
+        __month(1);
+        out.single2 = { status: t?.status, hold: t?.hold57?.reason || null, paid: t?.sitterPaid270 || 0 };
+        s.job = null;
+        // Лагерь с проживанием: смена и поездка в один месяц — поездка уезжает в месяц отъезда.
+        kids[0].age = 7;
+        const R = Math.random; Math.random = () => 0.5;
+        try { out.campBooked = kids.map(k => bookCamp54(k.id, 'domestic', s.country)); } finally { Math.random = R; }
+        const dep = family54().camps.find(c => c.child === kids[0].id && c.status === 'planned')?.departure;
+        let before = travel52().trips.map(x => x.id);
+        out.campWhy = travelWhy52({ ...__trip(0), departure86: dep });
+        out.campTrip = bookTravel52({ ...__trip(0), departure86: dep });
+        t = __newTrip(before);
+        out.campDep = { trip: t?.departure, camp: dep };
+        __month(1);
+        out.camp = { status: t?.status, hold: t?.hold57?.reason || null, departed: t?.departed, camps: family54().camps.filter(c => kids.some(k => k.id === c.child)).map(c => c.status) };
+        __month(2);
+        // Договорённость с бабушкой сохраняется, если дату поездки перенесли.
+        const mom = parents17()[0];
+        mom.city18 = residenceCity(); mom.inner.strain = 5;
+        const d = __trip(1);
+        const R2 = Math.random; Math.random = () => 0.01;
+        try { travelDraftMenu52(d); for (const k of kids) { __click('^Присмотр за детьми'); __click('^' + __esc(k.name)); __click('^' + __esc(mom.name) + ' · '); } } finally { Math.random = R2; }
+        before = travel52().trips.map(x => x.id);
+        out.planned = __click('^Запланировать поездку');
+        t = __newTrip(before);
+        returnTravel86({ ...tripDraft57(t), departure86: s.clock.ticks + 4 }); closeModal();
+        out.moved = { dep: t?.departure, now: s.clock.ticks };
+        __month(2);
+        out.early = t?.status;
+        __month(4);
+        out.later = { status: t?.status, hold: t?.hold57?.reason || null };
+        return out;
+      });
+      check('поездки: командировка, партнёр дома — уехала без присмотра', r.offer && ['away', 'completed'].includes(r.withPartner.status) && !r.withPartner.hold, r.withPartner);
+      check('поездки: командировка родителя-одиночки ждёт присмотра', r.offer2 && r.single1.status === 'planned' && /присмотр/.test(r.single1.hold || ''), r.single1);
+      check('поездки: после «Няня для всех детей» командировка уехала, няня оплачена', r.sitterClick && ['away', 'completed'].includes(r.single2.status) && r.single2.paid > 0, r.single2);
+      check('поездки: лагерь в месяц отъезда — поездку можно запланировать', r.campBooked.every(Boolean) && !r.campWhy.some(w => /присмотр/i.test(w)) && r.campTrip && r.campDep.trip === r.campDep.camp, r);
+      check('поездки: лагерь — поездка уезжает в месяц отъезда, дети в лагере', ['away', 'completed'].includes(r.camp.status) && !r.camp.hold && r.camp.camps.every(x => ['away', 'completed'].includes(x)), r.camp);
+      check('поездки: договорённость с бабушкой после переноса даты — поездка ждёт новую дату и уезжает', r.planned && r.moved.dep === r.moved.now + 4 && r.early === 'planned' && ['away', 'completed'].includes(r.later.status) && !r.later.hold, r);
+      check('поездки: без ошибок страницы', !errors.length, errors);
       await ctx.close();
     }
 
