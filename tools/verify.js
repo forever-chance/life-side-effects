@@ -575,9 +575,9 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       const olds = s.people.filter(p => p.alive && kin27(p) && p.age >= 18 && !['Мать', 'Отец'].includes(p.role)).sort((a, b) => (b.country === s.country) - (a.country === s.country) || b.age - a.age).slice(0, 2);
       for (const p of olds) { p.country = s.country; p.city18 = residenceCity(); p.age = 86; if (p.bio27) p.bio27.health = 55; p.bond = Math.max(p.bond || 0, 60); if (p.aging58) p.aging58.care = null; }
       const month = () => { s.clock.ticks++; agingMonth58(); };
-      month(); month();
+      for (let i = 0; i < 6; i++) month();
       const reqs = generations58().requests.filter(q => olds.some(p => p.id === q.person) && q.status === 'offered');
-      out.created = reqs.map(q => q.created);
+      out.created = generations58().requests.map(q => q.created); out.ours = reqs.length;
       const q = reqs[0], other = reqs[1];
       out.card = quickCard59(decisionItems24().find(i => i.ref.id === q.id)).match(/title="([^"]*)"/)?.[1];
       elderMenu58(q.person); const b = [...document.querySelectorAll('#modal .options button')].find(b => /^Не сейчас/.test(b.textContent)); out.notNow = !!b; b?.click();
@@ -587,7 +587,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       out.seen = seen;
       return out;
     });
-    check('уход за пожилыми: просьбы двух близких приходят в разные месяцы', ad.created.length === 2 && ad.created[0] !== ad.created[1], ad);
+    check('уход за пожилыми: просьбы нескольких близких приходят в разные месяцы', ad.ours === 2 && new Set(ad.created).size === ad.created.length, ad);
     check('уход за пожилыми: «Не сейчас» и «×» — отказ, 12 месяцев без новой просьбы', ad.card === 'Не сейчас' && ad.notNow && ad.status === 'declined' && ad.x === 'declined' && ad.seen.every(v => !v), ad);
     const hide = await pg.evaluate(() => {
       const out = {}; s.age = 30; s.cash = 1e8; s.pending = []; if ($('#modal').open) closeModal();
