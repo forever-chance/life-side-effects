@@ -69,10 +69,10 @@ async function life(browser, idx, cfg) {
       await pg.evaluate(([k, v]) => { const e = document.getElementById(k); if (e) { e.value = v; e.dispatchEvent(new Event('change', { bubbles: true })); } }, [k, v]);
     await pg.click('text=Родиться');
     await pg.waitForFunction("typeof s!=='undefined' && s && s.clock", null, { timeout: 15000 });
-    await pg.evaluate("()=>{try{if(typeof startupNotice180==='function'&&startupNotice180())finishStartup180(false);if(typeof tutorialActive180==='function'&&tutorialActive180())endTutorial180('skipped');}catch(e){}}");
+    await pg.evaluate(() => { try { if (typeof startupNotice180 === 'function' && startupNotice180()) finishStartup180(false); if (typeof tutorialActive180 === 'function' && tutorialActive180()) endTutorial180('skipped'); } catch (e) {} });
     await pg.evaluate(HARNESS);
     // Сохранения в localStorage не нужны прогону и тормозят его к старости.
-    await pg.evaluate("()=>{try{localStorage.clear()}catch(e){}}");
+    await pg.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
     await pg.evaluate(TRACE);
     res.start = await pg.evaluate("({country:s.country,gender:s.gender,bg:s.background,age:s.age})");
     res.years.push(await pg.evaluate(SNAP));
