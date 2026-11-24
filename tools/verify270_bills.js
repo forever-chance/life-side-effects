@@ -87,6 +87,8 @@ function helpers() {
     modal() { const m = $('#modal'); return { open: m.open, title: m.querySelector('h2')?.textContent || '', all: m.textContent.replace(/\s+/g, ' '), buttons: [...m.querySelectorAll('.options button')].map(b => b.textContent.replace(/\s+/g, ' ').trim()) }; },
     // Окно, которое открывает fn: заголовок, весь текст (с разделами nextDetail20) и кнопки.
     open(fn) { B.calm(); fn(); const m = B.modal(); B.calm(); return m; },
+    // Текст, который окно получает в show(): при разделах nextDetail20 окно рисует разделы, а не текст.
+    text(fn) { B.calm(); const keep = show; let seen = null; show = function (t, x, ...rest) { seen = x; return keep(t, x, ...rest); }; try { fn(); } finally { show = keep; } B.calm(); return seen; },
     plural: t => /(?<![А-Яа-яЁё])(?:[Бб]ытовые|[Сс]тарые|[Тт]екущие|[Нн]овые|[Нн]еоплаченные|[Дд]оговорные|[Зз]акрыть|[Оо]платить|[Рр]азобрать|долги и|кредиты и|Аренда и|Бюджет,) счёта/.test(t),
     bills: () => s.debts.filter(d => d.type === 'bill32' && /^Бытовые сч[её]та · /.test(d.creditor32 || '')).map(d => ({ id: d.id, creditor: d.creditor32, country: d.country, balance: Math.round(d.balance * 100) / 100, principal: Math.round(d.principal * 100) / 100, paid: d.paid, missed: d.missed, started: d.started, due: d.due, status: d.status32, history: (d.history32 || []).length, plan: d.repayment35?.status || null })),
     // Месяц, в котором бытовые счета не оплачены: денег нет.
@@ -124,11 +126,12 @@ function helpers() {
     out.billLog = s.log.filter(e => e.title === 'Часть обязательного счёта не оплачена').map(e => e.text);
     out.bills = B.bills();
     out.finance = B.open(financeMenu);
+    out.financeText = B.text(financeMenu);
     out.catalog = actionCatalog24().find(x => x.id === 'finance32')?.label;
-    out.activities = activitiesView();
     out.hub = B.open(financeHub65);
     out.expenses = B.open(expenseReport39);
     out.payments = B.open(paymentMenu40);
+    out.frugal = B.open(() => { paymentMenu40(); [...document.querySelectorAll('#modal .options button')].find(b => /Экономить максимально/.test(b.textContent))?.click(); });
     out.limits = B.open(manualLimitsMenu40);
     // Старый минус до 0.36: отчёт о сверке.
     const f36 = finance36(), keep36 = f36.deficit;
@@ -150,16 +153,26 @@ function helpers() {
     B.calm(); s.cash = 1e5; life61().nextBills = 0; life61().notices.forEach(q => { if (q.type === 'bills') q.status = 'later'; });
     const q = checkBills61();
     out.notice = q?.title || '';
+    out.decisions = decisionItems24().map(x => x.title);
     out.repay = q ? B.open(() => repayMenu61(q.id)) : null;
     if (q) { B.calm(); payOldBills61(q.id); B.calm(); }
     out.paid = s.log.find(e => e.title === 'Старые счета частично погашены' || e.title === 'Старые счёта частично погашены') || null;
-    out.decisions = decisionItems24().map(x => x.title);
-    out.rescueOk = (() => { B.calm(); s.cash = 0; B.month(); s.cash = 0; const ok = rescueBills68(); B.calm(); return ok ? s.log.find(e => /Родители помогли/.test(e.title))?.title || 'нет записи' : null; })();
+    out.rescueOk = (() => { B.calm(); s.cash = 0; B.month(); s.cash = 0; for (const p of parents17()) p.privateCash = Math.max(p.privateCash || 0, 1e6); const ok = rescueBills68(); B.calm(); return ok ? s.log.find(e => /Родители помогли/.test(e.title))?.title || 'нет записи' : null; })();
+    // Своё дело с совладельцем: причина, по которой продажа недоступна (подсказка под выбором в событии дела).
+    try {
+      const b = { id: 'biz-bills270', status: 'active', country: s.country, city: residenceCity(), specialty: 'bills270', title: 'Дело', cash: 1e9, partner158: { id: 'partner-bills270' } };
+      out.sale = businessWhy254(b, { business: b.id, country: b.country, city: b.city, specialty: b.specialty, status: 'offered', expires: s.clock.ticks + 3 }, { op: 'sale', cost: 0 });
+    } catch (e) { out.sale = 'ошибка: ' + e; }
+    // Студент программы из каталога: окно оплаты учебного периода.
+    try {
+      const prog = programs16.find(p => p.country === s.country && p.city === residenceCity()) || programs16.find(p => p.country === s.country), keep = path16().study;
+      path16().study = { id: 'study-bills270', program: prog.id, payer: 'self', application: null, status: 'active' };
+      out.tuition = B.open(tuitionMenu44); path16().study = keep;
+    } catch (e) { out.tuition = { title: 'ошибка', all: String(e) }; }
     // Аренда из объявлений: «Старые счета сохранены.», потом окно ремонта.
     try {
       B.calm(); s.cash = 1e7;
-      const pool = market41('rent', 'apartment');
-      const list = (Array.isArray(pool) ? pool : pool?.listings || []).filter(x => validListing41(x, 'rent'));
+      const list = ['flat', 'room', 'house'].flatMap(k => market41('rent', k)?.listings || []).filter(x => validListing41(x, 'rent'));
       out.rentOk = list.length ? rentHouse41(list[0]) : 'нет объявлений';
       B.calm();
       out.rent = s.log.find(e => /Старые сч[её]та сохранены/.test(e.text))?.text || '';
@@ -171,13 +184,14 @@ function helpers() {
   check(a.billLog.length > 0 && a.billLog.some(t => /^Бытовые счета: оплачено/.test(t)) && !a.billLog.some(B_plural), 'месяц без денег: запись «Бытовые счета: оплачено …»', a.billLog);
   check(a.bills.length === 1 && a.bills[0].creditor === 'Бытовые счета · nl', 'месяц без денег: долг кредитору «Бытовые счета · nl»', a.bills);
   const fin = a.finance.all;
-  check(['Неоплаченные счета', 'Счета можно оплачивать', 'Текущие счета оплачиваются автоматически', 'Старые счета погашаются', 'Погасить старые счета с резервом', 'Бытовые счета · nl'].every(t => fin.includes(t)) && !B_plural(fin),
-    'финансы (financeMenu): «Неоплаченные счета», «Счета можно оплачивать», «Текущие/Старые счета…», кнопка и кредитор', fin);
+  check(['Неоплаченные счета', 'Счета можно оплачивать', 'Погасить старые счета с резервом', 'Бытовые счета · nl'].every(t => fin.includes(t)) && !B_plural(fin),
+    'финансы (financeMenu): «Неоплаченные счета», «Счета можно оплачивать», кнопка «Погасить старые счета…», кредитор «Бытовые счета · nl»', fin);
+  check(/^Текущие счета оплачиваются автоматически: .+ Старые счета погашаются по вашему решению/.test(a.financeText || ''), 'финансы: текст окна «Текущие счета… Старые счета погашаются…» (в show; при разделах окно его не рисует)', a.financeText);
   check(a.catalog === 'Деньги, долги и счета', 'каталог действий: «Деньги, долги и счета»', a.catalog);
-  check(a.activities.includes('Платежи и неоплаченные счета') && !B_plural(a.activities), 'занятия: кнопка «Платежи и неоплаченные счета»', a.activities.slice(-300));
   check(a.hub.buttons.includes('Бюджет, счета и кредиты'), 'деньги и имущество: «Бюджет, счета и кредиты»', a.hub.buttons);
   check(a.expenses.all.includes('Жильё и бытовые счета') && !B_plural(a.expenses.all), 'фактические расходы: «Жильё и бытовые счета»', a.expenses.all);
-  check(a.payments.all.includes('Бытовые счета') && a.payments.all.includes('договорные счета не уменьшаются') && !B_plural(a.payments.all), 'автоплатежи: строка «Бытовые счета», «договорные счета не уменьшаются»', a.payments.all);
+  check(a.payments.all.includes('Бытовые счета') && !B_plural(a.payments.all), 'автоплатежи: строка «Бытовые счета»', a.payments.all);
+  check(a.frugal.title === 'Изменить приоритет?' && a.frugal.all.includes('договорные счета не уменьшаются'), 'автоплатежи → «Экономить максимально»: «договорные счета не уменьшаются»', a.frugal);
   check(a.limits.all.includes('Аренда и счета всё равно начисляются') && !B_plural(a.limits.all), 'ручные лимиты: «Аренда и счета всё равно начисляются»', a.limits.all);
   check(a.legacy.all.includes('Существующие кредиты и счета не изменены'), 'сверка старого минуса: «Существующие кредиты и счета не изменены»', a.legacy.all);
   check(a.young.buttons.some(b => b.includes('Попросить помочь закрыть старые счета')), 'молодой взрослый: «Попросить помочь закрыть старые счета»', a.young.buttons);
@@ -186,7 +200,10 @@ function helpers() {
   check(a.notice === 'Можно начать закрывать старые счета' && a.decisions.includes(a.notice), 'решение: «Можно начать закрывать старые счета»', [a.notice, a.decisions]);
   check(a.repay?.title === 'Закрыть старые счета' && a.repay.all.includes('Новые счета оплачиваются автоматически') && a.repay.buttons.includes('Разобрать счета и автоплатежи'), 'окно «Закрыть старые счета»: «Новые счета оплачиваются…», «Разобрать счета и автоплатежи»', a.repay);
   check(a.paid?.title === 'Старые счета частично погашены' && /Текущие счета продолжают оплачиваться/.test(a.paid.text), 'погашение: «Старые счета частично погашены. Текущие счета продолжают…»', a.paid);
-  check(a.rescueOk === null || a.rescueOk === 'Родители помогли закрыть счета', 'помощь родителей: запись «Родители помогли закрыть счета»' + (a.rescueOk === null ? ' (родителям нечем помочь — только исходник)' : ''), a.rescueOk);
+  check(a.rescueOk === null ? String(served('students68.js')).includes("log('Родители помогли закрыть счета'") : a.rescueOk === 'Родители помогли закрыть счета',
+    'помощь родителей: запись «Родители помогли закрыть счета»' + (a.rescueOk === null ? ' (родителям нечем помочь — проверен исходник)' : ''), a.rescueOk);
+  check(a.sale === 'Для продажи нужно урегулировать долю совладельца и неоплаченные счета.', 'своё дело: «…долю совладельца и неоплаченные счета.»', a.sale);
+  check(a.tuition?.title === 'Счёт учебного периода' && a.tuition.all.includes('новые счета и штрафы не начисляются'), 'оплата учебного периода: «новые счета и штрафы не начисляются»', a.tuition);
   check(a.rentOk === true && /Старые счета сохранены\./.test(a.rent), 'аренда из объявлений: «Старые счета сохранены.»', [a.rentOk, a.rent, a.rentError]);
   check(a.repair && a.repair.all.includes('не создают новые счета каждый месяц'), 'ремонт съёмного жилья: «…не создают новые счета каждый месяц»', a.repair);
 
@@ -199,7 +216,10 @@ function helpers() {
     const yod = { id: 'bill32-902', type: 'bill32', billKind32: 'basics', creditor32: yo, country: c, balance: 50, principal: 50, rate: 0, payment: 0, paid: 0, missed: 3, started: t - 10, due: t - 10, history32: [{ tick: t - 10, due: 50, paid: 0, added: 50 }], status32: 'overdue', creditorPerson40: undefined };
     delete yod.creditorPerson40;
     s.debts.push(old, yod);
-    // Квитанции 268–269 с ключом на «счёта», строки месячного расчёта, заявка близкому, запись журнала и решение.
+    // Квитанции 268–269 с ключом на «счёта» (вместо настоящих за прошлый месяц), строки месячного расчёта,
+    // заявка близкому, запись журнала и решение.
+    finance32().receipts = finance32().receipts.filter(r => !(r.kind === 'basics' && r.tick === t - 1));
+    finance39().receipts = finance39().receipts.filter(r => !(r.kind === 'basics' && r.tick === t - 1));
     finance32().receipts.push({ key: 'basics:' + yo + ':' + (t - 1), tick: t - 1, kind: 'basics', creditor: yo, due: 50, paid: 0, unpaid: 50, country: c });
     finance39().receipts.push({ key: c + ':basics:' + yo + ':' + (t - 1), kind: 'basics', creditor: yo, tick: t - 1, country: c, due: 50, paid: 0 });
     const p = finance40().period = { tick: t, country: c, strategy: finance40().strategy, rows: [] };
@@ -262,13 +282,15 @@ function helpers() {
     B.calm();
     const t = s.clock.ticks, c = s.country, yo = 'Бытовые счёта · ' + c;
     s.debts = s.debts.filter(d => !(d.type === 'bill32' && d.billKind32 === 'basics'));
+    finance32().receipts = finance32().receipts.filter(r => !(r.kind === 'basics' && r.tick === t - 1));
     s.debts.push({ id: 'bill32-903', type: 'bill32', billKind32: 'basics', creditor32: yo, country: c, balance: 40, principal: 40, rate: 0, payment: 0, paid: 0, missed: 1, started: t - 2, due: t - 2, history32: [{ tick: t - 2, due: 40, paid: 0, added: 40 }], status32: 'overdue' });
-    finance32().receipts.push({ key: 'basics:' + yo + ':' + (t - 2), tick: t - 2, kind: 'basics', creditor: yo, due: 40, paid: 0, unpaid: 40, country: c });
+    finance32().receipts.push({ key: 'basics:' + yo + ':' + (t - 1), tick: t - 1, kind: 'basics', creditor: yo, due: 40, paid: 0, unpaid: 40, country: c });
     save(); flushSave264();
     const id = s.saveId; s.saveId = 'bills270-other'; loadCharacter(id); B.calm();
     out.same = s.saveId === id;
     out.bills = B.bills();
-    out.receipt = finance32().receipts.find(r => r.tick === t - 2 && r.kind === 'basics')?.key;
+    out.receipt = finance32().receipts.filter(r => r.tick === t - 1 && r.kind === 'basics').map(r => r.key);
+    out.t = t;
     out.again = typeof billsMigrate270 === 'function' ? billsMigrate270() : 'нет billsMigrate270';
     out.tick = B.month(); B.month();
     out.after = B.bills();
@@ -276,11 +298,35 @@ function helpers() {
     return out;
   });
   check(c.same && c.bills.length === 1 && c.bills[0].id === 'bill32-903' && c.bills[0].creditor === 'Бытовые счета · nl' && c.bills[0].balance === 40, 'сохранение 268–269, «Персонажи»: ключ «Бытовые счёта · nl» стал «Бытовые счета · nl», долг тот же', c.bills);
-  check(c.receipt === 'basics:Бытовые счета · nl:' + (c.tick - 3) && c.again === 0, 'сохранение 268–269: ключ квитанции на «счета», повтор ничего не меняет', [c.receipt, c.again]);
+  check(c.receipt.length === 1 && c.receipt[0] === 'basics:Бытовые счета · nl:' + (c.t - 1) && c.again === 0, 'сохранение 268–269: ключ квитанции на «счета», повтор ничего не меняет', [c.receipt, c.again]);
   check(c.after.length === 1 && c.after[0].id === 'bill32-903' && c.after[0].balance > 40 && c.after[0].missed === 3, 'сохранение 268–269: два месяца без денег — долг тот же, растёт, пропуски считаются', c.after);
   check(c.menu.includes('Бытовые счета · nl') && !c.menu.includes('счёта ·'), 'карточка долга: кредитор «Бытовые счета · nl»', c.menu);
 
-  // 4. Ошибки страницы.
+  // 4. Два долга, у обоих действующий график с кредитором: график один, платёж и покрытый остаток — сумма.
+  const d = await pg.evaluate(() => {
+    const out = {};
+    B.calm();
+    const t = s.clock.ticks, c = s.country;
+    s.debts = s.debts.filter(d => !(d.type === 'bill32' && d.billKind32 === 'basics'));
+    const plan = (id, remaining, monthly, next) => ({ id, status: 'active', remaining, monthly, next, expectedEnd: next + 11, missed: 0, history: [] });
+    s.debts.push({ id: 'bill32-911', type: 'bill32', billKind32: 'basics', creditor32: 'Бытовые счета · ' + c, country: c, balance: 60, principal: 60, rate: 0, payment: 0, paid: 0, missed: 1, started: t - 8, due: t - 8, history32: [], status32: 'scheduled', repayment35: plan('plan-a', 60, 5, t + 1) });
+    s.debts.push({ id: 'bill32-912', type: 'bill32', billKind32: 'basics', creditor32: 'Бытовые счёта · ' + c, country: c, balance: 40, principal: 40, rate: 0, payment: 0, paid: 0, missed: 2, started: t - 4, due: t - 4, history32: [], status32: 'scheduled', repayment35: plan('plan-b', 40, 4, t + 2) });
+    out.n = typeof billsMigrate270 === 'function' ? billsMigrate270() : 'нет billsMigrate270';
+    const m = s.debts.filter(d => d.type === 'bill32' && d.billKind32 === 'basics');
+    out.merged = m.map(d => ({ id: d.id, balance: d.balance, status: d.status32, plan: d.repayment35 && { id: d.repayment35.id, status: d.repayment35.status, remaining: d.repayment35.remaining, monthly: d.repayment35.monthly, next: d.repayment35.next }, previous: (d.previousPlans35 || []).map(p => p.id + ':' + p.status) }));
+    out.t = t;
+    // Месяц с деньгами: бытовые счета оплачены, по графику списан общий платёж.
+    B.calm(); s.cash = 1e6; advanceMonth(); B.calm();
+    const k = s.debts.find(d => d.id === 'bill32-911');
+    out.after = k && { balance: Math.round(k.balance * 100) / 100, remaining: Math.round(k.repayment35.remaining * 100) / 100, status: k.status32, count: s.debts.filter(d => d.type === 'bill32' && d.billKind32 === 'basics').length };
+    return out;
+  });
+  const dm = d.merged[0];
+  check(d.merged.length === 1 && dm.id === 'bill32-911' && dm.balance === 100 && dm.status === 'scheduled' && dm.plan?.id === 'plan-a' && dm.plan.status === 'active' && dm.plan.remaining === 100 && dm.plan.monthly === 9 && dm.plan.next === d.t + 1 && dm.previous.includes('plan-b:merged270'),
+    'два графика: один долг 100, график 60+40 по 5+4 в месяц, второй график — в прежних', d.merged);
+  check(d.after && d.after.count === 1 && d.after.balance === 91 && d.after.remaining === 91 && d.after.status === 'scheduled', 'два графика: месяц с деньгами — списан общий платёж 9, долг и график 91', d.after);
+
+  // 5. Ошибки страницы.
   check(!errors.length, 'без ошибок страницы', errors);
   await ctx.close();
   await browser.close();

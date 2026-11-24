@@ -21,9 +21,9 @@
 // Повторный запуск ничего не меняет.
 
 // «счёта» во множественном числе: слово перед ним показывает число (прилагательное во мн. ч., «долги и», «оплатить»).
-const billsRe270=/(?<![А-Яа-яЁё])((?:[Бб]ытовые|[Сс]тарые|[Тт]екущие|[Нн]овые|[Нн]еоплаченные|[Дд]оговорные|[Зз]акрыть|[Оо]платить|[Рр]азобрать)\s|(?:[Дд]олги|[Кк]редиты|[Аа]ренда)\sи\s|[Бб]юджет,\s)счёта(?![А-Яа-яЁё])/g;
+const billsRe270=/(^|[^А-Яа-яЁё])((?:[Бб]ытовые|[Сс]тарые|[Тт]екущие|[Нн]овые|[Нн]еоплаченные|[Дд]оговорные|[Зз]акрыть|[Оо]платить|[Рр]азобрать)\s|(?:[Дд]олги|[Кк]редиты|[Аа]ренда)\sи\s|[Бб]юджет,\s)счёта(?![А-Яа-яЁё])/g;
 const billsKey270='Бытовые счета · ';
-function billsText270(v){return v.includes('счёта')?v.replace(billsRe270,'$1счета'):v;}
+function billsText270(v){return v.includes('счёта')?v.replace(billsRe270,'$1$2счета'):v;}
 // Все строковые значения состояния (без ключей объектов: имён кредиторов в ключах нет).
 function billsTexts270(root){
  let n=0;const seen=new Set(),stack=[root];
@@ -108,7 +108,7 @@ function billsMerge270(){
   for(const d of parts){drop.add(d);if(d.id&&d.id!==keep.id)map.set(d.id,keep.id);}
  }
  if(!drop.size)return 0;
- s.debts=s.debts.filter(d=>!drop.has(d));
+ for(let i=s.debts.length-1;i>=0;i--)if(drop.has(s.debts[i]))s.debts.splice(i,1);
  if(map.size)billsRelink270(map);
  return drop.size;
 }
