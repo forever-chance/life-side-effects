@@ -83,7 +83,7 @@ function helpers() {
 }
 
 const results = [];
-const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.log((ok ? 'ok   ' : 'FAIL ') + name + (ok ? '' : '  ' + JSON.stringify(info).slice(0, 500))); };
+const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.log((ok ? 'ok   ' : 'FAIL ') + name + (ok ? '' : '  ' + String(JSON.stringify(info)).slice(0, 500))); };
 
 // Данные каталогов с диска, как JSON.
 function readConst(file, name) {
