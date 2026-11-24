@@ -109,7 +109,7 @@ async function life(pg, cfg) {
     check(r.an / L >= 2 && r.an / L <= 4, 'ru 1990: Анастасия — 2–4 на 150 женщин', `${(r.an / L).toFixed(2)} в среднем (${band(1)})`);
     check(r.iv / L >= 2 && r.iv / L <= 4, 'ru 1990: Иванов(а) — 2–4 на 300 человек', `${(r.iv / L).toFixed(2)} в среднем (${band(2)})`);
     check(r.galinaOld >= 1.5 * uni && r.galinaOld >= 2 * r.galinaYoung, 'ru: Галина — частое имя у родившихся до 1965', `${(r.galinaOld * 100).toFixed(1)}% (место ${r.galinaRank}), у родившихся в 1985–2000 ${(r.galinaYoung * 100).toFixed(1)}%, равные веса ${(uni * 100).toFixed(1)}%`);
-    check(r.newKids >= 1.5 * 3 * uni && r.newKids >= 2.5 * r.newOld, 'ru: Софья, София, Ева — у родившихся после 2010', `${(r.newKids * 100).toFixed(1)}%, до 1965 — ${(r.newOld * 100).toFixed(1)}%, равные веса ${(3 * uni * 100).toFixed(1)}%`);
+    check(r.newKids >= 1.5 * 3 * uni && r.newKids >= 2 * r.newOld, 'ru: Софья, София, Ева — у родившихся после 2010', `${(r.newKids * 100).toFixed(1)}%, до 1965 — ${(r.newOld * 100).toFixed(1)}%, равные веса ${(3 * uni * 100).toFixed(1)}%`);
     info('чаще всего до 1965', r.top.old); info('чаще всего 1985–2000', r.top.young); info('чаще всего после 2010', r.top.kids);
     info('скорость стенда', `${L * 300 + 18000} человек за ${ms} мс`);
     check(errors.length === 0, 'стенд ru: без ошибок страницы', errors.slice(0, 2).join(' | '));

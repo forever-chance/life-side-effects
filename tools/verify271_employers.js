@@ -3,12 +3,18 @@
 // названия детерминированы для (страна, город, сфера, зерно); компания по старой работе без работодателя — из сферы;
 // вузы — только кириллицей, медицинский профиль называется медицинским, и вакансия врача ведёт в медицинский вуз;
 // выбор названия своего дела для 16 видов × 25 стран (ни одного корня без подходящего тега) и само окно открытия;
-// старое сохранение не переименовывает записанные вакансии, отклики, работу и компанию.
+// старое сохранение не переименовывает записанные вакансии, отклики, работу и компанию; после перезагрузки страницы
+// (careers45.js сбрасывает marketKey, рынок собирается заново с теми же id) у вакансий те же работодатели — и в жизни
+// 271, и в сохранении 270; набор работодателей города: профессия, чьё название называет место («Актёр театра»,
+// «Ассистент аптеки»), — в организации своего вида, когда такая есть в городе, и таблица «не у себя» для ведущего;
+// дипломы с прежним названием вуза показываются с нынешним, а в сохранении остаются прежними.
 // Игра раздаётся с диска, сервер не нужен:  node tools/verify271_employers.js
 // Файлы сборки, ещё не подключённые в index.html, добавляются после загрузки страницы, до «Родиться»:
 // names271-data.js, names271.js, org271-data.js, employers271.js.
 // ORG271_DATA=путь — взять другой org271-data.js (например, заготовку: python3 tools/org271_build.py --fixture --out=путь).
 // BASE=1 — прогон без org271-data.js и employers271.js: видно, какие проверки ловят старое поведение.
+// ORG271_CAP=n — потолок организаций на город, если ведущий поменяет orgCityMax271 (по ТЗ 15).
+// EMPLOYERS271=путь — взять другой employers271.js (например, прежнюю версию: видно, что ловят новые проверки).
 const fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
@@ -16,8 +22,10 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const INDEX = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const BASE = process.env.BASE === '1';
 const DATA = process.env.ORG271_DATA ? path.resolve(process.env.ORG271_DATA) : path.join(ROOT, 'org271-data.js');
+const CODE = process.env.EMPLOYERS271 ? path.resolve(process.env.EMPLOYERS271) : path.join(ROOT, 'employers271.js');
 const BEFORE = ['names271-data.js', 'names271.js'];
 const MINE = ['org271-data.js', 'employers271.js'];
+const CAP = +process.env.ORG271_CAP || 15;
 let pass = 0, fail = 0;
 const check = (ok, label, extra = '') => { ok ? pass++ : fail++; console.log((ok ? 'ok   ' : 'FAIL ') + label + (extra ? ' — ' + extra : '')); };
 
@@ -38,7 +46,18 @@ function orgCheck(cc, field, employer) {
   return '';
 }
 
-async function open(browser) {
+async function addFiles(pg, mine) {
+  for (const f of BEFORE) if (!INDEX.includes(f)) await pg.addScriptTag({ path: path.join(ROOT, f) });
+  if (mine) for (const f of MINE) if (!INDEX.includes(f)) await pg.addScriptTag({ path: f === 'org271-data.js' ? DATA : f === 'employers271.js' ? CODE : path.join(ROOT, f) });
+}
+// Перезагрузка с той же жизнью: сохранение читается заново, файлы 271 добавляются после загрузки, как в open.
+async function reload(pg, mine) {
+  await pg.reload();
+  await pg.waitForFunction("typeof start==='function'&&typeof s!=='undefined'&&s&&s.clock");
+  await addFiles(pg, mine);
+  await pg.evaluate(() => { if ($('#modal').open) closeModal(); s.pending = []; });
+}
+async function open(browser, { mine = !BASE } = {}) {
   const ctx = await browser.newContext();
   await ctx.route('**/*', r => {
     const u = new URL(r.request().url());
@@ -54,8 +73,7 @@ async function open(browser) {
   pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push('console: ' + m.text()); });
   await pg.goto('http://game.local/index.html');
   await pg.waitForFunction("typeof start==='function'&&document.querySelector('#country')");
-  for (const f of BEFORE) if (!INDEX.includes(f)) await pg.addScriptTag({ path: path.join(ROOT, f) });
-  if (!BASE) for (const f of MINE) if (!INDEX.includes(f)) await pg.addScriptTag({ path: f === 'org271-data.js' ? DATA : path.join(ROOT, f) });
+  await addFiles(pg, mine);
   await pg.evaluate(() => {
     window.T = {
       click: re => { const b = [...document.querySelectorAll('#modal .options button:not([disabled])')].find(b => re.test(b.textContent.trim())); if (!b) return false; b.click(); return true; },
@@ -113,7 +131,7 @@ async function life(pg, cfg) {
       const bad = rows.map(v => [v, orgCheck(cc, v.field, v.employer)]).filter(([, e]) => e);
       const shops = rows.filter(v => v.field !== 'service' && /^Магазины «/.test(v.employer || ''));
       const doctor = rows.find(v => v.profession === 'doctor');
-      check(distinct.size >= 8 && distinct.size <= 15, `${cc} · ${city}: разных работодателей 8–15`, `${distinct.size}`);
+      check(distinct.size >= 8 && distinct.size <= CAP, `${cc} · ${city}: разных работодателей 8–${CAP}`, `${distinct.size}`);
       check(rows.length > 50 && !bad.length && !shops.length, `${cc} · ${city}: работодатель вакансии — из сферы профессии, корень подходит к типу`,
         bad.length ? bad.slice(0, 2).map(([v, e]) => v.title + ' @ ' + v.employer + ': ' + e).join('; ') : shops.length ? shops[0].title + ' @ ' + shops[0].employer : rows.length + ' вакансий');
       check(doctor && !orgCheck(cc, 'medicine', doctor.employer), `${cc} · ${city}: врач — в медицинской организации`, doctor ? doctor.employer : 'нет вакансии врача');
@@ -142,7 +160,9 @@ async function life(pg, cfg) {
       return out;
     });
     const sizes = all ? Object.values(all).map(l => new Set(l).size) : [];
-    check(!!all && Object.keys(all).length >= 150 && sizes.every(n => n >= 8 && n <= 15), 'все города 25 стран: 8–15 работодателей', all ? `${Object.keys(all).length} городов, от ${Math.min(...sizes)} до ${Math.max(...sizes)}` : 'нет функции');
+    check(!!all && Object.keys(all).length >= 150 && sizes.every(n => n >= 8 && n <= CAP), `все города 25 стран: 8–${CAP} работодателей`, all ? `${Object.keys(all).length} городов, от ${Math.min(...sizes)} до ${Math.max(...sizes)}` : 'нет функции');
+    const cap = await pg.evaluate(() => typeof orgCityMax271 === 'number' ? orgCityMax271 : null);
+    check(cap === CAP, `потолок организаций на город — ${CAP}` + (CAP === 15 ? ' (ТЗ: 8–15)' : ' (ORG271_CAP)'), String(cap));
     check(!!all && Object.entries(all).every(([k, l]) => l.every(n => /^[А-ЯЁ][^A-Za-z]*«[^«»A-Za-z]+»$/.test(n))), 'названия работодателей — кириллица, «тип «корень»»');
 
     // ---------- 2. Компания, замена вакансии, окно вакансии, сектора locality95 ----------
@@ -360,6 +380,156 @@ async function life(pg, cfg) {
     check(r.application === 'Магазины «Под Липой»' && r.job === 'Магазины «Под Липой»' && r.company === 'Магазины «Под Липой»', 'старое сохранение: отклик, работа и компания — прежние', [r.application, r.job, r.company].join(' | '));
     check(!orgCheck('pl', 'medicine', r.legacy), 'сохранение без работодателя: компания врача — медицинская', r.legacy);
     check(errors.length === 0, 'старое сохранение: без ошибок страницы', errors.slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+
+  // ---------- 7. Перезагрузка страницы: жизнь 271 ----------
+  // careers45.js при загрузке сбрасывает marketKey, и первый makeVacancies16 собирает тот же рынок с теми же id.
+  {
+    const { pg, errors, ctx } = await open(browser);
+    await life(pg, { country: 'ru', gender: 'f' });
+    const look = field => pg.evaluate(field => {
+      const x = path16(); x.view = { ...x.view, country: s.country, field, format: 'near' };
+      makeVacancies16();
+      return { key: x.marketKey, rows: x.vacancies.map(v => [v.id, v.profession, v.employer]) };
+    }, field);
+    const a = await look('medicine');
+    await pg.evaluate(() => { save(); if (typeof flushSave264 === 'function') flushSave264(); });
+    await reload(pg, !BASE);
+    const cleared = await pg.evaluate(() => path16().marketKey);
+    const b = await look('medicine');
+    const same = (was, now) => now.rows.length > 0 && now.rows.every(r => { const o = was.rows.find(q => q[0] === r[0]); return !o || o[2] === r[2]; });
+    const doctor = b.rows.find(r => r[1] === 'doctor');
+    check(cleared === null && b.key === a.key, 'перезагрузка: рынок вакансий собирается заново с тем же ключом', String(cleared) + ' · ' + b.key);
+    check(same(a, b), 'перезагрузка (жизнь 271): у вакансий те же работодатели', b.rows.filter(r => r[1] === 'doctor').map(r => r[2]).slice(0, 1).join(''));
+    check(doctor && !orgCheck('ru', 'medicine', doctor[2]), 'перезагрузка: врач — в медицинской организации', doctor ? doctor[2] : 'нет вакансии врача');
+    // фоновый поиск после перезагрузки: в сохранении рынок «Уход», поиск собирает его заново с теми же id
+    const care2 = await look('care');
+    await pg.evaluate(() => { save(); if (typeof flushSave264 === 'function') flushSave264(); });
+    await reload(pg, !BASE);
+    const bg = await pg.evaluate(() => {
+      const x = path16();
+      x.search = true; if (s.jobSearch) s.jobSearch.enabled = true; x.lastSearch = -99; x.searchView78 = { ...x.view, country: s.country, field: 'care', format: 'near' };
+      x.jobApplications = x.jobApplications.filter(a => !['submitted', 'interview', 'interviewing', 'offered', 'accepted'].includes(a.status));
+      s.job = null;
+      const n = x.jobApplications.length;
+      backgroundJobSearch78();
+      const app = x.jobApplications.length > n ? x.jobApplications.at(-1) : null;
+      return app ? { id: app.vacancy.id, prof: app.vacancy.profession, employer: app.vacancy.employer } : null;
+    });
+    const was = bg && care2.rows.find(r => r[0] === bg.id);
+    check(bg && !orgCheck('ru', 'care', bg.employer) && (!was || was[2] === bg.employer), 'перезагрузка: фоновый поиск откликается с прежним работодателем сферы', bg ? bg.prof + ' @ ' + bg.employer : 'нет отклика');
+    check(errors.length === 0, 'перезагрузка (жизнь 271): без ошибок страницы', errors.slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+
+  // ---------- 8. Перезагрузка: сохранение 270 открывается в 271 ----------
+  {
+    const { pg, errors, ctx } = await open(browser, { mine: false });
+    await life(pg, { country: 'pl', gender: 'm' });
+    const a = await pg.evaluate(() => {
+      const x = path16(); x.view = { ...x.view, country: s.country, field: 'medicine', format: 'near' }; makeVacancies16();
+      const v = x.vacancies.find(v => v.profession === 'doctor');
+      x.jobApplications.push({ id: 'app-270', vacancy: { ...v }, status: 'rejected', probability: .5 });
+      // диплом 270 из вуза с названием арабским письмом
+      const u = universities16.find(u => u.country === 'eg' && u.profile === 3), p = programs16.find(p => p.university === u.id && p.field === 'medicine' && p.level === 'bachelor');
+      x.diplomas.push({ id: 'dip-270', field: p.field, level: p.level, track45: p.track45 || null, program46: p.id, profileSchema46: 1, title: levels16[p.level] + ' · ' + programName26(p), university: u.previousName271 || u.name, country: p.country, year: s.year, grade: 80, quality: p.quality, employment: p.employment });
+      save(); if (typeof flushSave264 === 'function') flushSave264();
+      return { key: x.marketKey, employers: [...new Set(x.vacancies.map(v => v.employer))], doctor: v.employer, uni: u.previousName271 || u.name, uniId: u.id };
+    });
+    await reload(pg, !BASE);
+    const b = await pg.evaluate(uniId => {
+      const x = path16(); x.view = { ...x.view, country: s.country, field: 'medicine', format: 'near' }; makeVacancies16();
+      const out = { key: x.marketKey, employers: [...new Set(x.vacancies.map(v => v.employer))], app: x.jobApplications.find(a => a.id === 'app-270')?.vacancy.employer };
+      // следующий квартал — новые вакансии, у них работодатели 271
+      s.clock.ticks += 3; makeVacancies16();
+      out.next = x.vacancies.find(v => v.profession === 'doctor')?.employer;
+      s.clock.ticks -= 3; x.marketKey = null;
+      // дипломы: на экране нынешнее название вуза, в сохранении — прежнее
+      const u = universities16.find(u => u.id === uniId);
+      out.uniNow = u.name;
+      openPath16('education');
+      out.education = document.getElementById('app')?.innerText || '';
+      out.archive = typeof studyArchive58 === 'function' ? studyArchive58(x) : '';
+      out.bio = (bioRows().find(r => r[0] === 'education') || [])[3] || '';
+      save(); if (typeof flushSave264 === 'function') flushSave264();
+      out.stored = x.diplomas.find(d => d.id === 'dip-270')?.university;
+      out.saved = (localStorage.getItem(LIFE_PREFIX + s.saveId) || '').includes(JSON.stringify(out.stored));
+      return out;
+    }, a.uniId);
+    check(b.key === a.key && b.employers.length === a.employers.length && b.employers.every(n => a.employers.includes(n)), 'сохранение 270 после перезагрузки: записанные вакансии не переименованы', b.employers.join(' | '));
+    check(b.app === a.doctor, 'сохранение 270 после перезагрузки: отклик — прежний', b.app);
+    check(b.next && !orgCheck('pl', 'medicine', b.next), 'сохранение 270: в следующем квартале врач — в медицинской организации', b.next);
+    const shown = t => t.includes(b.uniNow) && !t.includes(a.uni);
+    check(b.uniNow !== a.uni && shown(b.education) && shown(b.archive) && shown(b.bio), 'диплом 270: на экране учёбы, в архиве и в биографии — нынешнее название вуза', b.bio);
+    check(b.stored === a.uni && b.saved, 'диплом 270: в сохранении название вуза прежнее', b.stored);
+    check(errors.length === 0, 'сохранение 270 в 271: без ошибок страницы', errors.slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+
+  // ---------- 9. Набор работодателей города: профессии у себя ----------
+  // Своё место профессий, чьё название его называет, — независимо от employers271.js. При потолке 15 на 30 с лишним
+  // видов мест часть профессий неизбежно не у себя; проверяется, что набор города отдаёт места туда, где без них
+  // хуже всего, и что профессия идёт в организацию своего вида, если та есть в городе.
+  {
+    const OWN = {
+      stageactor: 'Театр', stagehand: 'Театр', setdesigner: 'Театр', dancer: 'Театр|Танц|самбы|фламенко',
+      screenwriter: 'Кино|Аниме|Анимац', filmdirector: 'Кино|Аниме|Анимац', cameraOperator: 'Кино', cameraoperator: 'Кино',
+      photographer: 'Фото', studioassistant: 'Фото', galleryassistant: 'Галере', curator: 'Музей|Галере',
+      librarian: 'Библиотек', bookshop: 'Книжн', publishingassistant: 'Издательств', rightsmanager: 'Издательств', staffwriter: 'Издательств|Редакц',
+      radioeditor: 'Радио', podcasteditor: 'Подкаст|Медиа|Радио', pharmacyassistant: 'Аптек', kindergarten: 'сад', museumeducator: 'Музей',
+      teacher: '^Школа$|Лицей', lecturer: 'Колледж|Академ|Институт|Университет', hotel: 'Гостиниц|Отел|Гестхаус|Гостев|Рёкан|Риад|лодж',
+      shiftManager: 'Супермаркет|Магазин', store: 'Торгов|Магазин|Супермаркет', mechanic16: 'Автосервис', gameqa: 'Игров', gameplay: 'Игров',
+      doctor: 'Клиник|Больниц|Медицин|Лечеб|Хирург|Диагност', surgeon: 'Хирург|Больниц|Клиник|Медицин|Лечеб', lawyer: 'Адвокат|Коллеги|Юридическ|Правов',
+      cook16: 'Ресторан|Кафе|Бистро|Траттори|Такери|Идзакая|Пивн|Кафана|Паб|Дайнер|Кебаб|Шурраскари|Тапас|Гостиниц|Отел', hair: 'Салон',
+    };
+    const { pg, errors, ctx } = await open(browser);
+    await life(pg, { country: 'ru', gender: 'f' });
+    const r = await pg.evaluate(OWN => {
+      if (typeof employerFor271 !== 'function') return null;
+      const out = { rows: [], code: null };
+      for (const cc of Object.keys(countries)) for (const city of cities[cc]) {
+        const names = cityEmployers271(cc, city);
+        for (const id of Object.keys(OWN)) out.rows.push({ cc, city, id, field: profession16(id).field, title: profession16(id).title, employer: employerFor271(cc, city, id), names });
+      }
+      // таблица по мере самого кода: у себя / рядом / не у себя
+      if (typeof orgMiss271 === 'function' && typeof orgMissLevels271 === 'object') {
+        const L = orgMissLevels271, c = { own: 0, near: 0, off: 0, tot: 0 }, off = {};
+        for (const cc of Object.keys(countries)) for (const city of cities[cc]) {
+          const all = orgRoster271(cc, city).all;
+          for (const p of professions16) {
+            const name = employerFor271(cc, city, p.id), e = all.find(e => e.name === name), m = orgMiss271(orgPrefs271(p), e);
+            c.tot++; if (m === L.own) c.own++; else if (m <= L.near) c.near++; else { c.off++; const k = p.title + ' → ' + e.type; off[k] = (off[k] || 0) + 1; }
+          }
+        }
+        out.code = { ...c, off: c.off, table: Object.entries(off).sort((a, b) => b[1] - a[1]) };
+      }
+      return out;
+    }, OWN);
+    const typeOf = name => (/^(.+) «/.exec(name || '') || [])[1] || '';
+    const fieldTypes = (cc, field) => new Set((ORG.countries[cc].types[field] || []).map(i => ORG.types[i][0]));
+    let hit = 0, inconsistent = [];
+    const offTab = {};
+    for (const row of r ? r.rows : []) {
+      const re = new RegExp(OWN[row.id]), mine = typeOf(row.employer);
+      if (re.test(mine)) hit++; else offTab[row.title + ' → ' + mine] = (offTab[row.title + ' → ' + mine] || 0) + 1;
+      const types = fieldTypes(row.cc, row.field);
+      const available = row.names.map(typeOf).filter(t => types.has(t) && re.test(t));
+      if (available.length && !re.test(mine)) inconsistent.push(row.cc + ' · ' + row.city + ': ' + row.title + ' @ ' + row.employer + ' при ' + available[0]);
+    }
+    const share = r && r.rows.length ? hit / r.rows.length : 0;
+    check(!!r && inconsistent.length === 0, 'профессия идёт в организацию своего вида, если та есть в городе', inconsistent.slice(0, 2).join(' | '));
+    // порог — для настоящих данных и потолка 15: до исправления 0.382 (места по сферам — жадно и с допуском), сейчас 0.557
+    if (!ORG.fixture && CAP === 15) check(share >= 0.5, 'профессии, чьё название называет место, — у себя хотя бы в половине случаев', share.toFixed(3));
+    else console.log('     (у себя — ' + share.toFixed(3) + '; порог только для настоящих данных и потолка 15)');
+    console.log('     не у себя (профессии, чьё название называет место), городов из ' + (r ? new Set(r.rows.map(x => x.cc + x.city)).size : 0) + ':');
+    for (const [k, n] of Object.entries(offTab).sort((a, b) => b[1] - a[1]).slice(0, 14)) console.log('       ' + k + ' · ' + n);
+    if (r && r.code) {
+      const c = r.code, pc = n => (100 * n / c.tot).toFixed(1) + ' %';
+      console.log(`     по мере employers271.js, все профессии × все города: у себя ${pc(c.own)}, рядом ${pc(c.near)}, не у себя ${pc(c.off)}`);
+      for (const [k, n] of c.table.slice(0, 12)) console.log('       ' + k + ' · ' + n);
+    }
+    check(errors.length === 0, 'набор работодателей: без ошибок страницы', errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
 

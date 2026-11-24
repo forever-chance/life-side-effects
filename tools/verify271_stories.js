@@ -1,20 +1,54 @@
 // Проверки сборки 271, часть «сюжеты» (stories271-data.js, stories271.js): редактор проектов берёт книги из сюжетов книг,
 // фильмы — из сюжетов фильмов, по жанру и формату; тон названия (Серьёзно / С иронией / Абсурд) показывает пять своих
 // названий; «Похожие сюжеты» — тот же вид и жанр, не меньше двух общих тем; в пуле нет повторов названий; будущие
-// премьеры и приглашения в кинопроекты — из сюжетов фильмов и не меняются при пересчёте; сохранение 270, где фильмы
-// уже были, видит те же премьеры (название, сюжет, режиссёр), новые — со следующего месяца.
+// премьеры — из полнометражных сюжетов фильмов, приглашения в кинопроекты — из сюжетов фильмов, и не меняются при
+// пересчёте; сохранение 270, где фильмы уже были, видит те же премьеры (название, сюжет, режиссёр), новые — со следующего
+// месяца; stories271 стоит в index.html после names270.js и до всех names271*.js.
 // Игра раздаётся с диска, сервер не нужен:  node tools/verify271_stories.js
-// Файлы сборки, ещё не подключённые в index.html, добавляются после загрузки страницы, до «Родиться».
-// BASE=1 — прогон без stories271: видно, какие проверки ловят старое поведение.
-const fs = require('fs'), path = require('path');
+// Страницы. «Сборка 271» — index.html; файлы, ещё не подключённые в index.html, добавляются после загрузки страницы,
+// до «Родиться», в настоящем порядке: stories271-data, stories271, names271-data, names271, names271-freq-data,
+// names271-freq (пока stories271 не подключён, теги names271* убираются из index.html и тоже добавляются после него).
+// «270» — index.html без тегов всех новых файлов 271 (в имени номер 271): так «до» — это и правда 270, даже когда всё
+// уже подключено. Премьеры G… сверяются ещё и с эталоном, снятым со сборки 270 (GOLDEN_G270 ниже).
+// BASE=1 — сборка 271 без stories271 (его теги убираются и из index.html): видно, какие проверки ловят старое поведение.
+// GOLDEN=1 — напечатать эталон премьер G… со страницы «270» (только если премьеры 270 изменены сознательно).
+const fs = require('fs'), path = require('path'), crypto = require('crypto'), { spawnSync } = require('child_process');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp' };
 const INDEX = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const BASE = process.env.BASE === '1';
+const BASE = process.env.BASE === '1', GOLDEN = process.env.GOLDEN === '1';
+const exists = f => fs.existsSync(path.join(ROOT, f));
 const MINE = ['stories271-data.js', 'stories271.js'];
-const NAMES = ['names271-data.js', 'names271.js'];
-const wired = f => new RegExp('<script[^>]+src="' + f.replace('.', '\\.') + '(\\?[^"]*)?"').test(INDEX);
+// names271* при загрузке меняют пулы имён и identitySurname / defaultParts256 — stories271 должен идти раньше всех.
+const NAMES = ['names271-data.js', 'names271.js', 'names271-freq-data.js', 'names271-freq.js'].filter(exists);
+const reEsc = f => f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const tagRe = (f, g = '') => new RegExp('<script[^>]+src="' + reEsc(f) + '(\\?[^"]*)?"[^>]*>\\s*</script>', g);
+const srcs = html => [...html.matchAll(/<script[^>]+src="([^"?]+)(\?[^"]*)?"/g)].map(m => m[1]);
+const wired = f => srcs(INDEX).includes(f);
+const strip = (html, files) => files.reduce((h, f) => h.replace(tagRe(f, 'g'), ''), html);
+// Новые файлы 271 — всё, в чьём имени есть номер 271 (старые файлы, поправленные в 271, остаются).
+const NEW271 = srcs(INDEX).filter(f => /(^|\D)271(\D|$)/.test(path.basename(f)));
+// Что раздаётся вместо index.html и что добавляется после загрузки.
+function pageSetup(variant) {
+  if (variant === '270') return { html: strip(INDEX, [...NEW271, ...MINE, ...NAMES]), add: [] };
+  // Неверный порядок для проверки защиты: names271-freq раньше stories271.
+  if (variant === 'freq-first') return { html: strip(INDEX, [...MINE, ...NAMES]), add: [...NAMES.filter(f => /freq/.test(f)), ...MINE, ...NAMES.filter(f => !/freq/.test(f))] };
+  if (BASE) return { html: strip(INDEX, MINE), add: NAMES.filter(f => !wired(f)) };
+  if (MINE.every(wired)) return { html: INDEX, add: NAMES.filter(f => !wired(f)) };
+  return { html: strip(INDEX, [...MINE, ...NAMES]), add: [...MINE, ...NAMES] };
+}
+// Порядок в index.html: stories271-data.js, stories271.js после names270.js, до всех names271*.js и до bootstrap61.js.
+// null — stories271 ещё не подключён.
+function orderProblems(html) {
+  const list = srcs(html), at = f => list.indexOf(f), out = [];
+  if (!MINE.every(f => list.includes(f))) return null;
+  if (at('stories271-data.js') > at('stories271.js')) out.push('stories271-data.js после stories271.js');
+  if (at('names270.js') < 0 || at('stories271-data.js') < at('names270.js')) out.push('stories271 не после names270.js');
+  for (const f of list.filter(f => /^names271.*\.js$/.test(f))) if (at(f) < at('stories271.js')) out.push(f + ' раньше stories271.js');
+  if (at('bootstrap61.js') >= 0 && at('stories271.js') > at('bootstrap61.js')) out.push('stories271.js после bootstrap61.js');
+  return out;
+}
 let pass = 0, fail = 0;
 const check = (ok, label, extra = '') => { ok ? pass++ : fail++; console.log((ok ? 'ok   ' : 'FAIL ') + label + (extra && !ok ? ' — ' + String(extra).slice(0, 400) : '')); };
 const note = text => console.log('     ' + text);
@@ -29,7 +63,23 @@ const DATA = (() => {
 })();
 const titlesOf = x => [...x.titles.serious, ...x.titles.ironic, ...x.titles.absurd];
 
-async function open(browser, ctx, extra = { before: [], after: [] }) {
+// Эталон премьер G… сборки 270: зёрна SEEDS, месяцы с 2028 по 2059 год, k = 0 и 1, строки
+// «id|название|режиссёр|страна|жанр|кратко|сюжет» через перевод строки → sha1. Снят GOLDEN=1 с дерева сборки 270
+// (git archive 97e440e) и совпал со страницей «270» рабочего дерева 271.
+const G270 = { seeds: [11, 4242, 777777], from: 2028 * 12, to: 2060 * 12 };
+const GOLDEN_G270 = { count: 2304, sha1: '633ba84849d804f6d5a3d59dbdda59882fea3ff9', first: [
+  'G24336-0|Третье королевство|Лив де Бур|Нидерланды|Фэнтези|Метеоролог по имени Вера наследует лавку, где продают не вещи, а обещания, и обнаруживает долг, оставленный предыдущей владелицей.|FILM-0274',
+  'G24336-1|Всё ещё здесь|Константин Волков|Россия|Драма|История сотрудница музея складывается из описаний потерянных вещей, которые разные люди находят в степном посёлке.|FILM-0488'] };
+const gList = pg => pg.evaluate(G => {
+  const x = films269(), keep = x.seed, out = [];
+  try {
+    for (const seed of G.seeds) { x.seed = seed; for (let ym = G.from; ym < G.to; ym++) for (const k of [0, 1]) { const f = filmById269('G' + ym + '-' + k); out.push(f ? [f.id, f.title, f.director, f.origin, f.genre, f.summary, f.story].join('|') : 'null:G' + ym + '-' + k); } }
+  } finally { x.seed = keep; }
+  return out;
+}, G270);
+const gDigest = list => ({ count: list.length, sha1: crypto.createHash('sha1').update(list.join('\n')).digest('hex'), first: list.slice(0, 2) });
+
+async function open(browser, ctx, variant = 'game') {
   ctx = ctx || await browser.newContext();
   if (!ctx.__routed) {
     ctx.__routed = true;
@@ -37,6 +87,7 @@ async function open(browser, ctx, extra = { before: [], after: [] }) {
       const u = new URL(r.request().url());
       if (u.hostname !== 'game.local') return r.abort();
       const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '') || 'index.html';
+      if (rel === 'index.html') return r.fulfill({ status: 200, body: pageSetup(u.searchParams.get('page') || 'game').html, headers: { 'content-type': 'text/html' } });
       const f = path.join(ROOT, rel);
       if (!f.startsWith(ROOT) || !fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
       r.fulfill({ status: 200, body: rel === 'offline-game.js' ? '' : fs.readFileSync(f), headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } });
@@ -45,13 +96,12 @@ async function open(browser, ctx, extra = { before: [], after: [] }) {
   const pg = await ctx.newPage();
   const errors = [];
   pg.on('pageerror', e => errors.push(String(e.message)));
-  await pg.goto('http://game.local/index.html');
+  await pg.goto('http://game.local/index.html?page=' + variant);
   // Со своими сохранениями в хранилище игра может открыться не на экране рождения — его откроет life().
   await pg.waitForFunction("typeof start==='function'&&typeof intro==='function'&&!!document.querySelector('#app,main,body')");
   await pg.waitForTimeout(300);
-  for (const f of extra.before || []) if (!wired(f)) await pg.addScriptTag({ path: path.join(ROOT, f) });
-  if (!BASE && !extra.base) for (const f of MINE) if (!wired(f)) await pg.addScriptTag({ path: path.join(ROOT, f) });
-  for (const f of extra.after || []) if (!wired(f)) await pg.addScriptTag({ path: path.join(ROOT, f) });
+  for (const f of pageSetup(variant).add) await pg.addScriptTag({ path: path.join(ROOT, f) });
+  const loaded = await pg.evaluate(() => ({ stories: typeof storyPool271 !== 'undefined' && typeof storyForm271 === 'function', names: typeof names271 !== 'undefined', freq: typeof freq271 !== 'undefined' }));
   await pg.evaluate(() => {
     window.Q = {
       form: () => document.querySelector('#modal .story-form189'),
@@ -68,7 +118,7 @@ async function open(browser, ctx, extra = { before: [], after: [] }) {
       clean: () => { if ($('#modal').open) closeModal(); s.pending = []; },
     };
   });
-  return { pg, errors, ctx };
+  return { pg, errors, ctx, loaded };
 }
 async function life(pg, cfg = {}) {
   await pg.evaluate(cfg => {
@@ -91,7 +141,15 @@ const premieres = (pg, from, to) => pg.evaluate(([from, to]) => {
 
 (async () => {
   const browser = await chromium.launch();
+  if (GOLDEN) {
+    const A = await open(browser, null, '270');
+    await life(A.pg);
+    console.log('const GOLDEN_G270 = ' + JSON.stringify(gDigest(await gList(A.pg))) + ';', A.loaded, A.errors.slice(0, 2));
+    await browser.close();
+    return;
+  }
   const books = DATA.stories.filter(x => x.type === 'book' && !x.retired), films = DATA.stories.filter(x => x.type === 'film' && !x.retired);
+  const fullFilms = films.filter(x => x.format === 'full');
 
   // ---------- 0. Данные пула ----------
   {
@@ -105,6 +163,17 @@ const premieres = (pg, from, to) => pg.evaluate(([from, to]) => {
     check(new Set(DATA.stories.map(x => x.id)).size === DATA.stories.length && books.length > 0 && films.length > 0, `пул: номера не повторяются; книг ${books.length}, фильмов ${films.length}`);
     const glued = all.flatMap(titlesOf).filter(t => /\s[—–-]\s/.test(t));
     check(glued.length === 0, 'пул: нет названий, склеенных через тире', glued.slice(0, 3).join('; '));
+    // Исходники данных — в репозитории (docs/stories271), и stories271-data.js собран из них: пересборка ничего не меняет.
+    const SRC = path.join(ROOT, 'docs', 'stories271'), script = fs.readFileSync(path.join(ROOT, 'tools', 'stories271_build.py'), 'utf8');
+    const srcFiles = fs.existsSync(SRC) ? fs.readdirSync(SRC) : [];
+    const env = { ...process.env }; delete env.STORIES271_DIR; delete env.STORIES271_OUT;
+    const run = spawnSync('python3', [path.join(ROOT, 'tools', 'stories271_build.py'), '--check'], { cwd: '/', env, encoding: 'utf8' });
+    const m = /номера сохранены: (\d+), новые: (\d+), снятые: (\d+), ошибок: (\d+)/.exec(run.stdout || '');
+    const retired = DATA.stories.filter(x => x.retired).length;
+    check(srcFiles.includes('themes.json') && srcFiles.some(f => /^book-\d+\.json$/.test(f)) && srcFiles.some(f => /^film-\d+\.json$/.test(f)) && !/['"]\/tmp\//.test(script),
+      'исходники: themes.json, book-*.json, film-*.json лежат в docs/stories271, скрипт сборки читает их по умолчанию', srcFiles.join(', ') || 'нет docs/stories271');
+    check(run.status === 0 && m && +m[1] === DATA.stories.length - retired && +m[2] === 0 && +m[3] === retired && +m[4] === 0,
+      `исходники: stories271-data.js собран из docs/stories271 — номера на месте, новых нет (${m ? m.slice(1).join('/') : '—'})`, (run.stdout || '').slice(-200) + (run.stderr || '').slice(-200));
   }
 
   // ---------- 1. Редактор проектов ----------
@@ -230,9 +299,11 @@ const premieres = (pg, from, to) => pg.evaluate(([from, to]) => {
       for (let ym = 2028 * 12; ym < 2111 * 12; ym++) for (const f of futureMonth269(ym)) out.again.push(f.id + '|' + f.title + '|' + f.director);
       return out;
     }, list);
-    const L = films.length, first = list.slice(0, L), titles = list.map(x => x[1]);
+    const L = fullFilms.length, first = list.slice(0, L), titles = list.map(x => x[1]);
     check(list.length > 1500 && list.every(x => /^H\d+-\d-F271-\d{4}-\d{1,2}$/.test(x[0])), `премьеры: с 2028 года идут из сюжетов фильмов, id с сюжетом и названием (${list.length} премьер до 2111)`, list.slice(0, 2).map(x => x[0]).join(', '));
     check(list.every(x => { const st = DATA.byId.get(x[4]); return st && st.type === 'film' && titlesOf(st).includes(x[1]) && st.synopsis.startsWith(x[3]); }), 'премьеры: название и краткое содержание — из сюжета фильма', list[0] && list[0].slice(1, 4).join(' · '));
+    const shorts = list.filter(x => DATA.byId.get(x[4])?.format !== 'full');
+    check(shorts.length === 0, `премьеры: в прокат выходят только полнометражные сюжеты, как в 269 (${fullFilms.length} сюжетов)`, `${shorts.length} коротких: ` + shorts.slice(0, 2).map(x => x[0] + ' «' + x[1] + '»').join(', '));
     check(new Set(first.map(x => x[4])).size === Math.min(L, first.length), `премьеры: сюжеты не повторяются, пока не кончатся (${L} сюжетов)`);
     check(new Set(titles).size === titles.length, `премьеры: ни одно название не повторяется за всю жизнь (${titles.length})`, titles.length - new Set(titles).size);
     check(r.byId === list.length, 'премьеры: по id находится тот же фильм — название, режиссёр, сюжет', `${r.byId}/${list.length}`);
@@ -244,7 +315,9 @@ const premieres = (pg, from, to) => pg.evaluate(([from, to]) => {
     check(tones.serious > tones.ironic && tones.ironic > tones.absurd && tones.absurd > 0 && comedy.ironic > comedy.serious, 'премьеры: чаще всерьёз, комедии чаще с иронией, абсурд — изредка', JSON.stringify({ tones, comedy }));
 
     // Приглашение в кинопроект: сюжет фильма нужного формата, не из премьер ближайших пяти лет.
-    const inv = await pg.evaluate(() => {
+    // Окно — до пяти лет, но не больше 4/5 полнометражных сюжетов (две премьеры в месяц): иначе свободных не останется.
+    const PW = Math.max(12, Math.min(60, Math.floor(fullFilms.length / 5)));
+    const inv = await pg.evaluate(W => {
       s.year = 2047; s.clock.month = 3; Q.clean();
       const x = creative47(), spec = Object.keys(specialties184.cinema)[0], r0 = Math.random, out = [];
       for (let i = 0; i < 6; i++) {
@@ -255,12 +328,12 @@ const premieres = (pg, from, to) => pg.evaluate(([from, to]) => {
         out.push(a?.offer.project269 ? { ...a.offer.project269, level: a.offer.level184 } : null);
       }
       const now = filmNow269(), near = [];
-      for (let ym = now - 60; ym <= now + 60; ym++) for (const f of futureMonth269(ym)) near.push(f.story);
+      for (let ym = now - W; ym <= now + W; ym++) for (const f of futureMonth269(ym)) near.push(f.story);
       return { out, near, log: s.log.find(e => e.title === 'Приглашение в новый проект')?.text || '' };
-    });
+    }, PW);
     const got = inv.out.filter(Boolean);
     const badInv = got.filter(p => { const st = DATA.byId.get(p.id); return !st || st.type !== 'film' || !titlesOf(st).includes(p.title) || st.synopsis !== p.synopsis || inv.near.includes(p.id) || st.format !== (p.level <= 2 ? 'short' : 'full'); });
-    check(got.length >= 4 && badInv.length === 0 && new Set(got.map(p => p.id)).size === got.length, `приглашения: сюжет фильма своего формата, не из премьер ±5 лет, без повторов (${got.length})`, JSON.stringify(badInv[0] || inv.out).slice(0, 300));
+    check(got.length >= 4 && badInv.length === 0 && new Set(got.map(p => p.id)).size === got.length, `приглашения: сюжет фильма своего формата, не из премьер ±${PW} мес., без повторов (${got.length})`, JSON.stringify(badInv[0] || inv.out).slice(0, 300));
     check(got.length && inv.log.includes(got.at(-1).title), 'приглашения: в записи — название проекта и сюжет', inv.log.slice(0, 200));
     check(errors.length === 0, 'премьеры: без ошибок страницы', errors.slice(0, 2).join(' | '));
     await ctx.close();
@@ -278,9 +351,10 @@ const premieres = (pg, from, to) => pg.evaluate(([from, to]) => {
 
   // ---------- 3. Сохранение 270 с уже виденными премьерами ----------
   {
-    // Страница без файлов 271: жизнь в 2040 году, фильмы смотрели, любимый — вымышленная премьера.
+    // Страница «270» (index.html без файлов 271): жизнь в 2040 году, фильмы смотрели, любимый — вымышленная премьера.
     const ctx = await browser.newContext();
-    const A = await open(browser, ctx, { base: true });
+    const A = await open(browser, ctx, '270');
+    check(!A.loaded.stories && !A.loaded.names && !A.loaded.freq, 'страница «270»: без stories271, names271 и names271-freq' + (NEW271.length ? ` (убраны из index.html: ${NEW271.join(', ')})` : ''), JSON.stringify(A.loaded));
     await life(A.pg);
     const before = await A.pg.evaluate(() => {
       s.films269 = { seen: {}, recent: [], fav: null, favScore: -1, seed: 424242 }; s.year = 2040; s.clock.month = 4;
@@ -295,11 +369,13 @@ const premieres = (pg, from, to) => pg.evaluate(([from, to]) => {
       localStorage.setItem(LIFE_PREFIX + 'v271-early', JSON.stringify(kid));
       return { gen, shown, avail, stats: filmStats269(), fav: s.films269.fav, now, month: futureMonth269(now).map(f => f.id), oldProject };
     });
+    const gA = await gList(A.pg), dA = gDigest(gA);
+    check(dA.count === GOLDEN_G270.count && dA.sha1 === GOLDEN_G270.sha1, `страница «270»: премьеры G… (${dA.count}, три зерна) — как в эталоне сборки 270`, JSON.stringify([dA.first, GOLDEN_G270.first]));
     await A.pg.close();
-    // Та же игра с файлами 271: сохранение загружается, всё виденное — то же самое.
-    const extra = fs.existsSync(path.join(ROOT, 'names271.js')) && !wired('names271.js') ? { after: NAMES } : {};
-    const strictDirector = !wired('names271.js') || MINE.every(wired);
-    const B = await open(browser, ctx, extra);
+    // Та же игра — сборка 271 со всеми names271*: сохранение загружается, всё виденное — то же самое.
+    const B = await open(browser, ctx);
+    note(`сборка 271: ${BASE ? 'без stories271 (BASE=1)' : MINE.every(wired) ? 'stories271 в index.html' : 'stories271 добавлен после загрузки'}` + `; names271: ${B.loaded.names ? 'есть' : 'нет'}, names271-freq: ${B.loaded.freq ? 'есть' : 'нет'}`);
+    check(await B.pg.evaluate(() => typeof storyNames271 !== 'undefined' && !!storyNames271 && typeof storyNamesLate271 !== 'undefined' && storyNamesLate271.length === 0), 'сборка 271: снимок имён 270 снят до names271 и names271-freq — у старых премьер прежние режиссёры');
     await life(B.pg);
     const after = await B.pg.evaluate(before => {
       loadCharacter('v271-films'); Q.clean();
@@ -323,8 +399,9 @@ const premieres = (pg, from, to) => pg.evaluate(([from, to]) => {
     const sameDir = before.gen.filter((f, i) => after.gen[i]?.director === f.director);
     check(before.gen.length > 50 && same.length === before.gen.length, `старое сохранение: вымышленные премьеры G… — те же название, сюжет и жанр (${same.length}/${before.gen.length})`,
       JSON.stringify([before.gen.find((f, i) => !same.includes(f)), after.gen[before.gen.findIndex(f => !same.includes(f))]]));
-    if (strictDirector) check(sameDir.length === before.gen.length, 'старое сохранение: у премьер G… тот же режиссёр' + (extra.after ? ' (и с names271, подключённым после stories271)' : ''), `${sameDir.length}/${before.gen.length}: ` + JSON.stringify([before.gen.find((f, i) => after.gen[i]?.director !== f.director)?.director, after.gen[before.gen.findIndex((f, i) => after.gen[i]?.director !== f.director)]?.director]));
-    else note(`режиссёры G… не сверяются: names271 уже в index.html, а stories271 ещё нет — в настоящем порядке stories271 должен идти раньше names271 (совпало ${sameDir.length}/${before.gen.length})`);
+    check(sameDir.length === before.gen.length, 'старое сохранение: у премьер G… тот же режиссёр' + (B.loaded.names || B.loaded.freq ? ' (names271' + (B.loaded.freq ? ' и names271-freq' : '') + ' загружены после stories271)' : ''), `${sameDir.length}/${before.gen.length}: ` + JSON.stringify([before.gen.find((f, i) => after.gen[i]?.director !== f.director)?.director, after.gen[before.gen.findIndex((f, i) => after.gen[i]?.director !== f.director)]?.director]));
+    const gB = await gList(B.pg), dB = gDigest(gB), gDiff = gA.map((x, i) => [x, gB[i]]).filter(([a, b]) => a !== b);
+    check(dB.count === GOLDEN_G270.count && dB.sha1 === GOLDEN_G270.sha1, `сборка 271: премьеры G… для трёх зёрен — те же название, режиссёр, страна и сюжет, что в эталоне 270 (отличий от «270»: ${gDiff.length}/${gA.length})`, JSON.stringify(gDiff.slice(0, 2)));
     check(after.shown.join() === before.shown.join() && after.avail.join() === before.avail.join(), 'старое сохранение: в прокате и в репертуаре этого месяца — те же фильмы', `${after.shown.join()} / ${before.shown.join()}`);
     check(after.stats === before.stats && after.task === before.gen.at(-1).title, 'старое сохранение: любимый фильм, счёт просмотров и запланированный фильм — те же', `${after.stats} / ${before.stats}`);
     check(after.month.join() === before.month.join() && after.pastStill.join() === before.month.join(), 'старое сохранение: месяц загрузки остаётся прежним и после перехода месяца', after.month.join());
@@ -334,6 +411,29 @@ const premieres = (pg, from, to) => pg.evaluate(([from, to]) => {
     check(after.earlyFrom === 2028 * 12 && after.early.every(id => /^H/.test(id)) && after.early.length > 0, 'сохранение до 2028 года: все вымышленные премьеры — новые', `${after.earlyFrom} ${after.early.join()}`);
     check(B.errors.length === 0 && A.errors.length === 0, 'старое сохранение: без ошибок страницы', [...A.errors, ...B.errors].slice(0, 2).join(' | '));
     await ctx.close();
+  }
+
+  // ---------- 4. Порядок файлов ----------
+  {
+    // Проверка порядка сама: на правильном и неправильных порядках.
+    const tag = f => `<script src="${f}?v=271"></script>`, html = list => list.map(tag).join('');
+    const good = html(['names270.js', ...MINE, 'names271-data.js', 'names271.js', 'names271-freq-data.js', 'names271-freq.js', 'bootstrap61.js']);
+    const bads = [['names270.js', 'names271-data.js', 'names271.js', 'names271-freq-data.js', 'names271-freq.js', ...MINE, 'bootstrap61.js'],
+      ['names270.js', 'names271-freq-data.js', 'names271-freq.js', ...MINE, 'names271-data.js', 'names271.js', 'bootstrap61.js'],
+      [...MINE, 'names270.js', 'names271.js', 'bootstrap61.js'], ['names270.js', 'stories271.js', 'stories271-data.js', 'bootstrap61.js']];
+    check(orderProblems(good).length === 0 && bads.every(b => orderProblems(html(b)).length > 0), 'порядок: проверка различает верный порядок и неверные (names271*, names271-freq* раньше stories271)',
+      JSON.stringify([orderProblems(good), ...bads.map(b => orderProblems(html(b)))]));
+    const real = orderProblems(INDEX);
+    if (real === null) note('порядок в index.html не проверен: stories271 ещё не подключён. Нужен: names270.js → ' + [...MINE, ...NAMES].join(' → ') + ' → … → bootstrap61.js');
+    else check(real.length === 0, 'порядок в index.html: stories271-data.js, stories271.js — после names270.js, до всех names271*.js и до bootstrap61.js', real.join('; '));
+    // Если names271-freq всё же загрузился раньше, снимок не снимается (иначе в нём были бы уже подменённые пулы).
+    if (NAMES.some(f => /freq/.test(f))) {
+      const { pg, errors, ctx } = await open(browser, null, 'freq-first');
+      const r = await pg.evaluate(() => typeof storyNames271 === 'undefined' ? null : { snap: !!storyNames271, late: typeof storyNamesLate271 === 'undefined' ? [] : storyNamesLate271 });
+      check(r && !r.snap && r.late.includes('names271-freq.js'), 'неверный порядок (names271-freq раньше stories271) замечен: снимка имён нет, storyNamesLate271 называет файл', JSON.stringify(r));
+      check(errors.length === 0, 'неверный порядок: без ошибок страницы', errors.slice(0, 2).join(' | '));
+      await ctx.close();
+    }
   }
   await browser.close();
   console.log(`\n${pass}/${pass + fail}` + (BASE ? ' (BASE=1: без stories271)' : ''));

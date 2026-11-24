@@ -3,7 +3,8 @@
 
    python3 tools/stories271_build.py [папка-с-данными] [--check] [--drop-retired]
 
-Папка по умолчанию — scratchpad/stories271 этой сессии (можно передать свою или STORIES271_DIR). Читает:
+Папка по умолчанию — docs/stories271 (можно передать свою или STORIES271_DIR). Это исходники данных, как
+docs/films.csv для films269-data.js: текст сюжета или названия правится там, потом скрипт запускается заново. Читает:
   themes.json         — список ключевых слов (тем), из которых берутся keywords;
   book-*.json         — сюжеты книг, film-*.json — сюжеты фильмов. Каждый файл — список
                         {genre, format: short|full, synopsis, keywords[3–5], titles: {serious[5], ironic[5], absurd[5]}}.
@@ -36,7 +37,7 @@ STORIES271_OUT — писать не в stories271-data.js, а в другой �
 import glob, hashlib, json, os, re, sys, collections
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_DIR = '/tmp/claude-0/-home-user-life-side-effects/673b65e8-1bde-512a-aa02-ceb3dd19767c/scratchpad/stories271'
+DEFAULT_DIR = os.path.join(ROOT, 'docs', 'stories271')  # 271: исходники лежат в репозитории, не во временной папке
 OUT = os.environ.get('STORIES271_OUT') or os.path.join(ROOT, 'stories271-data.js')  # STORIES271_OUT — для проверок
 TONES = ['serious', 'ironic', 'absurd']
 PREFIX = {'book': 'B271-', 'film': 'F271-'}
@@ -262,7 +263,7 @@ def build(src_dir, write=True, drop_retired=False):
     if not write:
         return 0
     lines = ["'use strict';",
-             '// Сборка 271: сюжеты книг и фильмов. Собирает tools/stories271_build.py из черновых JSON — руками не править.',
+             '// Сборка 271: сюжеты книг и фильмов. Собирает tools/stories271_build.py из docs/stories271/*.json — руками не править.',
              '// [id, book|film, жанр, short|full, краткое содержание, [ключевые слова], [5 серьёзных], [5 с иронией], [5 абсурдных], 1 = снят].',
              '// Номера не переиспользуются: на них ссылаются сохранения. Снятый сюжет нужен только старым сохранениям.',
              'const storyThemes271=' + json.dumps(themes, ensure_ascii=False, separators=(',', ':')) + ';',

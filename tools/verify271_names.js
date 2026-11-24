@@ -605,7 +605,10 @@ async function life(pg, cfg) {
       T.clean();
       if (typeof flushSave264 === 'function') flushSave264();
       s.oldCouples = couples;
-      return JSON.stringify(s);
+      // как в настоящем сохранении 270 (если names271 уже подключён в index.html, страница A — тоже 271)
+      const o = JSON.parse(JSON.stringify(s)); delete o.names271v;
+      for (const p of o.people) delete p.marriageDecided271;
+      return JSON.stringify(o);
     });
     const baseErrors = A.errors.slice();
     await A.ctx.close();

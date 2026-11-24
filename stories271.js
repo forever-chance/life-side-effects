@@ -4,7 +4,8 @@
 //    по жанру и формату, как раньше. У каждого сюжета 15 названий в трёх тонах: игрок выбирает тон
 //    (Серьёзно / С иронией / Абсурд) и видит его пять названий. «Похожие сюжеты» — до трёх сюжетов того же вида
 //    и жанра, у которых с текущим не меньше двух общих тем.
-// 2. Вымышленные премьеры кино (с 2028 года, films269.js) и приглашения в кинопроекты идут из сюжетов фильмов.
+// 2. Вымышленные премьеры кино (с 2028 года, films269.js) идут из полнометражных сюжетов фильмов, как и в 269;
+//    приглашения в кинопроекты — из сюжетов фильмов нужного формата.
 //    id новой премьеры — «H<месяц>-<номер>-<сюжет>-<название>»: название и сюжет записаны в самом id, поэтому
 //    просмотренный, любимый или клубный фильм находится всегда, даже если пул сюжетов потом вырастет.
 // 3. Старые сохранения. Премьеры G<месяц>-<номер> (269–270) собирает прежний генератор из catalog-data189.js — с теми же
@@ -12,6 +13,8 @@
 //    со следующего месяца после первого открытия в 271: всё, что игрок уже видел в прокате и записал, остаётся как было.
 //    Старый пул storyEntries189 остаётся загруженным: проекты и приглашения со старыми сюжетами хранят название
 //    и сюжет у себя, а storyLookup271 находит и старые номера (FILM-0001, BOOK-0001).
+// Порядок в index.html: stories271-data.js, stories271.js — после names270.js и до всех names271*.js (names271-data,
+// names271, names271-freq-data, names271-freq); почему — в разделе 2. tools/verify271_stories.js проверяет это.
 
 const storyTones271=[['serious','Серьёзно'],['ironic','С иронией'],['absurd','Абсурд']];
 const stories271=(typeof storyPool271!=='undefined'?storyPool271:[]).map(r=>({id:r[0],type:r[1],genre:r[2],format:r[3],synopsis:r[4],
@@ -192,10 +195,13 @@ if(typeof storyForm189==='function'&&typeof bookGenre189!=='undefined'){
 }
 
 // ---------- 2. Будущие премьеры и приглашения в кинопроекты ----------
-// Режиссёры премьер 269–270 собирались из пулов имён страны. Если names271 загружается после этого файла и меняет
-// пулы, старые премьеры собираются на снимке прежних пулов — у уже виденного фильма остаётся тот же режиссёр.
+// Режиссёры премьер 269–270 собирались из пулов имён страны. names271.js и names271-freq.js при загрузке меняют
+// пулы и подменяют identitySurname / defaultParts256, поэтому этот файл стоит после names270.js и до всех names271*.js:
+// старые премьеры собираются на снимке прежних пулов — у уже виденного фильма остаётся тот же режиссёр.
+// Если любой из них загрузился раньше, снимок был бы уже не 270-м: снимка нет, storyNamesLate271 называет файл.
+const storyNamesLate271=[typeof names271!=='undefined'&&'names271.js',typeof freq271!=='undefined'&&'names271-freq.js'].filter(Boolean);
 const storyNames271=(()=>{
- if(typeof names271!=='undefined'||typeof countries!=='object')return null;
+ if(storyNamesLate271.length||typeof countries!=='object')return null;
  const fns={identitySurname:typeof identitySurname==='function'?identitySurname:null,defaultParts256:typeof defaultParts256==='function'?defaultParts256:null,
   surnamePool256:typeof surnamePool256==='function'?surnamePool256:null,genderSurname256:typeof genderSurname256==='function'?genderSurname256:null,
   fullName256:typeof fullName256==='function'?fullName256:null};
@@ -225,6 +231,9 @@ function withOldNames271(fn){
  }
 }
 const filmPool271=stories271.filter(x=>x.type==='film'&&!x.retired).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
+// В прокат выходят только полнометражные сюжеты (как в 269: filmStories269 — только 'full'); короткий метр — для
+// приглашений в кинопроекты по уровню.
+const premierePool271=filmPool271.filter(x=>x.format==='full');
 // Тон названия премьеры: комедии чаще с иронией, экспериментальное кино чаще абсурдное, остальное — всерьёз.
 const premiereTones271={Комедия:{ironic:.5,absurd:.25,serious:.25},Экспериментальный:{serious:.4,absurd:.35,ironic:.25}};
 const premiereTonesDefault271={serious:.6,ironic:.3,absurd:.1};
@@ -259,9 +268,9 @@ function premiereTitle271(story,cycle,seed){
 }
 let premierePlan271=null;
 function premiereOrder271(seed){
- if(premierePlan271?.seed===seed&&premierePlan271.size===filmPool271.length)return premierePlan271.order;
- const order=withSeed269((seed^0x27102710)>>>0,()=>{const a=filmPool271.map((_,i)=>i);for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;});
- premierePlan271={seed,size:filmPool271.length,order};
+ if(premierePlan271?.seed===seed&&premierePlan271.size===premierePool271.length)return premierePlan271.order;
+ const order=withSeed269((seed^0x27102710)>>>0,()=>{const a=premierePool271.map((_,i)=>i);for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;});
+ premierePlan271={seed,size:premierePool271.length,order};
  return order;
 }
 const premiereById271=new Map();
@@ -280,9 +289,9 @@ function premiereFilm271(ym,k,story,ti){
  return f;
 }
 function premiere271(ym,k){
- const seed=films269().seed,L=filmPool271.length;
+ const seed=films269().seed,L=premierePool271.length;
  if(!L)return null;
- const n=futureSlot269(ym,k),story=filmPool271[premiereOrder271(seed)[n%L]];
+ const n=futureSlot269(ym,k),story=premierePool271[premiereOrder271(seed)[n%L]];
  return premiereFilm271(ym,k,story,premiereTitle271(story,Math.floor(n/L),seed));
 }
 // С какого месяца премьеры идут из новых сюжетов. Новая жизнь — с 2028 года. Сохранение 269–270, где фильмы уже были
@@ -302,7 +311,7 @@ if(typeof futureFilm269==='function'){
 if(typeof futureMonth269==='function'){
  const futureMonthBase271=futureMonth269;
  futureMonth269=function(ym){
-  if(ym<FUTURE_FROM269||!filmPool271.length||ym<films269().from271)return futureMonthBase271(ym);
+  if(ym<FUTURE_FROM269||!premierePool271.length||ym<films269().from271)return futureMonthBase271(ym);
   const need=Math.max(0,2-(filmsByMonth269.get(ym)?.length||0));
   return Array.from({length:need},(_,k)=>premiere271(ym,k)).filter(Boolean);
  };
@@ -317,7 +326,9 @@ if(typeof filmById269==='function'){
  };
 }
 // Приглашение в кинопроект: сюжет нужного формата, которого не было в приглашениях и нет среди премьер
-// пяти лет до и после сегодняшнего месяца.
+// projectWindow271() месяцев до и после сегодняшнего: до пяти лет, но так, чтобы в окне было не больше 4/5
+// полнометражных сюжетов (при 180 сюжетах и двух премьерах в месяц — три года), иначе свободных не осталось бы.
+function projectWindow271(){return Math.max(12,Math.min(60,Math.floor(premierePool271.length/5)));}
 if(typeof projectStory269==='function'){
  const projectStoryBase271=projectStory269;
  projectStory269=function(format){
@@ -325,7 +336,8 @@ if(typeof projectStory269==='function'){
   if(!rows.length)return projectStoryBase271(format);
   const x=films269();x.projects??=[];
   const now=filmNow269(),near=new Set();
-  for(let ym=Math.max(FUTURE_FROM269,x.from271,now-60);ym<=now+60;ym++)for(const f of futureMonth269(ym))if(f.story)near.add(f.story);
+  const w=projectWindow271();
+  for(let ym=Math.max(FUTURE_FROM269,x.from271,now-w);ym<=now+w;ym++)for(const f of futureMonth269(ym))if(f.story)near.add(f.story);
   const recent=new Set(x.projects.slice(-60));
   let pool=rows.filter(r=>!x.projects.includes(r.id)&&!near.has(r.id));
   if(!pool.length)pool=rows.filter(r=>!x.projects.includes(r.id));

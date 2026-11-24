@@ -1,27 +1,32 @@
 'use strict';
 // Сборка 271: работодатели, вузы и названия своего дела.
 //
-// СОСТОЯНИЕ: код закончен и проверен (tools/verify271_employers.js) и на заготовке данных, и на org-roots.json.
-// Данные — только в org271-data.js. Когда scratchpad/names271/org-roots.json обновится (или придёт заново),
-// достаточно запустить  python3 tools/org271_build.py  и  node tools/verify271_employers.js  — этот файл не меняется.
+// СОСТОЯНИЕ: код закончен, прошёл ревью сборки 271 (замечания исправлены) и проверен tools/verify271_employers.js
+// и на заготовке данных, и на org-roots.json. Данные — только в org271-data.js. Когда
+// scratchpad/names271/org-roots.json обновится (или придёт заново), достаточно запустить  python3 tools/org271_build.py
+// и  node tools/verify271_employers.js  — этот файл не меняется. Открытый вопрос к ведущему — потолок
+// orgCityMax271 (см. «Набор работодателей города»): это одна константа, тест берёт её из ORG271_CAP.
 //
-// 1. Работодатели. У города свой постоянный набор из 15 организаций (orgCityMax271): по одной на каждую из 12 сфер
-//    и ещё 3 там, где профессиям сферы без них хуже всего (обычно сервис — салон, клининг — и торговая сеть).
-//    Название — «<тип> «<корень>»»: тип из сферы профессии, корень страны, который подходит к типу по тегам. Набор
-//    зависит только от страны и города, поэтому одна и та же клиника в Казани остаётся той же клиникой. Внутри сферы
-//    вакансия идёт к той организации, чей тип ближе профессии (парикмахер — в салон, актёр — в театр, если он есть
-//    в городе): врач больше не работает в «Магазинах «Под Липой»». Известный остаток при 15: администратору отеля
-//    гостиницы в наборе не хватает (16-е место), он попадает в другую организацию сервиса.
-//    Обёртки: makeVacancies16 и replaceVacancy23 — только новые вакансии (по id, которых не было до вызова);
-//    company18 — только когда компания создаётся впервые и у работы нет записанного работодателя; locality95 —
-//    три старых «сектора» (engineering/design/retail) теперь тоже из набора города. Уже записанные вакансии,
-//    отклики, работа и компания в сохранении не переименовываются.
+// 1. Работодатели. У города постоянный набор не больше чем из 15 организаций (orgCityMax271): по одной на каждую из
+//    12 сфер и 3 сверх того. Название — «<тип> «<корень>»»: тип из сферы профессии, корень страны, который подходит к
+//    типу по тегам. Набор зависит только от страны и города, поэтому одна и та же клиника в Казани остаётся той же
+//    клиникой. Места делятся так, чтобы профессиям города в сумме было как можно больше «у себя» (orgProfFit271:
+//    своё место, где такая работа тоже бывает, название профессии само называет место). Внутри сферы вакансия идёт
+//    в ту организацию, где профессии лучше: врач не работает в «Магазинах «Под Липой»», актёр театра — в театре.
+//    Но 15 мест на 30 с лишним видов мест не хватает: при 15 часть профессий работает рядом (повар и бариста — в
+//    гостинице, пекарь — в супермаркете, фотограф — в творческой студии) или не у себя (библиотекарь — в
+//    издательстве, музейный куратор — на киностудии). Таблица по всем городам — tools/verify271_employers.js, раздел 9.
+//    Обёртки: makeVacancies16 — новые id получают работодателя 271, вакансия, собранная заново с прежним id (после
+//    загрузки страницы рынок строится снова), — прежнего работодателя; replaceVacancy23 — новая вакансия получает
+//    работодателя своей профессии; company18 — только когда компания создаётся впервые и у работы нет записанного
+//    работодателя; locality95 — три старых «сектора» (engineering/design/retail) теперь тоже из набора города.
+//    Уже записанные вакансии, отклики, работа и компания в сохранении не переименовываются.
 //    Окно вакансии показывает работодателя в разделе «Условия».
 // 2. Вузы. Названия латиницей, тайским и арабским письмом (у 11 поздних стран — «Institute of Urban Studies» без
 //    связи с профилем) заменены русскими по профилю вуза: медицинский профиль называется медицинским, поэтому
 //    вакансия врача ведёт в медицинский вуз. Прежнее имя — в u.previousName271. Дипломы в сохранениях хранят
 //    название строкой и не меняются; восстановление специализации старых дипломов (ensureSpecialties46) сверяет их
-//    с прежними названиями.
+//    с прежними названиями, а на экране (учёба, архив учёбы, биография) показывается нынешнее название вуза.
 // 3. Своё дело. В окне открытия под полем «Название» — три названия из корней, подходящих виду дела
 //    (specialtyTags[специальность], иначе kindTags[вид]; корни с any — в конце), кнопка «Другие варианты» и
 //    своё название в том же поле. Работает и для профессиональной школы (schoolOpening196).
@@ -53,8 +58,7 @@ function rootFits271(r,tags){if(r.fit.has('any'))return true;for(const t of tags
 function orgCountry271(country){return orgData271()?.countries[country]||null;}
 
 // ---------- Профессия → какие организации ей подходят ----------
-// Теги — к fit типа; слово — к названию типа (актёр — «Театр», пекарь — «Пекарня»). Слово весит больше тегов:
-// внутри сферы теги типов часто одинаковые (в искусстве у всех creative-media).
+// Теги профессии — к fit типа (для профессий без своих слов: любая организация сферы с общим тегом ей подходит).
 const orgFieldPrefs271={computing:['tech'],engineering:['build-industry','tech'],medicine:['health-care'],care:['health-care'],
  business:['finance-law'],law:['finance-law'],education:['kids-education'],science:['tech'],arts:['creative-media'],
  media:['creative-media'],trade:['craft-repair','build-industry'],service:[]};
@@ -73,93 +77,150 @@ const orgProfPrefs271={
  dogwalker38:['pets','services-home'],groomer38:['pets','beauty'],hair:['beauty'],hotel:['travel-hotel'],
  retail:['trade-shop','food'],shiftManager:['trade-shop','food'],warehouse:['trade-shop','services-home']
 };
-const orgProfWords271={
- gameqa:'Игров',gameplay:'Игров',accountant:'Бухгалтер',recruiter:'Кадров',hrassistant:'Кадров',store:'Торгов|Магазин',logistics:'Логист',
- marketer:'Маркетинг|Реклам',performance:'Реклам|Маркетинг',analyst:'Аналит|Консалт',
- doctor:'Клиник|Больниц|Медицин|Лечеб',surgeon:'Хирург|Больниц|Клиник',nurse:'Больниц|Клиник|Ухода|Патронаж',
- pharmacyassistant:'Аптек',socialworker:'Социальн|Помощи|Ухода',careworker:'Ухода|Помощи|Пансионат|Реабилит',
- lab:'Лаборатор|Диагност',researcher:'Исследоват|Научн|Институт',researchassistant:'Исследоват|Научн|Лаборатор',
- teacher:'Школ|Лицей',kindergarten:'сад',lecturer:'Колледж|Институт|Академ',tutor:'Репетитор|Учебн|Языков',museumeducator:'Музей',
- lawyer:'Адвокат|Коллеги|Юридическ',paralegal:'Юридическ|Нотариал|Правов',
- engineer:'Конструктор|Инженер|Проект',energy:'Энергет',
- mechanic16:'Автосервис',tailor:'Ателье',technician:'Завод|Фабрик|Цех',operator:'Завод|Фабрик|Цех',welder:'Завод|Цех|Верф',
- stageactor:'Театр',stagehand:'Театр',setdesigner:'Театр',lightingtech:'Театр|Кино',dancer:'Театр|Танц|самбы|фламенко',musician:'Звукозап|Театр',
- sound16:'Звукозап|Кино',filmdirector:'Кино|Аниме|Анимац',screenwriter:'Кино|Аниме|Анимац',cinematographer:'Кино',camera:'Кино',
- cameraOperator:'Кино',cameraoperator:'Кино',editor:'Кино|Анимац|Медиа',photographer:'Фото',studioassistant:'Фото',
- curator:'Галере|Музей',galleryassistant:'Галере',restorer:'Галере|Музей|Мастерск',animator:'Анимац|Аниме|Игров',designer:'Дизайн',ux:'Дизайн|Веб',
- illustrator:'Дизайн|Творческ|Издательств',bookdesigner:'Издательств|Дизайн',
- librarian:'Библиотек',bookshop:'Книжн',journalist:'Редакц|Информацион|Радио',radioeditor:'Радио',podcasteditor:'Подкаст|Медиа',
- bookeditor:'Издательств',proofreader:'Издательств|Редакц',publishingassistant:'Издательств',rightsmanager:'Издательств',
- literaryagent:'Издательств',literarytranslator:'Издательств',staffwriter:'Издательств|Редакц',archivist:'Библиотек|Редакц',archiveassistant:'Библиотек',
- baker:'Пекарн|Булочн|Кондитер',barista:'Кафе|Кофейн|Чайн',cook16:'Ресторан|Кафе|Бистро|Траттори|Такери|Идзакая|Пивн|Кафана|Паб|Дайнер|Кебаб|Шурраскари|Тапас',
- hotel:'Гостиниц|Отел|Гестхаус|Гостев|Рёкан|Риад|лодж',hair:'Салон|Красот',groomer38:'Салон',cleaner:'Клининг',courier:'Курьер',
- retail:'Супермаркет|Магазин',shiftManager:'Супермаркет|Магазин',warehouse:'Супермаркет|Курьер|Склад'
+// [своё место, где тоже бывает, название профессии само называет место] — слова из названий типов.
+// «Своё» — организация её вида (актёр — театр, пекарь — пекарня), «рядом» — где такая работа обычна
+// (повар — в гостинице, бухгалтер — в любой конторе), иначе — общий тег или ничего общего. Если название
+// профессии называет место («Актёр театра», «Ассистент аптеки»), несовпадение заметнее: вес двойной.
+const orgHotel271='Гостиниц|Отел|Гестхаус|Гостев|Рёкан|Риад|лодж',orgBake271='Пекарн|Булочн|Кондитер';
+const orgProfFit271={
+ support:['Сервисный центр|ИТ-компания|Облачн','.'],qa16:['ИТ-компания|Студия разработки|Игров|Веб-студ|Облачн','.'],
+ gameqa:['Игров','Студия разработки|ИТ-компания',1],gameplay:['Игров','Студия разработки',1],
+ developer:['Студия разработки|ИТ-компания|Облачн|Веб-студ','.'],tools:['Студия разработки|ИТ-компания|Игров|Облачн','.'],
+ data:['Лаборатория данных|Аналит|Облачн','.'],sysadmin:['ИТ-компания|Облачн|Сервисный центр','.'],
+ marketer:['Маркетинг|Реклам','Цифров|Консалт'],pmm:['Маркетинг','Реклам|Консалт'],performance:['Реклам|Маркетинг',''],
+ accountant:['Бухгалтер','.'],analyst:['Аналит|Консалт','Бухгалтер|Маркетинг'],store:['Торгов|Магазин|Супермаркет','',1],
+ logistics:['Логист','Торгов'],hrassistant:['Кадров','.'],recruiter:['Кадров','.'],
+ lawyer:['Адвокат|Коллеги|Юридическ|Правов','Патент'],paralegal:['Юридическ|Нотари|Правов|Адвокат|Коллеги','Патент'],
+ doctor:['Клиник|Больниц|Медицин|Лечеб','Диагност|Хирург'],surgeon:['Хирург|Больниц','Клиник|Медицин|Лечеб'],
+ nurse:['Патронаж|Ухода|Реабилит|Пансионат|Центр здоровья','Помощи|Социальн'],careworker:['Ухода|Помощи|Пансионат|Реабилит|Патронаж','Социальн'],
+ socialworker:['Социальн|Помощи','Ухода|Патронаж|Пансионат'],pharmacyassistant:['Аптек','',1],nanny54:['Помощи на дому|Патронаж','Социальн|Ухода'],
+ lab:['Лаборатор','Исследоват|Научн|Опытн'],researcher:['Исследоват|Научн|Обсерват','Лаборатор|Технопарк|Опытн'],
+ researchassistant:['Исследоват|Научн|Лаборатор','Обсерват|Технопарк|Опытн'],
+ teacher:['^Школа$|Лицей','Колледж|Языков|Школа|Академ',1],tutor:['Репетитор|Учебн|Языков','Школ|Лицей'],
+ lecturer:['Колледж|Академ','Учебн|Лицей',1],kindergarten:['сад','',1],museumeducator:['Музей','Учебн',1],
+ engineer:['Конструктор|Инженер|Проект|Техническ','Архитект|Энерг|Строит|Инжинир'],energy:['Энергет','Инженер|Инжинир|Технич|Проект'],
+ technician:['Завод|Фабрик|Цех','Мастерск|Верф|Лесопил|варн|Винодел|Артел'],electrician16:['Электромонтаж','Завод|Цех|Фабрик|Автосервис'],
+ mechanic16:['Автосервис','^Мастерская$|Цех',1],welder:['Завод|Цех|Верф','Фабрик|^Мастерская$'],operator:['Завод|Фабрик|Цех','Мастерск|Лесопил'],
+ tailor:['Ателье|Ткацк|батика','Фабрик|Цех|^Мастерская$|кожи'],
+ designer:['Дизайн|Творческ','Анимац|Аниме|Фото'],ux:['Дизайн','Творческ|Анимац'],artist:['Анимац|Аниме|Творческ','Дизайн|Кино'],
+ animator:['Анимац|Аниме','Кино|Творческ'],editor:['Кино|Анимац|Аниме','Звукозап|Творческ|Фото'],camera:['Кино','Фото|Анимац'],
+ cameraOperator:['Кино','Фото',1],cameraoperator:['Кино','Фото',1],cinematographer:['Кино','Фото|Театр'],sound16:['Звукозап|Кино','Театр|Анимац'],
+ illustrator:['Дизайн|Творческ','Анимац|Галере'],bookdesigner:['Дизайн|Творческ',''],
+ photographer:['Фото','Кино|Творческ',1],studioassistant:['Фото','Творческ|Кино',1],galleryassistant:['Галере','Творческ',1],
+ curator:['Галере|Музей','',1],restorer:['Галере|Музей|Творческ','Ателье'],
+ stagehand:['Театр','Кино|самбы|фламенко|Танц',1],lightingtech:['Театр|Кино','Фото|Звукозап'],setdesigner:['Театр','Кино',1],
+ stageactor:['Театр','Кино',1],dancer:['Театр|Танц|самбы|фламенко','',1],musician:['Звукозап|Театр','Кино|самбы|фламенко'],
+ screenwriter:['Кино|Аниме|Анимац','Театр',1],filmdirector:['Кино|Аниме|Анимац','Театр',1],
+ community:['Медиа|Подкаст|Редакц','Информац|Издат|Радио'],copy:['Редакц|Медиа|Издат|Информац','Радио|Подкаст'],
+ journalist:['Редакц|Информацион|Радио|Медиа','Подкаст|Издат'],bookeditor:['Издательств','Редакц'],
+ librarian:['Библиотек','',1],publishingassistant:['Издательств','Редакц|Книжн',1],proofreader:['Издательств|Редакц|Информац','Медиа'],
+ literarytranslator:['Издательств','Редакц|Информац'],literaryagent:['Издательств','Книжн|Редакц'],rightsmanager:['Издательств','Медиа',1],
+ archiveassistant:['Библиотек|Архив','Издат|Редакц|Информац'],archivist:['Библиотек|Архив','Редакц|Информац|Издат'],
+ bookshop:['Книжн','Библиотек|Издат',1],staffwriter:['Издательств|Редакц','Медиа',1],radioeditor:['Радио','Подкаст|Медиа',1],podcasteditor:['Подкаст|Медиа|Радио','',1],
+ cook16:['Ресторан|Кафе|Бистро|Траттори|Такери|Идзакая|Пивн|Кафана|Паб|Дайнер|Кебаб|Шурраскари|Тапас',orgHotel271+'|'+orgBake271],
+ barista:['Кафе|Кофейн|Чайн','Ресторан|Бистро|Дайнер|Джелатер|Траттори|'+orgBake271+'|'+orgHotel271],
+ hotel:[orgHotel271,'',1],retail:['Супермаркет|Магазин',orgBake271+'|Джелатер'],shiftManager:['Супермаркет|Магазин','',1],
+ warehouse:['Супермаркет|Курьер|Склад',''],hair:['Салон красоты','Салон|Баня|Хаммам|'+orgHotel271],groomer38:['Салон',''],
+ baker:[orgBake271,'Кафе|Кофейн|Ресторан|Бистро|Траттори|Дайнер|Супермаркет'],
+ cleaner:['Клининг',orgHotel271+'|Баня|Хаммам|Супермаркет'],courier:['Курьер','Супермаркет|Ресторан|Кафе|'+orgBake271]
 };
-function orgPrefs271(p){const pref=orgProfPrefs271[p?.id]||orgFieldPrefs271[p?.field]||[];const word=orgProfWords271[p?.id];return {pref,word:word?new RegExp(word,'i'):null};}
-function orgScore271(q,t){let n=0;for(const x of q.pref)if(t.fit.has(x))n++;return (q.word&&q.word.test(t.type)?4:0)+n;}
-// Насколько профессии не по себе в организации: 0 — свой тип (по слову, а без слова — по тегам), 0.2 — та же
-// область по тегам (фотограф в театре), 1 — ничего общего (парикмахер в супермаркете).
-function orgMiss271(q,t){const n=orgScore271(q,t);return (q.word?n>=4:(!q.pref.length||n>0))?0:n>0?.2:1;}
+// «Не по себе» в организации: 0 — своё место, 3 — рядом, 7 — та же область по тегам, 10 — ничего общего.
+// У профессий без своих слов (Специалист госслужбы, Садовник…) — 0 при общем теге, иначе 10.
+const orgMissLevels271={own:0,near:3,tag:7,none:10};
+const orgPrefsCache271=new Map();
+function orgPrefs271(p){
+ const key=p?.id||'field:'+(p?.field||'');
+ if(orgPrefsCache271.has(key))return orgPrefsCache271.get(key);
+ const fit=orgProfFit271[p?.id]||[];
+ const q={id:p?.id||null,pref:orgProfPrefs271[p?.id]||orgFieldPrefs271[p?.field]||[],own:fit[0]?new RegExp(fit[0],'i'):null,
+  near:fit[1]?new RegExp(fit[1],'i'):null,weight:fit[2]?2:1};
+ orgPrefsCache271.set(key,q);
+ return q;
+}
+function orgTagScore271(q,t){let n=0;for(const x of q.pref)if(t.fit.has(x))n++;return n;}
+function orgMiss271(q,t){
+ const L=orgMissLevels271;
+ if(q.own){if(q.own.test(t.type))return L.own;if(q.near&&q.near.test(t.type))return L.near;return orgTagScore271(q,t)?L.tag:L.none;}
+ return !q.pref.length||orgTagScore271(q,t)?L.own:L.none;
+}
+function orgSetCost271(profs,set){let sum=0;for(const q of profs){let m=Infinity;for(const t of set)m=Math.min(m,orgMiss271(q,t));sum+=q.weight*m;}return sum;}
+function orgSubsets271(list,k){
+ const out=[],acc=[];
+ const walk=start=>{if(acc.length===k){out.push([...acc]);return;}for(let i=start;i<=list.length-(k-acc.length);i++){acc.push(list[i]);walk(i+1);acc.pop();}};
+ walk(0);
+ return out;
+}
 
 // ---------- Набор работодателей города ----------
-// Не больше 15 организаций на город: по одной на каждую из 12 сфер и ещё 3 там, где без них профессиям хуже всего
-// (обычно салон и клининг в сервисе, торговая сеть в экономике). Своих типов у профессий около 35 (театр, кафе,
-// издательство…), поэтому часть профессий широких сфер попадает в организацию своей сферы, но соседнего типа:
-// фотограф — в театр, но не парикмахер — в супермаркет. Поднять потолок — одна константа (при 16 место получает
-// гостиница для администратора отеля).
-const orgCityMax271=15;
+// Потолок — 15 организаций на город (ТЗ: 8–15): по одной на каждую из 12 сфер (иначе вакансии сферы некуда деть)
+// и 3 сверх того. Своих мест у профессий около 30 (театр, киностудия, кафе, гостиница, аптека, библиотека…), поэтому
+// при 15 часть профессий работает не у себя. Места делятся так, чтобы сумма «не по себе» по всем профессиям города
+// (orgMiss271 × вес) была наименьшей: точный перебор наборов типов внутри сферы и распределение мест между сферами.
+// Из наборов, которые хуже лучшего не больше чем на orgTolerance271 и ни одной профессии, чьё название называет
+// место, не хуже, берётся один по зерну города — так города одной страны отличаются. На настоящих данных при 15
+// не у себя остаются, например: библиотекарь и редактор радио — в издательстве, музейный куратор — на киностудии,
+// воспитатель детского сада — в лицее, грумер — в супермаркете, управляющий магазином — в
+// маркетинговом агентстве (таблица — tools/verify271_employers.js, раздел 9). Потолок — одна константа:
+// не у себя при 15 — 11 % профессий, при 20 — 4 %, при 24 — меньше 1 %.
+const orgCityMax271=15,orgTolerance271=3;
 function orgRoster271(country,city){
  const key=country+'|'+city;
  if(org271.rosters.has(key))return org271.rosters.get(key);
  const c=orgCountry271(country);
  if(!c||typeof fields16!=='object'){org271.rosters.set(key,null);return null;}
  const rand=orgRng271(orgHash271('orgRoster271|'+key));
- const plan=Object.keys(fields16).filter(f=>c.types[f]?.length).map(f=>({field:f,types:orgShuffle271(c.types[f],rand),
-  profs:(typeof professions16==='object'?professions16:[]).filter(p=>p.field===f).map(orgPrefs271),chosen:[]}));
- const miss=(g,list)=>g.profs.reduce((sum,q)=>sum+(list.length?Math.min(...list.map(t=>orgMiss271(q,t))):1),0);
- // по одной организации на сферу: тип, с которым профессиям сферы лучше всего (из почти равных — по зерну города,
- // чтобы города одной страны отличались)
- for(const g of plan){
-  const cost=g.types.map(t=>miss(g,[t])),min=Math.min(...cost);
-  g.chosen.push(g.types[cost.findIndex(n=>n<=min+Math.min(.45,g.profs.length*.1))]);
- }
- // остальные места — туда, где новая организация сильнее всего убавит «не по себе»
- let total=plan.length;
- while(total<orgCityMax271){
-  let pick=null;
-  for(const g of orgShuffle271(plan,rand)){
-   const now=miss(g,g.chosen);
-   for(const t of g.types){
-    if(g.chosen.includes(t))continue;
-    const gain=now-miss(g,[...g.chosen,t]);
-    if(gain>.01&&(!pick||gain>pick.gain+1e-9))pick={g,t,gain};
-   }
+ const fields=Object.keys(fields16).filter(f=>c.types[f]?.length);
+ const spare=Math.max(0,orgCityMax271-fields.length);
+ // для каждой сферы и каждого числа k её организаций — набор типов с наименьшей суммой (из почти равных — по зерну)
+ const plan=fields.map(f=>{
+  const profs=(typeof professions16==='object'?professions16:[]).filter(p=>p.field===f).map(orgPrefs271);
+  const strict=profs.filter(q=>q.weight>1),best=[];
+  for(let k=1;k<=Math.min(c.types[f].length,spare+1,8);k++){
+   const all=orgSubsets271(c.types[f],k).map(set=>({set,cost:orgSetCost271(profs,set)}));
+   const min=all.reduce((m,x)=>Math.min(m,x.cost),Infinity),first=all.find(x=>x.cost===min);
+   // ради разнообразия городов профессия, чьё название называет место, хуже устроена не становится
+   const keep=strict.map(q=>orgSetCost271([q],first.set));
+   const near=all.filter(x=>x.cost<=min+orgTolerance271&&strict.every((q,i)=>orgSetCost271([q],x.set)<=keep[i]));
+   best.push(near[Math.floor(rand()*near.length)]);
   }
-  if(!pick)break;
-  pick.g.chosen.push(pick.t);total++;
- }
- // корни: сначала те, что подходят к типу по тегам, корни с any — потом; в городе корни не повторяются
- const roots=orgShuffle271(c.roots,rand),used=new Set(),names=new Set(),byField={},all=[];
+  return {field:f,best};
+ });
+ // места между сферами: каждой хотя бы одно, всего не больше потолка, сумма — наименьшая; при равной — меньше мест
+ let states=new Map([[0,{cost:0,ks:[]}]]);
  for(const g of plan){
+  const next=new Map();
+  for(const [used,st] of states)g.best.forEach((b,i)=>{
+   const u=used+i+1;if(u>Math.max(orgCityMax271,fields.length))return;
+   const cost=st.cost+b.cost,cur=next.get(u);
+   if(!cur||cost<cur.cost)next.set(u,{cost,ks:[...st.ks,i]});
+  });
+  states=next;
+ }
+ let done=null;
+ for(const [used,st] of [...states].sort((a,b)=>a[0]-b[0]))if(!done||st.cost<done.cost)done={...st,used};
+ // корни: сначала те, что подходят к типу по тегам, корни с any — потом; в городе корни не повторяются
+ const roots=orgShuffle271(c.roots,rand),usedRoots=new Set(),names=new Set(),byField={},all=[];
+ plan.forEach((g,gi)=>{
   byField[g.field]=[];
-  for(const t of g.chosen){
+  for(const t of g.best[done.ks[gi]].set){
    const fit=roots.filter(r=>rootFits271(r,t.fit));
    const ranked=[...fit.filter(r=>!r.fit.has('any')),...fit.filter(r=>r.fit.has('any'))];
-   const r=ranked.find(r=>!used.has(r.root)&&!names.has(t.type+' «'+r.root+'»'))||ranked.find(r=>!names.has(t.type+' «'+r.root+'»'));
+   const r=ranked.find(r=>!usedRoots.has(r.root)&&!names.has(t.type+' «'+r.root+'»'))||ranked.find(r=>!names.has(t.type+' «'+r.root+'»'));
    if(!r)continue;
-   used.add(r.root);
+   usedRoots.add(r.root);
    const e={field:g.field,type:t.type,fit:t.fit,root:r.root,name:t.type+' «'+r.root+'»'};
    names.add(e.name);byField[g.field].push(e);all.push(e);
   }
- }
- const out={country,city,byField,all};
+ });
+ const out={country,city,byField,all,cost:done.cost};
  org271.rosters.set(key,out);
  return out;
 }
+// Внутри сферы — организация, где профессии лучше всего: своё место, потом «рядом», потом по тегам; из равных — по зерну.
 function pickEmployer271(list,q,seed){
  if(!list?.length)return null;
- const scores=list.map(t=>orgScore271(q,t)),max=Math.max(...scores);
- const top=list.filter((_,i)=>scores[i]===max);
+ const scores=list.map(t=>orgMiss271(q,t)*10-orgTagScore271(q,t)),min=Math.min(...scores);
+ const top=list.filter((_,i)=>scores[i]===min);
  return top[orgHash271(seed)%top.length];
 }
 // Работодатель вакансии: сфера профессии, внутри неё — ближайший профессии тип. Одна профессия в одном городе —
@@ -187,10 +248,23 @@ function employVacancy271(v,force=false){
  const name=employerFor271(v.country,v.city,v.profession);
  if(name){v.employer=name;v.employer271=true;}
 }
+// Рынок с тем же ключом собирается заново с теми же id: после загрузки страницы careers45.js сбрасывает marketKey,
+// фоновый поиск (backgroundJobSearch78) — тоже. База ставит такой вакансии работодателя по старой карте секторов,
+// поэтому у пересобранной вакансии с прежним id работодатель берётся из прежней (записанной) вакансии: и имя 271,
+// и имя из сохранения 270 остаются. Новые id получают работодателя 271.
+function keepEmployer271(old,v){
+ if(!old.employer)return employVacancy271(v);
+ v.employer=old.employer;
+ if(old.employer271)v.employer271=true;else delete v.employer271;
+}
 makeVacancies16=function(...args){
- const x=path16(),before=new Set((x?.vacancies||[]).map(v=>v.id));
+ const prev=new Map((path16()?.vacancies||[]).map(v=>[v.id,v]));
  const out=employers271Base.makeVacancies16.apply(this,args);
- for(const v of path16()?.vacancies||[])if(!before.has(v.id))employVacancy271(v);
+ for(const v of path16()?.vacancies||[]){
+  const old=prev.get(v.id);
+  if(!old)employVacancy271(v);
+  else if(old!==v)keepEmployer271(old,v);
+ }
  return out;
 };
 replaceVacancy23=function(v,...rest){
@@ -277,6 +351,47 @@ if(typeof ensureSpecialties46==='function'&&renamedUnis271.length){
   const now=renamedUnis271.map(u=>u.name);
   renamedUnis271.forEach(u=>{u.name=u.previousName271;});
   try{return uniSpecialtiesBase271.apply(this,args);}finally{renamedUnis271.forEach((u,i)=>{u.name=now[i];});}
+ };
+}
+// Диплом хранит название вуза строкой, и в сохранении оно остаётся прежним (по нему сверяется ensureSpecialties46).
+// На экране — нынешнее название: учёба (educationView16), архив учёбы (studyArchive58) и биография (bioRows).
+// Одно прежнее название бывает у вузов разных стран, поэтому сначала по стране диплома.
+const uniRenamed271=new Map();
+for(const u of renamedUnis271){
+ uniRenamed271.set(u.country+'|'+u.previousName271,u.name);
+ const same=uniRenamed271.get('|'+u.previousName271);
+ uniRenamed271.set('|'+u.previousName271,same===undefined||same===u.name?u.name:null);
+}
+function currentUniName271(name,country){
+ if(!previousUniNames271.has(name))return name;
+ return uniRenamed271.get(country+'|'+name)||uniRenamed271.get('|'+name)||name;
+}
+function diplomaRenames271(){
+ const out=new Map();
+ for(const d of path16()?.diplomas||[]){
+  const now=currentUniName271(d.university,d.country);
+  if(now!==d.university)out.set(d.university,now);
+ }
+ return [...out].sort((a,b)=>b[0].length-a[0].length);
+}
+function renameUniText271(text,pairs,html){
+ if(typeof text!=='string')return text;
+ for(const [from,to] of pairs){const a=html?esc(from):from;if(text.includes(a))text=text.split(a).join(html?esc(to):to);}
+ return text;
+}
+const uniDisplayBase271={educationView16:typeof educationView16==='function'?educationView16:null,
+ studyArchive58:typeof studyArchive58==='function'?studyArchive58:null,bioRows:typeof bioRows==='function'?bioRows:null};
+if(renamedUnis271.length){
+ for(const k of ['educationView16','studyArchive58'])if(uniDisplayBase271[k])window[k]=function(...args){
+  const html=uniDisplayBase271[k].apply(this,args);
+  const pairs=s?diplomaRenames271():[];
+  return pairs.length?renameUniText271(html,pairs,true):html;
+ };
+ if(uniDisplayBase271.bioRows)bioRows=function(...args){
+  const rows=uniDisplayBase271.bioRows.apply(this,args);
+  const pairs=s?diplomaRenames271():[];
+  if(pairs.length&&Array.isArray(rows))for(const r of rows)if(Array.isArray(r))for(let i=0;i<r.length;i++)r[i]=renameUniText271(r[i],pairs,false);
+  return rows;
  };
 }
 
