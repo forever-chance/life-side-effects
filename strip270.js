@@ -54,23 +54,25 @@ function waitingItems270(){
  return items.filter(i=>i?.ref?.kind!=='health58').concat(items.filter(i=>i?.ref?.kind==='health58'));
 }
 
-function stripDate270(e){return (e.month!==undefined&&typeof months!=='undefined'&&months[e.month]?months[e.month]+' ':'')+(e.year??'');}
+function stripDate270(e){return ((e.month!==undefined&&typeof months!=='undefined'&&months[e.month]?months[e.month]+' ':'')+(e.year??'')).trim();}
 function stripText270(text){return typeof eventDescription204==='function'?eventDescription204(text||''):String(text||'');}
+// id записей и решений идут через data-атрибуты: в onclick строкой их пришлось бы экранировать дважды.
 function stripLatestRow270(e){
- const id=e.uiId||'';
- return '<div class="strip-row270 strip-latest270"><button class="strip-open270" data-strip-event="'+esc(id)+'" onclick="openHistory270(\''+esc(id)+'\')">'+
-  '<span class="strip-body270"><span class="strip-kicker270">Последнее событие · '+esc(stripDate270(e))+'</span>'+
+ const date=stripDate270(e);
+ return '<div class="strip-row270 strip-latest270"><button class="strip-open270" data-strip-event="'+esc(e.uiId||'')+'" onclick="openHistory270(this.dataset.stripEvent)">'+
+  '<span class="strip-body270"><span class="strip-kicker270">Последнее событие'+(date?' · '+esc(date):'')+'</span>'+
   '<span class="strip-line270"><b class="strip-title270">'+esc(e.title||'')+'</b><span class="strip-text270"> — '+esc(stripText270(e.text))+'</span></span></span>'+
   '<span class="strip-go270" aria-hidden="true">→</span></button></div>';
 }
 function stripWaitingRow270(items){
  const i=items[0],kind=String(i.ref.kind),id=String(i.ref.id);
- return '<div class="strip-row270 strip-waiting270"><button class="strip-open270" data-strip-kind="'+esc(kind)+'" data-strip-id="'+esc(id)+'" onclick="openDecision24(\''+esc(kind)+'\',\''+esc(id)+'\')">'+
+ return '<div class="strip-row270 strip-waiting270"><button class="strip-open270" data-strip-kind="'+esc(kind)+'" data-strip-id="'+esc(id)+'" onclick="stripDecision270(this)">'+
   '<span class="strip-body270"><span class="strip-kicker270">Ожидают ответа · <span class="strip-count270">'+items.length+'</span></span>'+
   '<span class="strip-line270"><b class="strip-title270">'+esc(i.title||'')+'</b>'+(i.note?'<span class="strip-text270"> — '+esc(i.note)+'</span>':'')+'</span></span>'+
   '<span class="strip-go270" aria-hidden="true">→</span></button>'+
   (items.length>1?'<button class="strip-all270" onclick="decisionsMenu24()" aria-label="Все ответы и состояния" title="Все ответы и состояния">Все</button>':'')+'</div>';
 }
+function stripDecision270(el){openDecision24(el.dataset.stripKind,el.dataset.stripId);}
 function topStrip270(){
  const want=stripRows270();
  let rows='';

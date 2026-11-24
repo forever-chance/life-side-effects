@@ -112,13 +112,13 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       check('список: у каждой карточки заголовок «Профессия · зарплата/год · Офис · рядом с домом»', r.n > 0 && !r.bad.length, r);
       check('список: зарплата в карточке одна (старая строка с суммой убрана)', r.n > 0 && !r.payTwice.length, r.payTwice);
       check('список: часы, город и страна — строкой под заголовком, в заголовке часов нет', r.n > 0 && !r.hours.length && !r.headHours, r);
-      for (const format of ['remote', 'hybrid', 'far', 'commute', 'abroad']) {
+      for (const format of ['remote', 'hybrid', 'far', 'commute', 'city', 'abroad']) {
         const f = await pg.evaluate(format => {
           Object.assign(path16().view, { format, page: 0 }); render();
           const cards = __cards();
           return { n: cards.length, heads: cards.map(c => c.head).slice(0, 3), bad: cards.filter(c => c.head !== __head(__vac(c.id)) || !c.head.endsWith(' · ' + __fmt[format])).map(c => c.head) };
         }, format);
-        check('список: формат «' + { remote: 'Удалённо', hybrid: 'Гибрид', far: 'Офис · другой конец города', commute: 'Офис · поездки в другой город', abroad: 'Офис · переезд за рубеж' }[format] + '» в заголовке', f.n > 0 && !f.bad.length, f);
+        check('список: формат «' + { remote: 'Удалённо', hybrid: 'Гибрид', far: 'Офис · другой конец города', commute: 'Офис · поездки в другой город', city: 'Офис · переезд в другой город', abroad: 'Офис · переезд за рубеж' }[format] + '» в заголовке', f.n > 0 && !f.bad.length, f);
       }
       const opts = await pg.evaluate(() => [...document.querySelectorAll('.trajectory select[aria-label="Формат"] option')].map(o => o.textContent));
       check('список: фильтр «Формат» называет офис, гибрид и удалёнку так же', opts.includes('Удалённо') && opts.includes('Гибрид') && opts.includes('Офис · рядом с домом') && !opts.includes('Удаленно'), opts);
@@ -128,6 +128,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       const f = await pg.evaluate(() => {
         const labels = [...document.querySelectorAll('.trajectory select[aria-label="Зарплата от"] option')].map(o => [o.value, o.textContent]);
         const before = __allPages(), n0 = __count();
+        if (labels.length < 2) return { labels: labels.map(l => l[1]), n0, before: before.length };
         // Порог примерно в середине: часть вакансий дешевле, часть дороже.
         const pays = before.map(c => Math.round(__pay(__vac(c.id)))).sort((a, b) => a - b), mid = pays[Math.floor(pays.length / 2)];
         const step = labels.filter(([v]) => v !== 'all').map(([v, t]) => [v, +t.replace(/[^\d]/g, '')]).filter(([, a]) => a <= mid).at(-1) || labels[1];
@@ -180,6 +181,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         const view = x.view, pays = x.vacancies.filter(v => !jobEligibility16(v).why.length).map(__pay).sort((a, b) => b - a);
         const steps = [...document.querySelectorAll('.trajectory select[aria-label="Зарплата от"] option')].filter(o => o.value !== 'all').map(o => [o.value, +o.textContent.replace(/[^\d]/g, '')]);
         const high = steps.find(([, a]) => a > pays[0]) || steps.at(-1);
+        if (!high) return { steps: 0 };
         x.view.salary270 = high[0]; x.search = false; toggleSearch16(); x.lastSearch = -10;
         for (const a of x.jobApplications) a.status = 'rejected';
         const n0 = x.jobApplications.length;

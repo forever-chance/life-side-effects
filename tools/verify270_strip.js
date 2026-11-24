@@ -79,7 +79,7 @@ const layout = () => {
     rows: getComputedStyle(app).gridTemplateRows
   };
 };
-const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { if ($('#modal').open) closeModal(); s.pending = []; s.clock.running = false; if (panel) s.ui05.panel = panel; if (t) tab = t; render(); }, [panel, t]);
+const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($('#modal').open) closeModal(); s.clock.running = false; if (panel) s.ui05.panel = panel; if (t) tab = t; render(); }, [panel, t]);
 
 (async () => {
   const browser = await chromium.launch();
@@ -157,6 +157,17 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { if ($('#modal').open)
     await pg.click('#app>.top-strip270 .strip-all270');
     const all = await pg.evaluate(() => ({ open: $('#modal').open, title: document.querySelector('#modal h2')?.textContent || '' }));
     check('«Все»: общий список ответов', all.open && /Ожидают/.test(all.title), all);
+    // id с кавычками и угловыми скобками доходит до openDecision24 как есть.
+    await pg.evaluate(() => {
+      if ($('#modal').open) closeModal();
+      window.__strip270 = { items: decisionItems24, open: openDecision24, calls: [] };
+      decisionItems24 = () => [{ ref: { kind: 'test270', id: `a'b"c<d>` }, q: {}, title: 'Проверка «кавычек»', note: '' }];
+      openDecision24 = (kind, id) => window.__strip270.calls.push([kind, id]);
+      render();
+    });
+    await pg.click('#app>.top-strip270 .strip-waiting270 .strip-open270');
+    const calls = await pg.evaluate(() => { const x = window.__strip270; decisionItems24 = x.items; openDecision24 = x.open; render(); return { calls: x.calls, all: !!document.querySelector('.strip-all270') }; });
+    check('решение с кавычками в id открывается тем же id', calls.calls.length === 1 && calls.calls[0][0] === 'test270' && calls.calls[0][1] === `a'b"c<d>`, calls);
     await pg.evaluate(() => { if ($('#modal').open) closeModal(); s.pending = [{ type: 'familyContact05', id: s.people.find(p => p.alive && ['Мать', 'Отец'].includes(p.role))?.id }].filter(q => q.id); decisionState24(); s.clock.running = false; });
 
     // «Люди» и «Траектория» — обе строки.
@@ -182,7 +193,7 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { if ($('#modal').open)
     check('телефон: старая вкладка «plans» (рисуется как «Личное дело») — полосы нет', !st.shown, st);
 
     // Время стоит на «Персонаже» и «Личном деле» и идёт дальше, когда игрок уходит.
-    const run = () => pg.evaluate(() => { if ($('#modal').open) closeModal(); s.pending = []; s.dead = false; s.clock.speed = 8; s.clock.running = true; clockStamp = Date.now(); clockCarry = 0; render(); return s.clock.ticks; });
+    const run = () => pg.evaluate(() => { s.pending = []; if ($('#modal').open) closeModal(); s.clock.choiceActive = false; s.clock.resumeAfterChoice = false; s.dead = false; s.clock.speed = 8; s.clock.running = true; clockStamp = Date.now(); clockCarry = 0; render(); return s.clock.ticks; });
     const after = () => pg.evaluate(() => ({ ticks: s.clock.ticks, running: s.clock.running, label: document.querySelector('.clock-bar small')?.textContent || '', button: document.querySelector('.clock-controls .primary')?.textContent || '' }));
     await pg.evaluate(() => { s.ui05.panel = 'left'; tab = 'story'; });
     let t0 = await run();
@@ -230,6 +241,23 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { if ($('#modal').open)
     st = await pg.evaluate(strip);
     check('часы: на «Действиях» время идёт, полоса на месте', a.ticks > t0 && st.shown && st.latest, { t0, a, st });
     await pg.evaluate(() => { if ($('#modal').open) closeModal(); s.pending = []; s.clock.running = false; });
+
+    // Год настоящих месяцев (advanceMonth): «Будни» и итоги года в полосу не попадают, полоса — первая настоящая запись «Истории».
+    const year = await pg.evaluate(() => {
+      s.ui05.panel = 'right'; tab = 'story'; s.clock.running = false;
+      const seen = new Set();
+      for (let i = 0; i < 14; i++) {
+        s.pending = []; if ($('#modal').open) closeModal(); s.pending = [];
+        advanceMonth();
+        for (const e of s.log.slice(0, 8)) seen.add(e.tag);
+      }
+      s.pending = []; if ($('#modal').open) closeModal(); s.pending = []; s.clock.running = false; render();
+      const title = document.querySelector('#app>.top-strip270 .strip-latest270 .strip-title270')?.textContent;
+      const box = document.createElement('div'); box.innerHTML = story();
+      const arts = [...box.querySelectorAll('article.event')].map(a => ({ title: a.querySelector('h3')?.textContent, tag: a.querySelector('.tag')?.textContent }));
+      return { title, first: arts.find(a => !['Будни', 'Годовая сводка'].includes(a.tag))?.title, top: arts.slice(0, 4), weekdays: seen.has('Будни'), summary: seen.has('Годовая сводка'), ticks: s.clock.ticks };
+    });
+    check('год настоящих месяцев: полоса — первая настоящая запись «Истории», «Будни» и итоги года пропущены', year.title && year.title === year.first && year.summary && !/^Будни|^Итоги прожитого года/.test(year.title), year);
 
     // Возраст в строке часов — с правильным окончанием.
     const ages = await pg.evaluate(() => { const age = s.age, out = {}; for (const n of [21, 22, 25, 31, 44, 111]) { s.age = n; out[n] = clockView().match(/· (\d+ \S+)<\/small>/)?.[1]; } s.age = age; render(); return out; });

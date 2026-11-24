@@ -32,7 +32,7 @@ function jobTitle270(title){return String(title||'').replace(/\s*·\s*\d+\s*ч\/
 function vacancyPay270(v){return localAmount16(v.salary,v.country);}
 function jobHead270(title,pay,format){return jobTitle270(title)+' · '+money(pay)+'/год · '+format;}
 function jobHeadHTML270(title,pay,format){
- return esc(jobTitle270(title))+' · <span class="pay270">'+esc(money(pay))+'/год</span> · <span class="format270">'+esc(format)+'</span>';
+ return esc(jobTitle270(title))+' · <span class="pay270" style="white-space:nowrap">'+esc(money(pay))+'/год</span> · <span class="format270">'+esc(format)+'</span>';
 }
 function vacancyHead270(v){return jobHead270(v.title,vacancyPay270(v),jobFormat270(v.format));}
 function vacancyHeadHTML270(v){return jobHeadHTML270(v.title,vacancyPay270(v),jobFormat270(v.format));}
