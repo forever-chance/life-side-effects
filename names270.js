@@ -53,3 +53,40 @@ if(typeof childBirthIdentity166==='function'){
  const birthBase270=childBirthIdentity166;
  childBirthIdentity166=function(child,...args){const r=birthBase270(child,...args);try{dedupeGiven270(child);}catch(e){}return r;};
 }
+// Полный тёзка как редкая находка: примерно в одной жизни из 50, в Корее и Китае — из 15 (там это обычное дело).
+// В такой жизни в случайном возрасте (6–50 лет) один новый человек не из родни, вашего пола и из страны вашего
+// рождения получает ровно ваше имя и фамилию. Запись в истории — когда он действительно появился среди ваших людей;
+// если кандидат так и не попал в жизнь (отказались от знакомства), ждём следующего. Во всех остальных случаях
+// генератор полного тёзку не даёт.
+const namesakeKin270=new Set(['Бабушка','Дедушка','Приёмный опекун','Мать','Отец','Брат','Сестра','Сиблинг','Ребенок','Сын','Дочь','Внук','Внучка','Внук / внучка','Племянник','Племянница','Потомок','Родственник','Партнер','Партнёр','Супруг','Супруга']);
+function namesakeRate270(country){return ['kr','cn'].includes(country)?1/15:1/50;}
+function namesakeState270(){
+ if(!s)return null;
+ if(!s.namesake270){const home=s.birthCountry||s.country;s.namesake270={on:Math.random()<namesakeRate270(home),at:6+Math.floor(Math.random()*45),done:false};}
+ return s.namesake270;
+}
+function namesakeTake270(p){
+ const st=namesakeState270();
+ if(!st?.on||st.done||st.pending||!p||p===s||s.age<st.at)return;
+ if(p.gender!==s.gender||namesakeKin270.has(p.role)||(p.country||s.country)!==(s.birthCountry||s.country))return;
+ const country=s.birthCountry||s.country,parts=s.surnameParts256?.length?[...s.surnameParts256]:(s.surname?[s.surname]:[]);
+ if(!parts.length)return;
+ const joiner=s.surnameJoiner256||' ';
+ p.givenName166=s.name;p.surnameParts256=parts;p.surnameJoiner256=joiner;p.surname=parts.join(joiner);
+ p.name=typeof fullName256==='function'?fullName256(s.name,parts,country,joiner):s.name+' '+p.surname;
+ p.birthSurname256=p.surname;p.namesake270=true;
+ st.pending={id:p.id,tick:s.clock?.ticks??0};
+}
+function namesakeCheck270(){
+ const st=s?.namesake270;
+ if(!st?.pending||st.done)return;
+ const p=(s.people||[]).find(q=>q.id===st.pending.id);
+ if(p){st.done=true;st.pending=null;log('Полный тёзка',(p.gender==='f'?'Новая знакомая: ':'Новый знакомый: ')+p.name+'. Вас зовут одинаково, до последней буквы.','Отношения');return;}
+ if((s.clock?.ticks??0)>st.pending.tick)st.pending=null;
+}
+{
+ const personBase270=person;
+ person=function(...args){const p=personBase270(...args);try{namesakeTake270(p);}catch(e){}return p;};
+ const ensureBase270=ensureUX;
+ ensureUX=function(...args){const r=ensureBase270.apply(this,args);try{namesakeCheck270();}catch(e){}return r;};
+}

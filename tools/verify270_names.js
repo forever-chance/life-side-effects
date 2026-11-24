@@ -1,5 +1,6 @@
 // Проверки сборки 270, часть «тёзки» (names270.js): генератор не выдаёт имя игрока, родственник с семейной
-// фамилией и новорождённый не получают полное имя игрока или живого человека, умерший тёзка не мешает.
+// фамилией и новорождённый не получают полное имя игрока или живого человека, умерший тёзка не мешает;
+// полный тёзка игрока — редкая находка: одна жизнь из 50 (Корея и Китай — из 15), один раз, с записью в истории.
 // Игра раздаётся с диска, сервер не нужен:  node tools/verify270_names.js
 // BASE=1 — прогон без names270.js: видно, какие проверки ловят старое поведение.
 const fs = require('fs'), path = require('path');
@@ -72,6 +73,33 @@ async function page(browser, country) {
       if (typeof dedupeGiven270 === 'function') { dedupeGiven270(b); dedupeGiven270(grandson); }
       out.living = { a: a.name, b: b.name, bSurname: b.surname, aSurname: a.surname };
       out.dead = { dead: dead.name, grandson: grandson.name };
+      // 6. Полный тёзка как редкая находка (namesake270).
+      if (typeof namesakeState270 === 'function') {
+        const home = s.birthCountry || s.country;
+        const count = () => s.log.filter(e => e.title === 'Полный тёзка').length;
+        s.namesake270 = { on: true, at: 0, done: false };
+        const twin = person('Друг', 30, s.gender, home); s.people.push(twin); render();
+        const after = person('Друг', 31, s.gender, home); s.people.push(after); render();
+        out.ns = { twin: twin.name, twinIsMine: mine.includes(twin.name), logged: count(), done: s.namesake270.done, nextIsMine: mine.includes(after.name),
+          text: (s.log.find(e => e.title === 'Полный тёзка') || {}).text || '' };
+        // Кандидат не попал в жизнь — ждём следующего.
+        s.namesake270 = { on: true, at: 0, done: false };
+        const ghost = person('Знакомство', 25, s.gender, home); s.clock.ticks += 1; render();
+        const pendingCleared = !s.namesake270.pending && !s.namesake270.done;
+        const real = person('Знакомый', 27, s.gender, home); s.people.push(real); render();
+        out.ns.retry = { ghostWasMine: mine.includes(ghost.name), pendingCleared, realIsMine: mine.includes(real.name), logged: count() };
+        // Родня, другой пол, возраст раньше срока, жизнь без тёзки — имя не трогаем.
+        s.namesake270 = { on: true, at: 0, done: false };
+        const mom = person('Мать', 50, s.gender, home), other = person('Друг', 30, s.gender === 'm' ? 'f' : 'm', home);
+        s.namesake270 = { on: true, at: s.age + 5, done: false };
+        const early = person('Друг', 30, s.gender, home);
+        s.namesake270 = { on: false, at: 0, done: false };
+        const off = person('Друг', 30, s.gender, home);
+        out.ns.skip = [mom, other, early, off].map(q => mine.includes(q.name) || !!q.namesake270);
+        // Частота: одна жизнь из 50, в Корее и Китае — из 15.
+        const rate = c => { let n = 0; const keep = s.namesake270, kb = s.birthCountry, kc = s.country; s.birthCountry = c; for (let i = 0; i < 20000; i++) { s.namesake270 = null; if (namesakeState270().on) n++; } s.namesake270 = keep; s.birthCountry = kb; s.country = kc; return n / 20000; };
+        out.ns.rate = { nl: rate('nl'), kr: rate('kr'), cn: rate('cn') };
+      }
       return out;
     }, country);
     check(r.generatorHits === 0, `${country}: генератор не выдаёт имя игрока`, `совпадений ${r.generatorHits} из 3000`);
@@ -79,6 +107,13 @@ async function page(browser, country) {
     check(!r.baby.clash && r.baby.surname === r.relative.playerSurname, `${country}: новорождённый не тёзка игрока, фамилия та же`, r.baby.name);
     check(r.living.a !== r.living.b && r.living.aSurname === r.living.bSurname, `${country}: живой тёзка получает другое имя`, `${r.living.a} / ${r.living.b}`);
     check(r.dead.dead === r.dead.grandson, `${country}: имя умершего можно повторить`, r.dead.grandson);
+    if (process.env.BASE !== '1') {
+      const ns = r.ns || {};
+      check(ns.twinIsMine && ns.logged === 1 && ns.done && !ns.nextIsMine && /Вас зовут одинаково/.test(ns.text), `${country}: полный тёзка — один раз, с записью в истории`, `${ns.twin} · ${ns.text}`);
+      check(ns.retry && ns.retry.ghostWasMine && ns.retry.pendingCleared && ns.retry.realIsMine && ns.retry.logged === 2, `${country}: тёзка-кандидат, не попавший в жизнь, переходит к следующему знакомому`, JSON.stringify(ns.retry));
+      check(ns.skip && ns.skip.every(x => !x), `${country}: не родня, тот же пол, не раньше срока, не в жизни без тёзки`, JSON.stringify(ns.skip));
+      check(ns.rate && Math.abs(ns.rate.nl - 0.02) < 0.006 && Math.abs(ns.rate.kr - 1 / 15) < 0.012 && Math.abs(ns.rate.cn - 1 / 15) < 0.012, `${country}: частота жизней с тёзкой — 1/50, Корея и Китай — 1/15`, JSON.stringify(ns.rate));
+    }
     check(errors.length === 0, `${country}: без ошибок страницы`, errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
