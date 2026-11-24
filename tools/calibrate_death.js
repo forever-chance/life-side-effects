@@ -37,10 +37,17 @@ async function serve(ctx) {
   });
 }
 
-const SNAP = `(()=>{const h=habits78();const z=s.health25;return {age:s.age,health:+s.health.toFixed(2),fatigue:Math.round(s.clock.fatigue),mood:Math.round(s.mood),
-  ill:!!s.illness,chronic:(z&&z.conditions||[]).length,smoke:h.smoke.strength||0,drink:h.drink.strength||0,cash:Math.round(s.cash),dead:!!s.dead}})()`;
+// Каждое изменение s.health записывается с источником «файл:функция»; в снимке года — суммы за год.
+const TRACE = `(()=>{let h=s.health;window.__HA={};Object.defineProperty(s,'health',{configurable:true,enumerable:true,get(){return h},set(v){
+  const d=v-h;if(d){let src='?';for(const line of (new Error().stack||'').split('\\n').slice(2)){const m=line.match(/at (?:([\\w$.<>]+) )?\\(?[^()]*\\/([\\w-]+\\.js)/);
+  if(m&&m[2]!=='harness.js'){src=m[2]+':'+(m[1]||'?').replace(/^Object\\./,'');break}}src+=d<0?' -':' +';__HA[src]=(__HA[src]||0)+d}h=v}})})()`;
 
-const CARE = `(()=>{if(s.dead||s.age<16)return;if(!s.clock.tasks.some(t=>t.kind==='rest'))assign('rest');
+const SNAP = `(()=>{const h=habits78();const z=s.health25;const src=window.__HA||{};window.__HA={};return {age:s.age,health:+s.health.toFixed(2),fatigue:Math.round(s.clock.fatigue),mood:Math.round(s.mood),
+  ill:!!s.illness,chronic:(z&&z.conditions||[]).length,smoke:h.smoke.strength||0,drink:h.drink.strength||0,cash:Math.round(s.cash),dead:!!s.dead,
+  src:Object.fromEntries(Object.entries(src).map(([k,v])=>[k,+v.toFixed(2)]))}})()`;
+
+// Случайные клики harness.js иногда ставят отдых на паузу: заботливый игрок его возобновляет.
+const CARE = `(()=>{if(s.dead||s.age<16)return;const r=s.clock.tasks.find(t=>t.kind==='rest');if(!r)assign('rest');else if(r.state==='paused')pauseTask05(r.id);
   const a=s.illness;if(a&&!a.treated){a.treated=true;a.left=Math.min(a.left||2,2);}})()`;
 
 async function life(browser, idx, cfg) {
@@ -62,6 +69,7 @@ async function life(browser, idx, cfg) {
     await pg.evaluate(HARNESS);
     // Сохранения в localStorage не нужны прогону и тормозят его к старости.
     await pg.evaluate("()=>{try{localStorage.clear()}catch(e){}}");
+    await pg.evaluate(TRACE);
     res.start = await pg.evaluate("({country:s.country,gender:s.gender,bg:s.background,age:s.age})");
     res.years.push(await pg.evaluate(SNAP));
     let age = res.start.age;
