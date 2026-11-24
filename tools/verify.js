@@ -31,7 +31,7 @@ async function page(browser, cfg) {
     if ($('#modal').open) closeModal();
     s.pending = [];
   });
-  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js', 'creative262.js'])
+  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js', 'creative262.js', 'business263.js'])
     if (!(await pg.evaluate(f => [...document.scripts].some(x => x.src.includes(f)), f))) await pg.addScriptTag({ path: path.join(ROOT, f) });
   return { pg, errors, ctx };
 }
@@ -237,6 +237,39 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     const m = await pg.evaluate(modal);
     check('гонорары: меню профиля показывает репутацию и множитель', /Репутация: новичок \(1\.0\)/.test(m.text) && /Гонорары сейчас ×\d/.test(m.text), m.text);
     check('гонорары: без ошибок страницы', !errors.length, errors);
+    await ctx.close();
+  }
+
+  // 10. Своё дело (263).
+  {
+    const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'no' });
+    const r = await pg.evaluate(() => {
+      s.age = 30; s.cash = 1e8; s.illness = null;
+      const ok = startEnterprise152('services', 'Тестовая мастерская', 'hair'); const b = s.enterprise152;
+      const W = c().wage / 12, task = () => s.clock.tasks.find(t => t.kind === 'business263' && t.business263 === b.id);
+      const out = { ok, mode: b.mode263, fit: b.fit263, selfHours: task()?.hours, wage: enterpriseWage155(b), W };
+      setBusinessMode263(b.id, 'partial'); out.partialHours = task()?.hours;
+      setBusinessMode263(b.id, 'manager'); out.managerHours = task()?.hours;
+      setBusinessMode263(b.id, 'self');
+      for (let i = 0; i < 3; i++) { s.clock.ticks++; enterpriseLocationMonth168(b); }
+      const h = b.history.at(-1); out.month = { demand: h?.demand263, capacity: h?.capacity263, status: b.status };
+      b.fresh263 = .8; b.cash = 1e8; out.renovated = developEnterprise156(b.id, 'renovation263') && b.fresh263 === 1;
+      return out;
+    });
+    check('своё дело: новое дело — «сам», 35 ч/нед. в расписании', r.ok && r.mode === 'self' && r.selfHours === 35 && r.fit >= .45 && r.fit <= 1.45, r);
+    check('своё дело: сотрудник получает 0.8 средней зарплаты страны', r.wage === Math.round(r.W * .8), r);
+    check('своё дело: режим меняет часы (частично 15, управляющий 3)', r.partialHours === 15 && r.managerHours === 3, r);
+    check('своё дело: месяц считает спрос и мощность', r.month.demand > 0 && r.month.capacity >= 1, r.month);
+    check('своё дело: ремонт возвращает свежесть', r.renovated, r);
+    await pg.evaluate(() => businessModeMenu263(s.enterprise152));
+    let m = await pg.evaluate(modal);
+    check('своё дело: меню режима называет доход дела и цену управляющего', /приносит в среднем .* управляющий стоит/.test(m.text) && m.buttons.length >= 4, m);
+    await pg.evaluate(() => { closeModal(); const b = s.enterprise152; delete b.mode263; delete b.modeAsked263; s.pending = []; businessMode263(b); resolvePending(); });
+    m = await pg.evaluate(modal);
+    check('своё дело: дело из старого сохранения спрашивает режим', /Дело теперь требует вашего времени/.test(m.text) && m.buttons.some(b => /^Сам/.test(b)), m);
+    await pg.evaluate(click('/^Сам/'));
+    check('своё дело: выбор режима из окна ставит 35 ч/нед.', await pg.evaluate(() => s.enterprise152.mode263 === 'self' && s.clock.tasks.find(t => t.kind === 'business263').hours === 35 && !s.pending.length), null);
+    check('своё дело: без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }
 
