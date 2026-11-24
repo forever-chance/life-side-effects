@@ -86,12 +86,12 @@ const familyMoveLabels270={'Снять и переехать':'','Перееха
 show=function(title,text,opts=[],...rest){
  try{
   if(s&&!s.dead&&s.age>=18&&Array.isArray(opts)){
+   // Продажа жилья, в котором вы живёте, тоже переезд: в аренду того же района.
+   const sell=title==='Продать объект?'&&/Одновременно переедете/.test(text);
    const o=opts.find(o=>o&&Object.hasOwn(familyMoveLabels270,o.label)&&!o.disabled&&!o.move270);
-   const line=o&&familyMoveLine270(familyMoveLabels270[o.label]);
-   if(line){
-    if(typeof text==='string'&&text.trim())text=text+'\n'+line;
-    else opts=opts.map(x=>x===o?{...x,hint:[x.hint,line].filter(Boolean).join(' · ')}:x);
-   }
+   const line=o?familyMoveLine270(familyMoveLabels270[o.label]):sell?familyMoveLine270():'';
+   if(line&&typeof text==='string'&&text.trim())text=text+'\n'+line;
+   else if(line&&o)opts=opts.map(x=>x===o?{...x,hint:[x.hint,line].filter(Boolean).join(' · ')}:x);
   }
  }catch(e){console.error(e);}
  return family270Base.show.call(this,title,text,opts,...rest);

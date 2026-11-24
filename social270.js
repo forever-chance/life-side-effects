@@ -126,14 +126,16 @@ function weddingsDueSoc270(){
   marrySoc270(host,partner,w,q);
  }
 }
+// Бабушки и дедушки здесь не женятся: союза между ними в игре нет, и «новый муж бабушки» при живом дедушке — ошибка.
 function weddingsPlanSoc270(){
  if(typeof npcPartner55!=='function')return;
  const own=currentPartner()?.id;
  for(const p of s.people){
-  if(!p.alive||p.age<20||!p.agency55?.partner||p.npcMarried54||p.id===own||!adultEligible55(p)||!weddingEligible132(p))continue;
+  if(!p.alive||p.age<20||p.age>75||!p.agency55?.partner||p.npcMarried54||p.id===own||['Бабушка','Дедушка'].includes(p.role)
+   ||!adultEligible55(p)||!weddingEligible132(p))continue;
   const partner=npcPartner55(p);
   if(awaySoc270(p)||awaySoc270(partner)||weddingOpenSoc270(p.id)||weddingOpenSoc270(partner.id))continue;
-  if(chance(weddingChanceSoc270))planWeddingSoc270(p);
+  if(chance(weddingChanceSoc270*(p.age>60?.5:1)))planWeddingSoc270(p);
  }
 }
 function unionOtherSoc270(p){

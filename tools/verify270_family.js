@@ -409,6 +409,30 @@ async function main() {
       await ctx.close();
     }
 
+    // 8. Случайная игра со всеми файлами: обёртки не падают при переездах, поездках и событиях.
+    {
+      const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'ru' });
+      await pg.addScriptTag({ path: path.join(ROOT, 'tools', 'harness.js') });
+      await pg.evaluate(() => {
+        __base(30); s.cash = 3e5;
+        const p = __adult('Партнер', 31, residenceCity(), 70, 'f');
+        s.housing.occupant = p.id; p.cohabit = true; ensureHome();
+        [6, 3].map(a => __kid(a, ['player', p.id])); __cat('Ночка');
+      });
+      const issues = [];
+      for (let i = 0; i < 30; i++) {
+        const st = await pg.evaluate(() => __H.run(6, 0.35));
+        issues.push(...(await pg.evaluate(() => __H.dump().issues)));
+        if (st.dead) break;
+      }
+      const ours = [...issues.filter(x => x.kind === 'exception').map(x => x.detail), ...errors].filter(x => /family270|familyCare|familyMove|familyRepair|familyPet|familyHousehold/.test(x));
+      const state = await pg.evaluate(() => ({ age: s.age, kids: ownChildren55().map(childLocal55) }));
+      console.log('случайная игра: до ' + state.age + ' лет, исключений всего ' + issues.filter(x => x.kind === 'exception').length + ', ошибок страницы ' + errors.length);
+      check('случайная игра: обёртки family270 не падают', !ours.length, ours.slice(0, 3));
+      check('случайная игра: несовершеннолетние дети живут с вами', state.kids.every(Boolean), state);
+      await ctx.close();
+    }
+
   } finally {
     await browser.close();
   }

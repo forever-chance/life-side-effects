@@ -121,6 +121,11 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         out.friendMarried = fr.npcMarried54 && fp.npcMarried54 && fr.marriage270?.spouse === fp.id;
         out.guest = s.log.find(e => e.title === 'Свадьба · ' + fr.name)?.text || null;
         out.qStatus = q?.status;
+        // Планировщик: пара друга — в план; бабушка с новым партнёром — нет.
+        const gm = T.mk('Бабушка', 70, { gender: 'f', bond: 70 }); T.pair(gm, 30);
+        const f2 = T.mk('Друг', 33, { bond: 30 }); T.pair(f2, 20);
+        const rnd0 = Math.random; Math.random = () => 0; try { weddingsPlanSoc270(); } finally { Math.random = rnd0; }
+        out.planFriend = !!weddingOpenSoc270(f2.id); out.planGran = !!weddingOpenSoc270(gm.id);
         return out;
       });
       check('свадьба: друг без партнёра не женится', r.loneEligible === false && r.loneOffer === false, r);
@@ -134,6 +139,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       check('свадьба: приглашение связано со свадьбой и принято', r.inviteLinked && r.accepted, r);
       check('свадьба: брак не пишется через месяц после рассылки', r.notYet, r);
       check('свадьба: после праздника — брак и «Вы были среди гостей»', r.friendMarried && /среди гостей/.test(r.guest || ''), r);
+      check('свадьба: планировщик берёт пару друга, но не бабушку', r.planFriend && !r.planGran, r);
       check('свадьба: без ошибок страницы', !errors.length, errors);
       await ctx.close();
     }
