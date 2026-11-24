@@ -447,6 +447,19 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       for (let i = 0; i < 20; i++) { delete childhood67().requests.outing; if (askParent67('outing')) break; }
       return s.log.find(e => /поход в кино/.test(e.title))?.text || 'не согласились';
     });
+    const monthly = await pg.evaluate(() => {
+      // 269.1: настоящий месяц с кинотеатром и со сломанным состоянием из сохранения 269.
+      s.age = 30; s.year = 2045; s.cash = 1e8; s.pending = []; if ($('#modal').open) closeModal();
+      const sp = businessCatalog253.find(b => b.name === 'Кинотеатр' && b.country === countries[s.country].name);
+      startEnterprise152('culture253', 'Месяц', sp.id); const b = s.enterprise152;
+      const m0 = s.clock.month, y0 = s.year, errors = [];
+      for (let i = 0; i < 3; i++) { try { advanceMonth(); } catch (e) { errors.push(e.message); } s.pending = []; if ($('#modal').open) closeModal(); }
+      const moved = (s.year * 12 + s.clock.month) - (y0 * 12 + m0);
+      b.cases254 = { modifiers: [] };
+      try { advanceMonth(); } catch (e) { errors.push('broken: ' + e.message); } s.pending = []; if ($('#modal').open) closeModal();
+      return { moved, errors, full: Array.isArray(b.cases254.cases) && Array.isArray(b.cases254.ledger), movedAfter: (s.year * 12 + s.clock.month) - (y0 * 12 + m0) };
+    });
+    check('кинотеатр: настоящий месяц идёт, сломанное состояние из 269 чинится', monthly.moved === 3 && monthly.movedAfter === 4 && monthly.full && !monthly.errors.length, monthly);
     check('кино: в семейном походе по детской просьбе назван детский фильм', /Смотрели «[^»]+»/.test(outing) || outing === 'нет родителя', outing);
     const more = await pg.evaluate(() => {
       const out = {}; s.age = 30; s.year = 2047; s.clock.month = 3; s.pending = []; if ($('#modal').open) closeModal();

@@ -389,6 +389,32 @@ if(typeof offerMenu47==='function'){
 // показ — меньше). Зал фильма вмещает до 1.2 его средней тяги на своих сеансах. Сеансы поровну — спрос кинотеатра
 // ровно такой, как без этой системы (множитель 1); перекладывать сеансы с провалов на хиты — до +15%, наоборот — до −15%.
 // Отчёт приходит раз в три месяца (можно раз в полгода или выключить — тогда сеансы делятся поровну).
+// 269.1: состояние событий своего дела (254) всегда полное. Кинотеатр 269 и конкурент 266 создавали b.cases254
+// только с modifiers, а businessMonth254 и businessCase254 читают cases, ledger, receivables — месяц падал, и время
+// (месяц, год, возраст) переставало идти. Чиним и новые, и уже сохранённые неполные объекты.
+const cases254Defaults269=()=>({serial:0,lastMonth:-1,cooldowns:{},cases:[],ledger:[],modifiers:[],receivables:[],allocations:{}});
+function cases254Repair269(b){
+ if(!b)return null;
+ const st=b.cases254??=cases254Defaults269();
+ for(const [k,v] of Object.entries(cases254Defaults269()))if(st[k]==null)st[k]=v;
+ return st;
+}
+function cases254RepairAll269(){
+ if(!s||typeof ownedEnterprises168!=='function')return;
+ try{for(const b of ownedEnterprises168())if(b?.cases254)cases254Repair269(b);}catch(e){}
+}
+if(typeof businessState254==='function'){
+ const businessStateBase269=businessState254;
+ businessState254=function(b,...args){const st=businessStateBase269.call(this,b,...args);if(b)cases254Repair269(b);return b?.cases254??st;};
+}
+if(typeof autonomousMonth==='function'){
+ const autonomousMonthRepair269=autonomousMonth;
+ autonomousMonth=function(...args){cases254RepairAll269();return autonomousMonthRepair269.apply(this,args);};
+}
+if(typeof loadCharacter==='function'){
+ const loadCharacterRepair269=loadCharacter;
+ loadCharacter=function(...args){const out=loadCharacterRepair269.apply(this,args);cases254RepairAll269();return out;};
+}
 const CINEMA_SESSIONS269=42;
 function cinemaBusiness269(b){return !!b&&typeof businessName265==='function'&&/Кинотеатр/.test(businessName265(b));}
 function cinemaState269(b){return b.cinema269??={every:3,next:s.clock.ticks+3,weights:{},period:{},months:0};}
@@ -411,10 +437,12 @@ if(typeof enterpriseLocationMonth168==='function'){
  enterpriseLocationMonth168=function(b,...args){
   if(!cinemaBusiness269(b)||b.status!=='active')return cinemaMonthBase269.call(this,b,...args);
   const plan=cinemaPlan269(b),tick=s.clock.ticks,before=b.last;
-  (b.cases254??={}).modifiers??=[];
-  b.cases254.modifiers=b.cases254.modifiers.filter(m=>m.case!=='cinema269');
+  // 269.1: не (b.cases254??={}) — неполный объект ронял businessMonth254, и месяц переставал идти.
+  const st254=cases254Repair269(b);
+  st254.modifiers=st254.modifiers.filter(m=>m.case!=='cinema269');
   if(plan.mult!==1)b.cases254.modifiers.push({case:'cinema269',until:tick,demand:plan.mult});
   const out=cinemaMonthBase269.call(this,b,...args);
+  cases254Repair269(b);
   const h=b.history?.at(-1);
   if(b.last===before||!h||h.tick!==tick||!plan.rep.length)return out;
   const st=cinemaState269(b),att=plan.rep.reduce((a,r)=>a+r.att,0)||1,share=plan.rep.reduce((a,r)=>a+r.share,0)||1;
