@@ -31,7 +31,7 @@ async function page(browser, cfg) {
     if ($('#modal').open) closeModal();
     s.pending = [];
   });
-  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js', 'creative262.js', 'business263.js', 'save264.js', 'business265.js', 'business266.js', 'taxes266.js'])
+  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js', 'creative262.js', 'business263.js', 'save264.js', 'business265.js', 'business266.js', 'taxes266.js', 'feed267.js'])
     if (!(await pg.evaluate(f => [...document.scripts].some(x => x.src.includes(f)), f))) await pg.addScriptTag({ path: path.join(ROOT, f) });
   return { pg, errors, ctx };
 }
@@ -373,6 +373,34 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     check('налоги: строка в итогах года с суммой с дела и гонораров', /Налог 30% с дохода \(своё дело, гонорары\): /.test(tax.text), tax);
     check('налоги: не из чего платить — недоимка на следующий год', tax.arrears === 300, tax);
     check('дело и налоги: без ошибок страницы', !errors.length, errors);
+    await ctx.close();
+  }
+
+  // 14. Лента: «Будни» (267).
+  {
+    const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'nl' });
+    const r = await pg.evaluate(() => {
+      const out = {}; s.feed267 = null; const n0 = s.log.length;
+      for (let i = 0; i < 4; i++) log('Книга клуба', 'Обсуждение.', 'Занятия');
+      log('Симптомы вернулись', 'Обострение.', 'Здоровье', true); log('Обострение закончилось', 'Прошло.', 'Здоровье');
+      log('Бумажный самолётик', 'Долетел.', 'Быт'); log('Бумажный самолётик', 'Долетел.', 'Быт');
+      out.added = s.log.length - n0; out.week = { ...s.feed267.week };
+      s.clock.month = 5; flushWeekdays267(); out.weekdays = s.log[0].title + ' | ' + s.log[0].text;
+      s.log = Array.from({ length: 499 }, (_, i) => ({ title: 'x' + i, text: '', major: i === 498, year: 1 }));
+      log('Новая запись', 'Текст.', 'Тест'); out.keepsMajor = s.log.some(e => e.title === 'x498') && s.log.length <= 500;
+      return out;
+    });
+    check('лента: рутина не пишется отдельными записями, зарисовка — раз в два года', r.added === 1 && r.week['книжный клуб'] === 4 && r.week['обострения'] === 1 && r.week['бумажный самолётик'] === 1, r);
+    check('лента: раз в три месяца — строка «Будни»', /^Будни · апрель — июнь \| Книжный клуб ×4, /.test(r.weekdays), r.weekdays);
+    check('лента: крупные записи не вытесняются при 500', r.keepsMajor, r);
+    const est = await pg.evaluate(() => {
+      const far = s.people.find(p => p.alive && !kin27(p)); if (!far) return null; far.bond = 10;
+      const n = s.log.filter(e => e.title === 'Имущество после утраты').length; far.alive = false;
+      try { openEstate58(far.id); } catch (e) { return 'err ' + e.message; }
+      return s.log.filter(e => e.title === 'Имущество после утраты').length - n;
+    });
+    check('лента: наследство дальнего знакомого не пишется в ленту', est === 0 || est === null, est);
+    check('лента: без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }
 

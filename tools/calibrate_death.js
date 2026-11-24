@@ -92,6 +92,10 @@ async function life(browser, idx, cfg) {
     // Сохранения в localStorage не нужны прогону и тормозят его к старости.
     await pg.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
     await pg.evaluate(TRACE);
+    // Счётчик записей ленты за всю жизнь (игра хранит только последние 500): заголовок, метка, крупная ли, видна ли.
+    await pg.evaluate(() => { window.__LC = {}; const base = log; log = function (title, text, tag = '', major = false, ...r) {
+      const k = String(title) + ' | ' + (tag || ''); const e = window.__LC[k] ??= { n: 0, major: 0, stored: 0, sample: String(text).slice(0, 140) }; e.n++; if (major) e.major++;
+      const head = s.log[0], out = base.call(this, title, text, tag, major, ...r); if (s.log[0] !== head) e.stored++; return out; }; });
     res.start = await pg.evaluate("({country:s.country,gender:s.gender,bg:s.background,age:s.age})");
     res.years.push(await pg.evaluate(SNAP));
     let age = res.start.age;
@@ -108,6 +112,8 @@ async function life(browser, idx, cfg) {
       if (Date.now() - t0 > 40 * 60e3) { res.timeout = true; break; }
     }
     res.issues = await pg.evaluate('__H.issues.length');
+    res.feed = await pg.evaluate(() => window.__LC || null);
+    res.quiet = await pg.evaluate(() => typeof quietEntry === 'function' ? s.log.filter(e => quietEntry(e)).length + '/' + s.log.length : null);
     res.issueList = await pg.evaluate('__H.issues.slice(0,10).map(i=>i.kind+": "+String(i.detail).slice(0,120)+" @"+i.age)');
   } catch (e) { res.fatal = String(e).slice(0, 500); }
   res.errors = errors.slice(0, 10);
