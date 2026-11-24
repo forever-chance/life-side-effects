@@ -6,7 +6,8 @@
 // оно всю жизнь стояло у 100. Теперь:
 // - у каждого возраста есть потолок: 100 до 30 лет, 88 в 50, 64 в 70, 44 в 80, 24 в 90;
 // - форма (0–100) поднимает потолок на половину расстояния до 100: при форме 60 в 70 лет — 75 вместо 64;
-// - ниже потолка здоровье каждый месяц возвращает 6% разрыва, если нет болезни, недоедания и переутомления;
+// - ниже потолка здоровье каждый месяц возвращает 6% разрыва; болезнь это останавливает,
+//   недоедание замедляет втрое, переутомление вдвое;
 // - выше потолка (после лечения, удачного года) лишнее сходит на 10% в месяц;
 // - «Восстановить силы» поднимает здоровье только до потолка;
 // - форму дают «Движение» в хобби и спортивные секции, без них она сходит к 20 за год-полтора.
@@ -27,13 +28,18 @@ function healthCeiling259(){
  return Math.round(base+(100-base)*.5*health259().fitness/100);
 }
 
+// Что мешает восстановлению и во сколько раз оно идёт медленнее.
 function healthBlockers259(){
  const out=[];
- if(s.illness)out.push('болезнь');
+ if(s.illness)out.push(['болезнь',0]);
  const food=typeof finance39==='function'?finance39().food:null;
- if(food&&food.strain>=3)out.push('недоедание');
- if(s.clock&&s.clock.fatigue>=70)out.push('переутомление');
+ if(food&&food.strain>=3)out.push(['недоедание',.35]);
+ if(s.clock&&s.clock.fatigue>=70)out.push(['переутомление',.5]);
  return out;
+}
+
+function recoveryRate259(){
+ return healthBlockers259().reduce((r,[,k])=>r*k,.06);
 }
 
 function addFitness259(n){
@@ -80,7 +86,7 @@ function healthMonth259(){
  h.fitness+=(20-h.fitness)*.08;
  const cap=healthCeiling259();
  if(s.health>cap)s.health=clamp(s.health-(s.health-cap)*.1);
- else if(!healthBlockers259().length)s.health=clamp(s.health+(cap-s.health)*.06);
+ else s.health=clamp(s.health+(cap-s.health)*recoveryRate259());
  fitnessNotes259();
 }
 
@@ -123,7 +129,7 @@ healthMenu=function(){
  everydayState();
  const h=health259(),cap=healthCeiling259(),now=Math.round(s.health),blockers=healthBlockers259();
  const lines=[`Здоровье ${now} из 100. В вашем возрасте и с вашей формой оно держится около ${cap}.`];
- if(now<cap-1)lines.push(blockers.length?'Сейчас восстановиться мешает: '+blockers.join(', ')+'.':'Ниже этого уровня здоровье понемногу возвращается само, если высыпаться и нормально есть.');
+ if(now<cap-1)lines.push(s.illness?'Пока не пройдёт болезнь, здоровье не восстанавливается.':blockers.length?'Ниже этого уровня здоровье возвращается само, но сейчас медленнее: '+blockers.map(b=>b[0]).join(', ')+'.':'Ниже этого уровня здоровье понемногу возвращается само, если высыпаться и нормально есть.');
  lines.push(`Форма ${fitnessWord259(h.fitness)} (${Math.round(h.fitness)} из 100). Её поднимают «Движение» в хобби и спортивные секции, без них она сходит за год-полтора.`);
  show('Самочувствие',lines.join('\n'),[
   {label:'Сон и восстановление',hint:'2 ч/нед., 2 мес. · усталость −25 · настроение +7 · здоровье до '+Math.max(now,cap),fn:()=>assign('rest')},
