@@ -404,6 +404,54 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     await ctx.close();
   }
 
+  // 15. Каталог фильмов (269).
+  {
+    const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'nl' });
+    const r = await pg.evaluate(() => {
+      const out = {}; s.age = 25; s.year = 2026; s.clock.month = 10;
+      out.kids = filmsAvailable269({ age: 8 }).every(f => f.minAge <= 6) && filmsAvailable269({ age: 5 }).length === 0;
+      out.ruOnly = !filmsAvailable269({ country: 'nl' }).some(f => f.country === 'Россия') && filmsAvailable269({ country: 'ru' }).some(f => f.country === 'Россия');
+      out.notYet = !filmsAvailable269().some(f => f.year === 2027) && filmsNow269(3).length > 0;
+      out.hobby = hobbies.film.slice(1).map(label => { finishTask({ kind: 'hobby', hobby: 'film', label, id: 'h-' + label, duration: 1, progress: 1, hours: 2 }); return s.log[0].text; });
+      const p = s.people.find(p => p.alive && p.age >= 18 && p.country === s.country && (!p.city18 || p.city18 === residenceCity()));
+      if (p) { task16('meeting53', 'Сходить в кино · ' + p.name, 1, { person53: p.id, meeting53: 'cinema', home53: s.country, city53: residenceCity(), partner53: false, startCostRatio: 0 }, 2); const t = s.clock.tasks.at(-1); t.progress = t.duration; finishTask(t); out.meeting = s.log.find(e => e.title === 'Сходить в кино')?.text || ''; }
+      out.stats = practiceDetails250('film');
+      // Киноклуб: фильм раз в месяц участия, в ленте — «Будни».
+      s.cash = 1e7; path16().languages[activityLanguage86('cinema269')] = 6; joinClub19('cinema269');
+      const m = clubState19().memberships.find(m => m.type === 'cinema269');
+      if (m) { s.feed267 = null; for (let i = 0; i < 3; i++) { s.clock.ticks++; clubProgramMonth245(m); } out.club = m.films269.length === 3 && new Set(m.films269).size === 3 && s.feed267.week['киноклуб'] === 3; }
+      // Будущее: с 2028 года в каждом месяце не меньше двух премьер, одни и те же после перезагрузки.
+      s.year = 2061; s.clock.month = 6;
+      const now = filmsNow269(1), ids = now.map(f => f.id + f.title + f.director).join();
+      futureCache269.clear(); const again = filmsNow269(1).map(f => f.id + f.title + f.director).join();
+      out.future = now.length >= 2 && ids === again && now.every(f => f.generated && f.title && f.director && f.summary) && !!filmById269(now[0].id);
+      return out;
+    });
+    check('кино: дети видят только детские фильмы, до 6 лет — ничего', r.kids, r);
+    check('кино: российские премьеры только в России, анонсы 2027 ещё не вышли', r.ruOnly && r.notYet, r);
+    check('кино: у ретроспективы, обсуждения и домашней программы есть фильмы', r.hobby.length === 3 && r.hobby.every(t => /«[^»]+»/.test(t) && !/Занятие увлекло/.test(t)), r.hobby);
+    check('кино: в походе в кино назван фильм', /Смотрели «[^»]+» \(\d{4}\)\./.test(r.meeting), r.meeting);
+    check('кино: в увлечении видно, сколько посмотрено и любимый фильм', /Посмотрено фильмов: \d+\. Любимый — «/.test(r.stats), r.stats);
+    check('кино: киноклуб — новый фильм каждый месяц, в ленте через «Будни»', r.club, r);
+    check('кино: после каталога премьеры придумываются и не меняются', r.future, r);
+    const biz = await pg.evaluate(() => {
+      s.age = 30; s.year = 2045; s.cash = 1e8;
+      const spec = businessCatalog253.find(b => b.name === 'Кинотеатр' && b.country === countries[s.country].name);
+      if (!spec || !startEnterprise152('culture253', 'Проверка', spec.id)) return 'не открылось';
+      enterpriseMenu152(); const t = [...document.querySelectorAll('#modal p')].map(p => p.textContent).join(' '); closeModal(); return t;
+    });
+    check('кино: в меню кинотеатра виден репертуар', /В прокате: «/.test(biz), biz.slice(-200));
+    const outing = await pg.evaluate(() => {
+      s.age = 9; const par = parents17().find(childLocal55); if (!par) return 'нет родителя';
+      par.privateCash = 1e8; par.bond = 100;
+      for (let i = 0; i < 20; i++) { delete childhood67().requests.outing; if (askParent67('outing')) break; }
+      return s.log.find(e => /поход в кино/.test(e.title))?.text || 'не согласились';
+    });
+    check('кино: в семейном походе по детской просьбе назван детский фильм', /Смотрели «[^»]+»/.test(outing) || outing === 'нет родителя', outing);
+    check('кино: без ошибок страницы', !errors.length, errors);
+    await ctx.close();
+  }
+
   await browser.close();
   const bad = results.filter(r => !r.ok);
   console.log(`\n${results.length - bad.length}/${results.length} проверок прошли`);
