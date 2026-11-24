@@ -27,6 +27,8 @@ async function bench(browser, country) {
   await pg.click('text=Родиться');
   await pg.waitForFunction("typeof s!=='undefined'&&s&&s.clock");
   if (!process.env.BASE && !(await pg.evaluate(() => typeof business263 !== 'undefined'))) await pg.addScriptTag({ path: path.join(ROOT, 'business263.js') });
+  if (!process.env.BASE && !(await pg.evaluate(() => typeof businessSeason265 !== 'undefined'))) await pg.addScriptTag({ path: path.join(ROOT, 'business265.js') });
+  if (process.env.SCENARIOS) await pg.evaluate(v => { window.BENCH_SCENARIOS = v.split(','); }, process.env.SCENARIOS);
   const res = await pg.evaluate(N => {
     try { if (typeof startupNotice180 === 'function' && startupNotice180()) finishStartup180(false); if (typeof tutorialActive180 === 'function' && tutorialActive180()) endTutorial180('skipped'); } catch (e) {}
     s.age = 30; s.skill = 50; s.illness = null; s.pending = [];
@@ -37,8 +39,11 @@ async function bench(browser, country) {
     // Сохранение и перерисовка на расчёт не влияют, а на каждом шаге съедают память страницы.
     const quiet = log, sv = save, rd = render; log = () => {}; save = () => {}; render = () => {};
     try {
-      for (const [scName, [mode, staffN]] of Object.entries(scenarios)) for (const type of ['studio', 'services', 'shop']) for (let i = 0; i < N; i++) {
-        const specs = Object.keys(enterpriseSpecialties153[type]).filter(k => k !== 'school196');
+      const types = (window.BENCH_TYPES || Object.keys(enterpriseTypes152));
+      const specsOf = type => type.endsWith('253') ? businessCatalog253.filter(b => b.type === type && enterpriseAvailable253(b.id)).map(b => b.id) : Object.keys(enterpriseSpecialties153[type]).filter(k => k !== 'school196');
+      for (const [scName, [mode, staffN]] of Object.entries(window.BENCH_SCENARIOS ? Object.fromEntries(Object.entries(scenarios).filter(([k]) => window.BENCH_SCENARIOS.includes(k))) : scenarios)) for (const type of types) for (let i = 0; i < N; i++) {
+        const specs = specsOf(type);
+        if (!specs.length) break;
         const spec = specs[i % specs.length];
         s.enterprise152 = null; s.otherEnterprises168 = []; s.cash = 1e9;
         if (!startEnterprise152(type, 'Стенд ' + i, spec)) { out.push({ scName, type, failed: true }); continue; }
@@ -80,7 +85,7 @@ const q = (a, p) => { const x = a.filter(v => v != null).sort((m, n) => m - n); 
   await browser.close();
   console.log(process.env.BASE ? 'Старая модель' : 'Модель 263', '·', COUNTRIES.join(' '), '·', N, 'дел на сценарий, тип и страну');
   console.log('сценарий   тип       убыток 1-й год  закрыто за 5 лет  маржа медиана (25–75%)   владелец, средних зарплат в год: медиана (25–75%)');
-  for (const sc of ['self', 'selfStaff', 'partial', 'manager']) for (const type of ['studio', 'services', 'shop', 'all']) {
+  for (const sc of ['self', 'selfStaff', 'partial', 'manager']) for (const type of [...new Set(all.map(x => x.type))].concat('all')) {
     const g = all.filter(x => x.scName === sc && (type === 'all' || x.type === type) && !x.failed);
     if (!g.length) continue;
     const pct = f => (100 * g.filter(f).length / g.length).toFixed(0).padStart(3) + '%';

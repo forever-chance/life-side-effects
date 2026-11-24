@@ -28,6 +28,10 @@ const business263={
 };
 
 function businessW263(b){return countries[b.country].wage/12;}
+// Переопределяются в business265.js; здесь — поведение 263 для трёх исходных видов.
+function businessBase263(b){return business263.base[b.type]??1.8;}
+function businessUnit263(b){return business263.unit[b.type]??2.2;}
+function businessSeason263(b){return 1+.08*Math.sin((s.clock.month??0)/12*2*Math.PI);}
 // Дело из старого сохранения не занимало ни часа. Пока владелец не выберет режим, считаем «частично»
 // и один раз спрашиваем окном.
 function businessMode263(b){
@@ -89,11 +93,13 @@ enterpriseLocationMonth168=function(business){
  const age=s.clock.ticks-(business.opened159??s.clock.ticks);
  const ramp=Math.min(1,.35+.65*age/12);
  business.fresh263*=Math.pow(.975,1/12);
- const season=1+.08*Math.sin((s.clock.month??0)/12*2*Math.PI);
- const demand=business263.base[business.type]*(market?.demand??1)*skill*business.fit263*ramp*business.fresh263*
+ /* 265: спрос, выработка и сезон — по каждому виду дела (businessBase263 / businessUnit263 / businessSeason263),
+    раньше только для студии, услуг и магазина: у 13 видов из каталога 253 спрос был NaN */
+ const season=businessSeason263(business);
+ const demand=businessBase263(business)*(market?.demand??1)*skill*business.fit263*ramp*business.fresh263*
   pricing.demand*space.demand*ads*scenario254('demand')*(1+(event?.[2]??0))*(.85+Math.random()*.3)*season;
  const capacity=((present?cfg.units:0)+staff.length+(mode==='manager'?1:0))*space.capacity*(business.equipment156?1.12:1);
- const primarySales=Math.round(business263.unit[business.type]*W*Math.min(demand,capacity)*pricing.price*scenario254('price'));
+ const primarySales=Math.round(businessUnit263(business)*W*Math.min(demand,capacity)*pricing.price*scenario254('price'));
  const wage=enterpriseWage155(business);
  const payroll=wage*staff.length+(mode==='manager'?Math.round(W*1.3):0);
  const rent=enterpriseRent157(business);

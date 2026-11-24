@@ -31,7 +31,7 @@ async function page(browser, cfg) {
     if ($('#modal').open) closeModal();
     s.pending = [];
   });
-  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js', 'creative262.js', 'business263.js', 'save264.js'])
+  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js', 'creative262.js', 'business263.js', 'save264.js', 'business265.js'])
     if (!(await pg.evaluate(f => [...document.scripts].some(x => x.src.includes(f)), f))) await pg.addScriptTag({ path: path.join(ROOT, f) });
   return { pg, errors, ctx };
 }
@@ -295,6 +295,33 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     check('сохранение: через полсекунды изменения в хранилище сами', r.afterTimer === 22222, r);
     check('сохранение: «Начать новую жизнь» сразу после изменения не теряет прошлую', r.afterNewLife === 33333, r);
     check('сохранение: без ошибок страницы', !errors.length, errors);
+    await ctx.close();
+  }
+
+  // 12. Экономика по видам дела (265).
+  {
+    const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'nl' });
+    const r = await pg.evaluate(() => {
+      s.age = 30; s.illness = null; const out = { bad: [], types: 0 };
+      for (const type of Object.keys(enterpriseTypes152)) {
+        const spec = type.endsWith('253') ? businessCatalog253.find(b => b.type === type && enterpriseAvailable253(b.id))?.id : Object.keys(enterpriseSpecialties153[type]).find(k => k !== 'school196');
+        if (!spec) continue;
+        s.enterprise152 = null; s.otherEnterprises168 = []; s.cash = 1e9;
+        if (!startEnterprise152(type, 'Проверка', spec)) { out.bad.push(type + ': не открылось'); continue; }
+        const b = s.enterprise152; out.types++;
+        for (let i = 0; i < 6; i++) { s.clock.ticks++; enterpriseLocationMonth168(b); }
+        if (!b.history.length || !b.history.every(h => Number.isFinite(h.sales) && Number.isFinite(h.costs)) || !Number.isFinite(b.cash)) out.bad.push(type);
+      }
+      const b = s.enterprise152; b.cash = NaN; b.history.push({ sales: NaN, costs: NaN, cash: NaN }); repairBusiness265();
+      out.repaired = Number.isFinite(b.cash) && b.cash > 0 && b.history.every(h => Number.isFinite(h.sales));
+      const cinema = businessCatalog253.find(x => /Кинотеатр/.test(x.name) && enterpriseAvailable253(x.id));
+      out.cinema = cinema ? enterpriseMarket165({ type: 'culture253', specialty: cinema.id, country: s.country, city: residenceCity() })?.variable : null;
+      return out;
+    });
+    check('экономика дел: все виды, доступные в стране, дают конечные числа на полгода', r.types >= 8 && !r.bad.length, r);
+    check('экономика дел: дело, сломанное в 263, чинится', r.repaired, r);
+    check('экономика дел: кинотеатр отдаёт прокатчикам 47%', r.cinema === .47, r);
+    check('экономика дел: без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }
 
