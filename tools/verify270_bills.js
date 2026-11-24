@@ -3,6 +3,8 @@
 // Игра раздаётся с диска, сервер не нужен:  node tools/verify270_bills.js
 // BASE=1 — прогон без исправления: 11 старых файлов раздаются из коммита BASE_REV (по умолчанию 56c15c9, до правки),
 // bills270.js не подключается. Видно, какие проверки ловят старое поведение.
+// BILLS_REV=<коммит> — bills270.js из этого коммита (остальное как есть): проверка слияния против прежней версии
+// миграции, например BILLS_REV=97e440e — до исправления удвоенного графика (раздел 5).
 // Для проверок сохранений страница перезагружается в порядке сборки: index.html раздаётся с bills270.js перед
 // bootstrap61.js (только в памяти, файлы на диске не меняются).
 const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
@@ -13,7 +15,9 @@ const BASE = process.env.BASE === '1', BASE_REV = process.env.BASE_REV || '56c15
 const FIXED = ['business-events254.js', 'decisions61.js', 'finance32.js', 'finance35.js', 'finance36.js', 'finance39.js', 'finance40.js',
   'housing41.js', 'structure65.js', 'students68.js', 'tuition44.js'];
 const OLD = BASE ? Object.fromEntries(FIXED.map(f => [f, execFileSync('git', ['-C', ROOT, 'show', BASE_REV + ':' + f])])) : {};
-const served = f => BASE && OLD[f] ? OLD[f] : fs.readFileSync(path.join(ROOT, f));
+const BILLS_REV = process.env.BILLS_REV || '';
+const BILLS = BILLS_REV ? execFileSync('git', ['-C', ROOT, 'show', BILLS_REV + ':bills270.js']) : null;
+const served = f => BASE && OLD[f] ? OLD[f] : BILLS && f === 'bills270.js' ? BILLS : fs.readFileSync(path.join(ROOT, f));
 let pass = 0, fail = 0;
 const check = (ok, label, extra = '') => { ok ? pass++ : fail++; console.log((ok ? 'ok   ' : 'FAIL ') + label + (ok || !extra ? '' : ' — ' + (typeof extra === 'string' ? extra : JSON.stringify(extra)).slice(0, 700))); };
 
@@ -62,7 +66,7 @@ async function page(browser) {
     if ($('#modal').open) closeModal();
     s.pending = [];
   });
-  if (!BASE && !(await pg.evaluate(() => [...document.scripts].some(x => x.src.includes('bills270.js'))))) await pg.addScriptTag({ path: path.join(ROOT, 'bills270.js') });
+  if (!BASE && !(await pg.evaluate(() => [...document.scripts].some(x => x.src.includes('bills270.js'))))) await pg.addScriptTag({ content: String(served('bills270.js')) });
   await pg.evaluate(helpers);
   return { pg, errors, ctx, state };
 }
@@ -98,7 +102,7 @@ function helpers() {
 
 (async () => {
   const browser = await chromium.launch();
-  console.log(BASE ? `BASE=1: старые файлы из ${BASE_REV}, без bills270.js` : 'с исправлением');
+  console.log(BASE ? `BASE=1: старые файлы из ${BASE_REV}, без bills270.js` : BILLS_REV ? `bills270.js из ${BILLS_REV}` : 'с исправлением');
 
   // 0. Исходники: 33 строки «счета», ни одного «счёта» во множественном числе; родительный единственного с ё.
   {
@@ -326,7 +330,54 @@ function helpers() {
     'два графика: один долг 100, график 60+40 по 5+4 в месяц, второй график — в прежних', d.merged);
   check(d.after && d.after.count === 1 && d.after.balance === 91 && d.after.remaining === 91 && d.after.status === 'scheduled', 'два графика: месяц с деньгами — списан общий платёж 9, долг и график 91', d.after);
 
-  // 5. Ошибки страницы.
+  // 5. График был только у нового долга «счёта» (у старого «счета» графика нет — две карточки, график приняли по одной).
+  // После слияния график тот же: покрывает свою часть, платёж прежний, история и прежние договорённости по разу.
+  const e = await pg.evaluate(() => {
+    const out = {};
+    B.calm();
+    const t = s.clock.ticks, c = s.country, basics = () => s.debts.filter(d => d.type === 'bill32' && d.billKind32 === 'basics');
+    const plant = keepHistory => {
+      s.debts = s.debts.filter(d => !(d.type === 'bill32' && d.billKind32 === 'basics'));
+      const old = { id: 'bill32-921', type: 'bill32', billKind32: 'basics', creditor32: 'Бытовые счета · ' + c, country: c, balance: 100, principal: 100, rate: 0, payment: 0, paid: 0, missed: 2, started: t - 12, due: t - 12, history32: [{ tick: t - 12, due: 100, paid: 0, added: 100 }], status32: 'overdue' };
+      if (!keepHistory) delete old.history32;
+      const q = { id: 'plan-y', kind: 'installments', created: t - 4, retryAt: t + 2, expires: t - 2, chance: 1, roll: 0, status: 'accepted', decided: t - 3, monthly: 10, covered: 60 };
+      s.debts.push(old, { id: 'bill32-922', type: 'bill32', billKind32: 'basics', creditor32: 'Бытовые счёта · ' + c, country: c, balance: 40, principal: 60, rate: 0, payment: 0, paid: 20, missed: 1, started: t - 5, due: t - 5,
+        history32: [{ tick: t - 5, due: 60, paid: 0, added: 60 }, { tick: t - 4, due: 0, paid: 0 }], status32: 'scheduled',
+        negotiation35: q, negotiations35: [q], previousPlans35: [{ id: 'plan-x', status: 'cancelled', remaining: 30, monthly: 3, next: t - 20, expectedEnd: t - 9, missed: 0, history: [] }],
+        repayment35: { id: 'plan-y', status: 'active', remaining: 40, monthly: 10, next: t + 1, expectedEnd: t + 4, missed: 0, history: [{ key: 'plan-y:' + (t - 2), tick: t - 2, due: 10, paid: 10, country: c }, { key: 'plan-y:' + (t - 1), tick: t - 1, due: 10, paid: 10, country: c }] } });
+      s.debts = JSON.parse(JSON.stringify(s.debts)); // как после загрузки сохранения
+    };
+    const view = () => basics().map(d => ({ id: d.id, balance: Math.round(d.balance * 100) / 100, status: d.status32, history: (d.history32 || []).length,
+      plan: d.repayment35 && { id: d.repayment35.id, status: d.repayment35.status, remaining: Math.round(d.repayment35.remaining * 100) / 100, monthly: d.repayment35.monthly, history: d.repayment35.history.length },
+      previous: (d.previousPlans35 || []).map(p => p.id + ':' + p.status), asked: (d.negotiations35 || []).map(q => q.id), talk: d.negotiation35?.id || null,
+      due: typeof billDue35 === 'function' ? Math.round(billDue35(d) * 100) / 100 : null }));
+    plant(true);
+    out.n = typeof billsMigrate270 === 'function' ? billsMigrate270() : 'нет billsMigrate270';
+    out.merged = view();
+    // Месяц с деньгами: текущие счета оплачены, по графику списан прежний платёж 10, старая часть ждёт решения игрока.
+    B.calm(); s.cash = 1e6; advanceMonth(); B.calm();
+    out.after = view();
+    // У старого долга нет даже истории: история нового долга тоже по разу.
+    plant(false);
+    out.n2 = typeof billsMigrate270 === 'function' ? billsMigrate270() : 'нет billsMigrate270';
+    out.bare = view();
+    return out;
+  });
+  const em = e.merged[0];
+  check(e.merged.length === 1 && em.id === 'bill32-921' && em.balance === 140 && em.status === 'overdue' && em.history === 3,
+    'график только у долга «счёта»: один долг 100+40, просрочен (старая часть вне графика), история обоих', e.merged);
+  check(em?.plan?.id === 'plan-y' && em.plan.status === 'active' && em.plan.remaining === 40 && em.plan.monthly === 10 && em.plan.history === 2,
+    'график только у долга «счёта»: график прежний — покрывает 40, платёж 10, два платежа в истории (не удвоен)', em?.plan);
+  check(em && em.previous.join() === 'plan-x:cancelled' && em.asked.join() === 'plan-y' && em.talk === 'plan-y' && em.due === 110,
+    'график только у долга «счёта»: прежняя договорённость и переговоры по разу; к оплате 100 вне графика + 10 по графику', em);
+  const ea = e.after[0];
+  check(e.after.length === 1 && ea.balance === 130 && ea.plan?.remaining === 30 && ea.plan.monthly === 10 && ea.plan.history === 3,
+    'график только у долга «счёта»: месяц с деньгами — по графику списано 10 (не 20), долг 130, график 30', e.after);
+  const eb = e.bare[0];
+  check(e.bare.length === 1 && eb.balance === 140 && eb.history === 2 && eb.plan?.remaining === 40 && eb.plan.monthly === 10 && eb.plan.history === 2 && eb.previous.join() === 'plan-x:cancelled',
+    'старый долг без истории и графика: история, график и прежние договорённости нового долга — по разу', e.bare);
+
+  // 6. Ошибки страницы.
   check(!errors.length, 'без ошибок страницы', errors);
   await ctx.close();
   await browser.close();
