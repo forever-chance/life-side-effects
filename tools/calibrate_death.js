@@ -4,7 +4,9 @@
 //   node tools/calibrate_death.js OUT.jsonl N MAX_AGE POLICY SEED [DEATH]
 //
 // POLICY: random — случайные действия harness.js;
-//         care   — то же плюс «Восстановить силы» всегда в расписании, «Движение» каждый месяц, врач при болезни.
+//         care   — то же плюс «Восстановить силы» всегда в расписании, «Движение» каждый месяц, врач при болезни;
+//         smoker / drinker — случайный игрок, который с 18 лет курит или пьёт регулярно и сильно;
+//         creative — с 18 лет иллюстратор: берёт лучший доступный заказ, без заказа делает работу в портфолио.
 // DEATH:  off — смерть только в 100 (снять траекторию здоровья);
 //         old — как было до 258 (только после 75); new — mortality258.js, как в игре.
 const fs = require('fs'), path = require('path');
@@ -14,6 +16,7 @@ const ROOT = path.resolve(__dirname, '..');
 const [OUT = 'trajectories.jsonl', N = '4', MAX_AGE = '100', POLICY = 'random', SEED = '1', DEATH = 'new'] = process.argv.slice(2);
 const HARNESS = fs.readFileSync(path.join(__dirname, 'harness.js'), 'utf8').replace(/console\.log\(/g, '(()=>{})(');
 const NEW_DEATH = 'mortality258()||s.age>=100';
+const CREATIVE_TRACK = 'finearts';
 const OLD_DEATH = 's.age>75&&chance(Math.min(.8,(s.age-74)*.018+(100-s.health)*.002))||s.age>=100';
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
 
@@ -43,7 +46,7 @@ const TRACE = `(()=>{let h=s.health;window.__HA={};Object.defineProperty(s,'heal
   if(m&&m[2]!=='harness.js'){src=m[2]+':'+(m[1]||'?').replace(/^Object\\./,'');break}}src+=d<0?' -':' +';__HA[src]=(__HA[src]||0)+d}h=v}})})()`;
 
 const SNAP = `(()=>{const h=habits78();const z=s.health25;const src=window.__HA||{};window.__HA={};return {age:s.age,health:+s.health.toFixed(2),fatigue:Math.round(s.clock.fatigue),mood:Math.round(s.mood),
-  ill:!!s.illness,chronic:(z&&z.conditions||[]).length,smoke:h.smoke.strength||0,drink:h.drink.strength||0,cash:Math.round(s.cash),dead:!!s.dead,fitness:typeof health259==='function'?Math.round(health259().fitness):null,ceiling:typeof healthCeiling259==='function'?healthCeiling259():null,trend:Number.isFinite(s.healthTrend258)?+s.healthTrend258.toFixed(1):null,
+  ill:!!s.illness,chronic:(z&&z.conditions||[]).length,smoke:h.smoke.strength||0,drink:h.drink.strength||0,cash:Math.round(s.cash),dead:!!s.dead,creative:typeof creative47==='function'?(()=>{const x=creative47(),done=x.applications.filter(a=>a.status==='completed'&&a.offer.track==='${CREATIVE_TRACK}');return {works:x.works.filter(w=>w.track==='${CREATIVE_TRACK}').length,paid:Math.round(done.reduce((n,a)=>n+(a.paid||0),0)),hours:Math.round(done.reduce((n,a)=>n+a.offer.hours*a.offer.duration*52/12,0)),level:Math.max(0,...x.works.filter(w=>w.track==='${CREATIVE_TRACK}').map(w=>w.level184||0)),rep:s.reputation262?.['${CREATIVE_TRACK}']?.value??null,wage:c().wage}})():null,smokeYears:typeof habits78==='function'?+(habits78().smoke.years261||0).toFixed(1):null,drinkYears:typeof habits78==='function'?+(habits78().drink.years261||0).toFixed(1):null,fitness:typeof health259==='function'?Math.round(health259().fitness):null,ceiling:typeof healthCeiling259==='function'?healthCeiling259():null,trend:Number.isFinite(s.healthTrend258)?+s.healthTrend258.toFixed(1):null,
   src:Object.fromEntries(Object.entries(src).map(([k,v])=>[k,+v.toFixed(2)]))}})()`;
 
 // Заботливый игрок: отдых всегда в расписании (случайные клики harness.js иногда ставят его на паузу —
@@ -53,6 +56,21 @@ const SNAP = `(()=>{const h=habits78();const z=s.health25;const src=window.__HA|
 const CARE = `(()=>{if(s.dead||s.age<16)return;const r=s.clock.tasks.find(t=>t.kind==='rest');if(!r)assign('rest');else if(r.state==='paused')pauseTask05(r.id);
   if(typeof health259==='function'&&window.__careTick!==s.clock.ticks){window.__careTick=s.clock.ticks;addFitness259(4);}
   const a=s.illness;if(a&&!a.treated){a.treated=true;a.left=Math.min(a.left||2,2);}})()`;
+
+// Курильщик / пьющий: с 18 лет привычка всегда регулярная и сильная (6). Оплата привычки в прогоне всегда проходит —
+// случайные клики держат деньги у нуля, а в игре без денег привычка уходит в «сокращение». Это допущение прогона.
+const HABIT = kind => `(()=>{if(s.dead||s.age<18||typeof habits78!=='function')return;if(!window.__habitPay){window.__habitPay=1;const pay=payExpense23;
+  payExpense23=function(amount,label,key,...r){if(String(key||'').startsWith('habit78:'))return true;return pay.call(this,amount,label,key,...r)}}
+  const h=habits78()['${kind}'];h.strength=6;delete h.mode;h.withdrawal261=0;})()`;
+
+// Творческая карьера: с 18 лет иллюстрации (finearts) — лучший доступный заказ, принять каждое предложение,
+// без заказа — работа для портфолио. Случайных кликов меньше (5%), чтобы они не отменяли работу.
+const CREATIVE = `(()=>{if(s.dead||s.age<18||typeof creative47!=='function')return;const x=creative47(),tick=s.clock.ticks;
+  for(const a of x.applications)if(a.status==='offered'&&tick<a.until&&creativeTasks47().length<3)acceptCreative47(a.id);
+  if(creativeTasks47().length||s.clock.tasks.some(t=>t.kind==='creativeReview47'&&!['completed','cancelled'].includes(t.state)))return;
+  const offers=creativeMarket47('${CREATIVE_TRACK}').filter(o=>!x.applications.some(a=>a.offer.id===o.id)&&!creativeCheck47(o).why.length)
+    .sort((a,b)=>(b.level184||1)-(a.level184||1)||b.fee-a.fee);
+  if(offers[0])applyCreative47(offers[0].id);else sampleWork47('${CREATIVE_TRACK}');})()`;
 
 async function life(browser, idx, cfg) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -84,7 +102,7 @@ async function life(browser, idx, cfg) {
         while (!s.dead && s.age === a0 && n++ < 400) { if (care) eval(care); __H.run(1, act); }
         __H.texts = []; __H.actions = [];
         return { age: s.age, dead: s.dead };
-      }, [POLICY === 'care' ? CARE : '', 0.25]);
+      }, [POLICY === 'care' ? CARE : POLICY === 'smoker' ? HABIT('smoke') : POLICY === 'drinker' ? HABIT('drink') : POLICY === 'creative' ? CREATIVE : '', POLICY === 'creative' ? 0.05 : 0.25]);
       if (st.age !== age || st.dead) { res.years.push(await pg.evaluate(SNAP)); age = st.age; }
       if (st.dead || st.age >= +MAX_AGE) break;
       if (Date.now() - t0 > 40 * 60e3) { res.timeout = true; break; }

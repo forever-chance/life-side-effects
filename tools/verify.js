@@ -1,6 +1,6 @@
-// Точечные проверки сборок 259–260: меню здоровья, питомцы, помёт, просьба о питомце, праздники.
-// Игра раздаётся с диска, сервер не нужен:  node tools/verify260.js
-// Если pets260.js / holidays260.js ещё не подключены в index.html, скрипт подгружает их сам.
+// Точечные проверки сборок 259 и дальше: здоровье и смерть, питомцы, помёт, просьба о питомце, праздники, привычки.
+// Игра раздаётся с диска, сервер не нужен:  node tools/verify.js
+// Если новые файлы ещё не подключены в index.html, скрипт подгружает их сам.
 const fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
@@ -31,7 +31,7 @@ async function page(browser, cfg) {
     if ($('#modal').open) closeModal();
     s.pending = [];
   });
-  for (const f of ['pets260.js', 'holidays260.js'])
+  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js'])
     if (!(await pg.evaluate(f => [...document.scripts].some(x => x.src.includes(f)), f))) await pg.addScriptTag({ path: path.join(ROOT, f) });
   return { pg, errors, ctx };
 }
@@ -165,6 +165,54 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     const last = await pg.evaluate("s.log[0]&&s.log[0].title+' | '+s.log[0].text");
     check('праздник: запись называет праздник', /Кингсдей \| Вы заглядываете на «Кингсдей»/.test(last), last);
     check('праздник: без ошибок страницы', !errors.length, errors);
+    await ctx.close();
+  }
+
+  // 8. Привычки (261).
+  {
+    const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'no' });
+    const cost = await pg.evaluate(() => { const h = habits78().smoke; h.strength = 6; delete h.mode; return { cost: habitCost78('smoke'), month: c().wage / 12 }; });
+    check('привычки: регулярное курение стоит около 7% месячной зарплаты', Math.abs(cost.cost / cost.month - .07) < .005, cost);
+    const ceil = await pg.evaluate(() => {
+      s.age = 55; const h = habits78().smoke; h.strength = 6; delete h.mode; h.years261 = 30;
+      const withHabit = healthCeiling259(); h.strength = 0; h.years261 = 0; const without = healthCeiling259();
+      h.strength = 6; h.years261 = 30; s.illness = null; healthMenu();
+      return { withHabit, without, text: [...document.querySelectorAll('#modal p')].map(p => p.textContent).join(' ') };
+    });
+    check('привычки: курение опускает потолок здоровья (5 + стаж)', ceil.without - ceil.withHabit >= 11 && ceil.without - ceil.withHabit <= 12, ceil);
+    check('привычки: меню «Самочувствие» говорит, сколько отнимает курение', /Курение сейчас опускает этот уровень на 1[12]/.test(ceil.text), ceil.text);
+    await pg.evaluate(() => closeModal());
+    const wd = await pg.evaluate(() => {
+      s.pending = []; s.mood = 70; const h = habits78().smoke; h.strength = 5; h.lastMode261 = undefined; h.mode = 'pause'; h.used = -5;
+      const rnd = Math.random; Math.random = () => .99; try { habitMonth261({ smoke: 5, drink: 0 }); } finally { Math.random = rnd; }
+      return { withdrawal: h.withdrawal261, log: s.log.find(e => e.title === 'Без сигарет')?.text || '', mood: s.mood };
+    });
+    check('привычки: отказ при зависимости даёт ломку (первый из двух месяцев уже засчитан)', wd.withdrawal === 1 && wd.log && wd.mood === 67, wd);
+    const cr = await pg.evaluate(() => {
+      s.pending = []; s.mood = 30; const h = habits78().smoke;
+      const rnd = Math.random; Math.random = () => 0; try { habitMonth261({ smoke: 5, drink: 0 }); } finally { Math.random = rnd; }
+      return s.pending.map(q => q.type + ':' + q.kind);
+    });
+    check('привычки: в тяжёлый месяц тянет сорваться', cr[0] === 'craving261:smoke', cr);
+    await pg.evaluate(() => resolvePending());
+    let m = await pg.evaluate(modal);
+    check('привычки: окно тяги с риском словами', m.title === 'Тянет закурить' && m.buttons.some(b => /Перетерпеть.*(получится|рискованно)/.test(b)), m);
+    await pg.evaluate(() => { const rnd = Math.random; Math.random = () => .99; try { [...document.querySelectorAll('#modal .options button')].find(b => /Перетерпеть/.test(b.textContent)).click(); } finally { Math.random = rnd; } });
+    check('привычки: перетерпеть удалось — запись «Выдержали»', await pg.evaluate(() => s.log[0].title === 'Выдержали' && habits78().smoke.mode === 'pause'), null);
+    await pg.evaluate(() => { s.cash += 1e6; habitDetail78('smoke'); });
+    m = await pg.evaluate(modal);
+    check('привычки: меню привычки называет цену, здоровье и группу поддержки', /обходится в/.test(m.text) && /ниже, чем могло бы/.test(m.text) && m.buttons.some(b => /группу поддержки/.test(b)) && !m.buttons.some(b => /Обсудить с /.test(b)), m);
+    await pg.evaluate(click('/группу поддержки/'));
+    const quit = await pg.evaluate(() => { const t = s.clock.tasks.find(t => t.kind === 'quit261'); if (!t) return null; const before = habits78().smoke.strength; finishTask(t); return { before, after: habits78().smoke.strength, log: s.log[0].title }; });
+    check('привычки: группа поддержки в расписании снижает силу привычки', quit && quit.after === quit.before - 2 && quit.log === 'Три месяца в группе', quit);
+    const ev = await pg.evaluate(() => { const h = habits78().drink; h.strength = 6; delete h.mode; const n = s.log.length; drinkEvent261(h); return { added: s.log.length > n || s.log[0].title, title: s.log[0].title }; });
+    check('привычки: тяжёлая выпивка даёт событие', ['Ссора', 'Разговор с начальством', 'Ночь в участке', 'Утро'].includes(ev.title), ev);
+    const cn = await pg.evaluate(() => { const p = s.people.find(p => p.alive && p.age >= 18 && childLocal55(p)); if (!p) return null; s.pending = [{ type: 'concern261', kind: 'drink', personId: p.id }]; resolvePending(); return p.name; });
+    m = await pg.evaluate(modal);
+    check('привычки: близкий заговаривает о выпивке', cn && m.title === 'Разговор · ' + cn && m.buttons.some(b => /Попросить помочь бросить/.test(b)), { cn, m });
+    await pg.evaluate(click('/Попросить помочь бросить/'));
+    check('привычки: просьба о помощи — пауза с поддержкой', await pg.evaluate(() => habits78().drink.mode === 'pause' && habits78().drink.supported === s.clock.ticks && s.log[0].title === 'Разговор'), null);
+    check('привычки: без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }
 
