@@ -730,8 +730,8 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       if ($('#modal').open) closeModal(); s.clock.running = false;
       return out;
     });
-    check('счета: «×» — 3 месяца тишины, окно само не открывается, автоигра идёт', bills.first === 'Закрыть старые счёта' && bills.label === 'Скрыть на 3 месяца' && bills.x && bills.months.every(m => !m.open && m.running) && !bills.months[0].shown && !bills.months[1].shown && bills.months[2].shown, bills);
-    check('счета: тишина только сразу после отсрочки, «Напомнить через три месяца» — та же отсрочка', bills.later.open && bills.later.title === 'Закрыть старые счёта' && !bills.later.running && bills.menuLater.status === 'later' && bills.menuLater.postponed && bills.menuLater.next === 3, bills);
+    check('счета: «×» — 3 месяца тишины, окно само не открывается, автоигра идёт', bills.first === 'Закрыть старые счета' && bills.label === 'Скрыть на 3 месяца' && bills.x && bills.months.every(m => !m.open && m.running) && !bills.months[0].shown && !bills.months[1].shown && bills.months[2].shown, bills);
+    check('счета: тишина только сразу после отсрочки, «Напомнить через три месяца» — та же отсрочка', bills.later.open && bills.later.title === 'Закрыть старые счета' && !bills.later.running && bills.menuLater.status === 'later' && bills.menuLater.postponed && bills.menuLater.next === 3, bills);
     check('уведомления и возраст (взрослый): без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }

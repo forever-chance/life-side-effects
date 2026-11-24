@@ -97,7 +97,7 @@ function businessWhy254(b,q,plan){
  if(b.cash<plan.cost)return 'Недостаточно денег на счёте предприятия.';
  if(plan.op==='shift'&&!enterpriseStaff155(b).length)return 'Для дополнительной смены нужны сотрудники.';
  if(['refund','return'].includes(plan.op)&&!(plan.op==='refund'?q.salesBacking:q.costBacking))return 'Нет подтверждённой оплаченной суммы для возврата.';
- if(plan.op==='sale'&&(b.partner158||businessState254(b).receivables.some(r=>r.status==='overdue')))return 'Для продажи нужно урегулировать долю совладельца и неоплаченные счёта.';
+ /* 270: «счета» во мн. ч. без ё (ё-проход 268 испортил) */if(plan.op==='sale'&&(b.partner158||businessState254(b).receivables.some(r=>r.status==='overdue')))return 'Для продажи нужно урегулировать долю совладельца и неоплаченные счета.';
  if(plan.op==='collect'&&!plan.revenue)return 'Счёт уже закрыт.';
  if(['rent','rentAccept'].includes(plan.op)&&b.rentOffer159?.id!==q.rent)return 'Условия аренды уже изменились.';
  return '';
