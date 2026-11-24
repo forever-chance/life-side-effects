@@ -254,7 +254,7 @@ print(json.dumps({'out':[m.fix_text(x)[0] for x in t],'skip':sorted(m.SKIP)},ens
     const he = /(^|[^А-Яа-яЁё])(Он|он|его|ему|ним)(?![А-Яа-яЁё])/;
     check('показ, friends247: подруга в E0098 и E0033 — в окне нет «он»/«его», текст без рода',
       shows.gender === 'f' && shows.q4 && !he.test(shows.m2?.text || '') && !he.test(shows.m4?.text || '') &&
-      /берётся за организацию/.test(shows.m2?.text) && /Друг просит научить тому, чем вы давно занимаетесь, и готов/.test(shows.m4?.text), { g: shows.gender, m2: shows.m2?.text, m4: shows.m4?.text });
+      /берётся за организацию/.test(shows.m2?.text) && /Друг хочет научиться тому, чем вы давно занимаетесь, и готов/.test(shows.m4?.text), { g: shows.gender, m2: shows.m2?.text, m4: shows.m4?.text });
     check('показ, workshops249: E0031 — в окне «по вашему хобби», в журнале «Вы пропускаете интенсив…»',
       shows.q3 && /по вашему хобби/.test(shows.m3?.text) && shows.l3 === 'Вы пропускаете интенсив и занимаетесь как обычно.', { m: shows.m3, l: shows.l3 });
 
