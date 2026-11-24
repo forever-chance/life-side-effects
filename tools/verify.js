@@ -448,6 +448,51 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       return s.log.find(e => /поход в кино/.test(e.title))?.text || 'не согласились';
     });
     check('кино: в семейном походе по детской просьбе назван детский фильм', /Смотрели «[^»]+»/.test(outing) || outing === 'нет родителя', outing);
+    const more = await pg.evaluate(() => {
+      const out = {}; s.age = 30; s.year = 2047; s.clock.month = 3; s.pending = []; if ($('#modal').open) closeModal();
+      const texts = () => [...document.querySelectorAll('#modal .options button')].map(b => b.textContent);
+      const click = re => { const b = [...document.querySelectorAll('#modal .options button:not([disabled])')].find(b => re.test(b.textContent)); if (!b) return false; b.click(); return true; };
+      // Афиша: в любом меню «Сходить в кино» сначала выбирается фильм, он попадает в задачу и в запись.
+      const p = s.people.find(p => p.alive && p.age >= 18 && p.country === s.country && (!p.city18 || p.city18 === residenceCity()));
+      show('Встречи', 'x', [{ label: 'Сходить в кино', fn: () => planMeeting53(p.id, 'cinema') }]);
+      click(/^Сходить в кино/); out.poster = $('#modal h2').textContent + ' | ' + texts().slice(0, 2).join(' / ');
+      const r0 = Math.random; Math.random = () => 0.01; p.meetingAfter53 = 0; click(/^«/); Math.random = r0;
+      const t = s.clock.tasks.find(t => t.kind === 'meeting53'); out.chosen = t && filmById269(t.film269)?.title;
+      if (t) { t.progress = t.duration; finishTask(t); out.meetLog = s.log.find(e => e.title === 'Сходить в кино')?.text || ''; }
+      if ($('#modal').open) closeModal();
+      show(hobbies.film[0], 'x', hobbies.film.slice(1).map(label => ({ label, fn: () => {} }))); out.hobbyCinema = texts().some(b => /^Сходить в кино/.test(b)); closeModal();
+      // Названия премьер не повторяются в пределах 20 лет; сюжеты идут без повторов, пока не кончатся.
+      const titles = [], stories = []; for (let ym = 2028 * 12; ym < 2048 * 12; ym++) for (const f of futureMonth269(ym)) { titles.push(f.title); stories.push(f.story); }
+      out.titles = new Set(titles.slice(0, 200)).size === Math.min(200, titles.length) && new Set(stories.slice(0, filmStories269.length)).size === Math.min(filmStories269.length, stories.length);
+      // Приглашение в кинопроект — конкретный проект с сюжетом.
+      const x = creative47(), spec = Object.keys(specialties184.cinema)[0];
+      x.works.push({ id: 'v1', track: 'cinema', specialty184: spec, quality: 90, level184: 2, title: 'Проба 1' }, { id: 'v2', track: 'cinema', specialty184: spec, quality: 90, level184: 2, title: 'Проба 2' }); x.nextCinema191 = 0;
+      Math.random = () => 0.001; try { cinemaInvitation191(x.works.at(-1)); } finally { Math.random = r0; }
+      const a = x.applications.find(a => a.offer.sourceWork191 === 'v2');
+      out.invite = a ? (a.offer.project269 ? 'ok' : 'без проекта') : 'нет приглашения';
+      out.inviteLog = s.log.find(e => e.title === 'Приглашение в новый проект')?.text || '';
+      if (a) { offerMenu47(a.id, true); out.card = /Проект[\s\S]*Сюжет/.test($('#modal').innerText); closeModal(); }
+      // Кинотеатр: отчёт раз в три месяца, перенос сеансов на хит поднимает спрос, поровну — множитель 1.
+      s.cash = 1e8; const sp = businessCatalog253.find(b => b.name === 'Кинотеатр' && b.country === countries[s.country].name);
+      startEnterprise152('culture253', 'Проверка 2', sp.id); const b = s.enterprise152; s.pending = [];
+      out.even = cinemaPlan269(b).mult;
+      for (let i = 0; i < 3; i++) { s.clock.ticks++; enterpriseLocationMonth168(b); }
+      out.report = s.pending.some(q => q.type === 'cinemaReport269'); resolvePending();
+      out.reportText = $('#modal').innerText; click(/^Добавить сеансов/); out.boost = cinemaPlan269(b).mult;
+      cinemaMenu269(b.id); click(/^Без отчётов/); out.off = cinemaPlan269(b).mult; if ($('#modal').open) closeModal();
+      // Цифры в подсказках и ё на экране.
+      show('Проверка', 'Ребенок и Учеба', [{ label: 'Вариант', hint: 'настроение +5 · доверие +3', fn: () => {} }]);
+      out.hint = $('#modal .options small').textContent; out.yo = $('#modal').innerText; closeModal();
+      return out;
+    });
+    check('кино: в меню «Сходить в кино» — афиша, выбранный фильм в записи', /Сходить в кино \| «/.test(more.poster) && more.chosen && more.meetLog.includes('«' + more.chosen + '»'), more);
+    check('кино: в увлечении «Кино» можно сходить на фильм по выбору', more.hobbyCinema, more);
+    check('кино: премьеры будущего без повторов названий и сюжетов', more.titles, more);
+    check('кино: приглашение в конкретный проект с сюжетом и разделом «Проект»', more.invite === 'ok' && /предлагают проект «[^»]+»/.test(more.inviteLog) && more.card, more);
+    check('кинотеатр: отчёт по фильмам с прибылью и убытком раз в три месяца', more.report && /сеансов в неделю, зал заполнен на \d+%, (прибыль|убыток)/.test(more.reportText), more.reportText);
+    check('кинотеатр: сеансы поровну не меняют спрос, перенос на хит — поднимает, без отчётов — снова поровну', more.even === 1 && more.boost > 1 && more.boost <= 1.15 && more.off === 1, more);
+    check('подсказки: числа больше не вырезаются', /настроение \+5/.test(more.hint) && /доверие \+3/.test(more.hint), more.hint);
+    check('ё: «Ребенок», «Учеба» на экране с ё', /Ребёнок и Учёба/.test(more.yo) && !/Ребенок|Учеба/.test(more.yo), more.yo);
     check('кино: без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }
