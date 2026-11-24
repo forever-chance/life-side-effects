@@ -4,7 +4,7 @@
 //   node tools/calibrate_death.js OUT.jsonl N MAX_AGE POLICY SEED [DEATH]
 //
 // POLICY: random — случайные действия harness.js;
-//         care   — то же плюс «Восстановить силы» всегда в расписании и врач при болезни.
+//         care   — то же плюс «Восстановить силы» всегда в расписании, «Движение» каждый месяц, врач при болезни.
 // DEATH:  off — смерть только в 100 (снять траекторию здоровья);
 //         old — как было до 258 (только после 75); new — mortality258.js, как в игре.
 const fs = require('fs'), path = require('path');
@@ -43,11 +43,15 @@ const TRACE = `(()=>{let h=s.health;window.__HA={};Object.defineProperty(s,'heal
   if(m&&m[2]!=='harness.js'){src=m[2]+':'+(m[1]||'?').replace(/^Object\\./,'');break}}src+=d<0?' -':' +';__HA[src]=(__HA[src]||0)+d}h=v}})})()`;
 
 const SNAP = `(()=>{const h=habits78();const z=s.health25;const src=window.__HA||{};window.__HA={};return {age:s.age,health:+s.health.toFixed(2),fatigue:Math.round(s.clock.fatigue),mood:Math.round(s.mood),
-  ill:!!s.illness,chronic:(z&&z.conditions||[]).length,smoke:h.smoke.strength||0,drink:h.drink.strength||0,cash:Math.round(s.cash),dead:!!s.dead,trend:Number.isFinite(s.healthTrend258)?+s.healthTrend258.toFixed(1):null,
+  ill:!!s.illness,chronic:(z&&z.conditions||[]).length,smoke:h.smoke.strength||0,drink:h.drink.strength||0,cash:Math.round(s.cash),dead:!!s.dead,fitness:typeof health259==='function'?Math.round(health259().fitness):null,ceiling:typeof healthCeiling259==='function'?healthCeiling259():null,trend:Number.isFinite(s.healthTrend258)?+s.healthTrend258.toFixed(1):null,
   src:Object.fromEntries(Object.entries(src).map(([k,v])=>[k,+v.toFixed(2)]))}})()`;
 
-// Случайные клики harness.js иногда ставят отдых на паузу: заботливый игрок его возобновляет.
+// Заботливый игрок: отдых всегда в расписании (случайные клики harness.js иногда ставят его на паузу —
+// он его возобновляет), врач при болезни и «Движение» раз в месяц.
+// «Движение» начисляется напрямую (+4 к форме, как от занятия): случайные клики держат деньги у нуля всю жизнь,
+// и оплата занятия в начале месяца проваливается. Это допущение прогона, не игры.
 const CARE = `(()=>{if(s.dead||s.age<16)return;const r=s.clock.tasks.find(t=>t.kind==='rest');if(!r)assign('rest');else if(r.state==='paused')pauseTask05(r.id);
+  if(typeof health259==='function'&&window.__careTick!==s.clock.ticks){window.__careTick=s.clock.ticks;addFitness259(4);}
   const a=s.illness;if(a&&!a.treated){a.treated=true;a.left=Math.min(a.left||2,2);}})()`;
 
 async function life(browser, idx, cfg) {
