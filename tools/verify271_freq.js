@@ -187,6 +187,19 @@ async function life(pg, cfg) {
       check(r.assign?.length && r.assign.every(y => y === 2031 - 44), 'assignFamilyName166: год рождения по возрасту', JSON.stringify(r.assign));
       check(r.lastFresh === 1950 && r.lastJoined === r.playerYear, 'name() сразу после person(): год нового человека, а не игрока', `${r.lastFresh} / ${r.lastJoined}`);
     }
+    // Игрок при создании жизни (с рождения и с 18 лет): имя по году его рождения, а не прошлой жизни.
+    if (!BASE) for (const startAge of ['0', '18']) {
+      const st = await pg.evaluate(startAge => {
+        intro();
+        for (const [k, v] of Object.entries({ country: 'ru', gender: 'f', startAge, name: '', familyOrigin17: 'local', familyHousehold131: 'two' })) { const e = document.getElementById(k); if (e) { e.value = v; e.dispatchEvent(new Event('change', { bubbles: true })); } }
+        const seen = [], keep = familyName166;
+        familyName166 = function (...args) { if (freq271.stack.length === 1 && s?.people?.length) seen.push(birthYear271f()); return keep.apply(this, args); };
+        try { start(); } finally { familyName166 = keep; }
+        if ($('#modal').open) closeModal();
+        return { seen, birth: s.birthYear, age: s.age, year: s.year };
+      }, startAge);
+      check(st.seen.length && st.seen.every(y => y === st.birth), `игрок (старт с ${startAge}): имя по году его рождения`, JSON.stringify(st));
+    }
     check(errors.length === 0, 'эпохи и страны: без ошибок страницы', errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
