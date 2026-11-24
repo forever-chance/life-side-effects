@@ -67,8 +67,9 @@ function mergePets271(){
  }
 }
 mergePets271();
-// Происхождения: полные пулы (имена обоих полов и фамилии) идут и в extendedFamilyNames167 — по ним names270
-// узнаёт, из какого пула имя. Неполные (только имена или только фамилии) добираются по стране.
+// Происхождения: пулы идут и в extendedFamilyNames167 — тогда случайный NPC с таким происхождением (portraits49)
+// получает имя своего происхождения, а не большинства (раньше татарское, бурятское, чеченское давали русские имена).
+// Неполный пул (только имена или только фамилии) добирается по стране — это делает originName271.
 names271.originKeys=(()=>{
  const keys=new Set([...Object.keys(familyNameCountries166),...Object.keys(extendedFamilyNames167),...Object.values(origins17).flat()]);
  if(typeof demography165==='object')for(const d of Object.values(demography165)){Object.keys(d.base||{}).forEach(k=>keys.add(k));for(const c of Object.values(d.cities||{}))Object.keys(c).forEach(k=>keys.add(k));}
@@ -79,10 +80,20 @@ for(const [o,v] of Object.entries(names271.data.origins||{})){
  if(!names271.originKeys.has(o))continue;
  names271.origins[o]=v;
  const one=list=>(list||[]).filter(n=>!n.includes(' '));
- if(v.f?.length&&v.m?.length&&v.surnames?.length){
-  const old=extendedFamilyNames167[o]?.map(x=>String(x).split(' ').filter(Boolean))||[[],[],[]];
-  extendedFamilyNames167[o]=[[...new Set([...one(v.f),...old[0]])].join(' '),[...new Set([...one(v.m),...old[1]])].join(' '),[...new Set([...one(v.surnames),...old[2]])].join(' ')];
- }
+ const old=extendedFamilyNames167[o]?.map(x=>String(x).split(' ').filter(Boolean))||[[],[],[]];
+ extendedFamilyNames167[o]=[[...new Set([...one(v.f),...old[0]])].join(' '),[...new Set([...one(v.m),...old[1]])].join(' '),[...new Set([...one(v.surnames),...old[2]])].join(' ')];
+}
+// names270 ищет пул имени по всем происхождениям подряд; теперь сначала — своё происхождение и своя страна,
+// иначе «Мария» при замене имени могла взять пул армянских или грузинских имён.
+if(typeof givenPool270==='function'){
+ const base=givenPool270;
+ givenPool270=function(p,country){
+  const g=p.givenName166,key=p.gender==='m'?'m':'f',own=p.origins?.[0]&&names271.origins[p.origins[0]]?.[key];
+  if(own?.includes(g))return own;
+  const local=countries[country]?.names?.[p.gender==='m'?1:0];
+  if(local?.includes(g))return local;
+  return base(p,country);
+ };
 }
 // Индия: фамилии с пометкой региона идут людям соответствующего происхождения.
 names271.regionOrigins={bengal:['бенгальское'],punjab:['панджабское'],west:['маратхское','гуджаратское'],south:['тамильское','телугу','каннада']};
@@ -92,7 +103,6 @@ names271.regionOrigins={bengal:['бенгальское'],punjab:['панджа�
   const v=names271.origins[o]??={};v.surnames=[...new Set([...(v.surnames||[]),surname])];
  }
 }
-// Родительный падеж не нужен: имена в пулах — только именительный.
 function originName271(country,gender,origin){
  const o=names271.origins[origin];if(!o)return null;
  const culture=originCulture271[origin]||familyNameCountries166[origin]||country;
@@ -249,10 +259,12 @@ function childChoiceList271(child,parents){
  // Египет: имя отца и имя деда; за границей — имя отца как постоянная фамилия.
  if(egChain271(father)||country==='eg'&&father&&cultureOf271(father)==='eg'&&egOrigin271(father)){
   const fp=parts271(father);
-  if(country==='eg')add('Имя отца и имя деда',[given271(father),fp[0]||egMale271()],' ',null,{style:'chain'});
-  else add('Имя отца как фамилия',[given271(father)],' ',null,{style:'fixed'});
+  // В Египте у ребёнка нет другой «фамилии», кроме имён отца и деда.
+  if(country==='eg'){add('Имя отца и имя деда',[given271(father),fp[0]||egMale271()],' ',null,{style:'chain'});return out;}
+  add('Имя отца как фамилия',[given271(father)],' ',null,{style:'fixed'});
  }else if(country==='eg'&&!father&&list.every(p=>cultureOf271(p)==='eg')){
   add('Имена по мужской линии',egChainParts271(),' ',null,{style:'chain'});
+  return out;
  }
  const pp=p=>parentParts256(p);
  if(rule==='jp'){
@@ -539,8 +551,8 @@ if(typeof pendingLabels24==='object'){pendingLabels24.marriageName271='Фами�
   const r=base(id,accept);
   try{
    if(r&&accept&&p){
-    if(q.kind==='marry'&&p.married&&!was){queueOnce({type:'marriageName271',id:p.id});s.clock.running=false;}
-    if(q.kind==='divorce'&&!p.married&&was){queueOnce({type:'divorceName271',id:p.id});s.clock.running=false;}
+    if(q.kind==='marry'&&p.married&&!was){queueOnce({type:'marriageName271',id:p.id});s.clock.running=false;save();}
+    if(q.kind==='divorce'&&!p.married&&was){queueOnce({type:'divorceName271',id:p.id});s.clock.running=false;save();}
    }
   }catch(e){console.error(e);}
   return r;
@@ -672,6 +684,8 @@ function startFamily271(typed){
 // Бабушка и дедушка — по линии своего ребёнка (родителя игрока).
 function grandLine271(gp){
  const parent=s.people.find(p=>p.bio27?.parents?.includes(gp.id)&&['Мать','Отец'].includes(p.role));if(!parent)return;
+ // Старое сохранение: девичья фамилия мамы не записана. Если у мамы фамилия папы, линию мамы не трогаем.
+ if(!startCtx271&&!parent.birthSurname271&&parent.role==='Мать'&&s.people.some(q=>q.role==='Отец'&&q.alive&&genderSurname256(q.surname||'','m',cultureOf271(q))===genderSurname256(parent.surname||'','m',cultureOf271(parent))))return;
  const birth=parent.birthSurname271||{parts:parts271(parent),joiner:joiner271(parent),culture:cultureOf271(parent)};
  const culture=birth.culture||cultureOf271(parent),rule=customDefault271[country271(parent)]||'father';
  const bp=birth.parts||[];if(!bp.length)return;
