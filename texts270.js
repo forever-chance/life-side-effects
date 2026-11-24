@@ -129,15 +129,18 @@ function textsTargets270(){
  if(typeof businessEvents254!=='undefined'&&Array.isArray(businessEvents254))for(const e of businessEvents254)business.set(e.id,e);
  return [[catalogTexts270,catalog],[businessTexts270,business]];
 }
+// Возвращает, сколько текстов поменялось.
 function applyTexts270(){
  const auto=typeof youText270==='function'?youText270:null;let n=0;
  for(const [list,targets] of textsTargets270())for(const r of list)for(const id of r.ids){
   const o=targets.get(id);
-  if(o&&(o.text===r.from||(auto&&o.text===auto(r.from)))){o.text=r.to;n++;}
+  if(o&&o.text!==r.to&&(o.text===r.from||(auto&&o.text===auto(r.from)))){o.text=r.to;n++;}
  }
  return n;
 }
-const textsApplied270=applyTexts270();
+applyTexts270();
+// Сколько мест показывает выверенный текст (для проверок: 45 в каталоге и 23 в своём деле).
+const textsApplied270=textsTargets270().reduce((n,[list,targets])=>n+list.reduce((k,r)=>k+r.ids.filter(id=>targets.get(id)?.text===r.to).length,0),0);
 
 const textsPairs270=new Map([...yoFixes270,...[...catalogTexts270,...businessTexts270].map(r=>[r.from,r.to])]);
 const textsRe270=new RegExp([...textsPairs270.keys()].sort((a,b)=>b.length-a.length).map(t=>t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'g');
