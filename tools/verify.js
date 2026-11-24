@@ -31,7 +31,7 @@ async function page(browser, cfg) {
     if ($('#modal').open) closeModal();
     s.pending = [];
   });
-  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js', 'creative262.js', 'business263.js'])
+  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js', 'creative262.js', 'business263.js', 'save264.js'])
     if (!(await pg.evaluate(f => [...document.scripts].some(x => x.src.includes(f)), f))) await pg.addScriptTag({ path: path.join(ROOT, f) });
   return { pg, errors, ctx };
 }
@@ -270,6 +270,31 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     await pg.evaluate(click('/^Сам/'));
     check('своё дело: выбор режима из окна ставит 35 ч/нед.', await pg.evaluate(() => s.enterprise152.mode263 === 'self' && s.clock.tasks.find(t => t.kind === 'business263').hours === 35 && !s.pending.length), null);
     check('своё дело: без ошибок страницы', !errors.length, errors);
+    await ctx.close();
+  }
+
+  // 11. Отложенное сохранение (264).
+  {
+    const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'nl' });
+    const r = await pg.evaluate(async () => {
+      const out = {}, id = s.saveId, stored = () => parseLife(localStorage.getItem(LIFE_PREFIX + id));
+      flushSave264();
+      let writes = 0; const real = saveNow264;
+      s.cash = 11111; show('Замер', 'Окно.', [{ label: 'Вариант', fn: () => {} }]); choose(0);
+      out.immediate = stored()?.cash; out.pendingTarget = saveTarget264 === s;
+      out.readBack = readLife(id)?.cash;
+      s.cash = 22222; save(); save(); save();
+      await new Promise(r => setTimeout(r, 600));
+      out.afterTimer = stored()?.cash;
+      s.cash = 33333; save(); const old = s; s = null; intro();
+      out.afterNewLife = parseLife(localStorage.getItem(LIFE_PREFIX + id))?.cash; s = old;
+      return out;
+    });
+    check('сохранение: клик больше не пишет сразу, запись отложена', r.immediate !== 11111 && r.pendingTarget, r);
+    check('сохранение: чтение персонажа обратно сначала дописывает отложенное', r.readBack === 11111, r);
+    check('сохранение: через полсекунды изменения в хранилище сами', r.afterTimer === 22222, r);
+    check('сохранение: «Начать новую жизнь» сразу после изменения не теряет прошлую', r.afterNewLife === 33333, r);
+    check('сохранение: без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }
 
