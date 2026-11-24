@@ -2,6 +2,8 @@
 // словарь ё без омографов, старые сохранения.
 // Игра раздаётся с диска:  node tools/verify270_texts.js
 // После старта жизни подгружаются файлы 270, которых ещё нет в index.html, в порядке финальной сборки.
+// Для проверки старых сохранений страница перезагружается в порядке сборки: index.html раздаётся с этими файлами
+// перед bootstrap61.js (только в памяти, файлы на диске не меняются).
 // Полная сверка книг и пьес с редакторским каталогом v33 — если он есть на диске (V33_JSON=путь/game_content.json).
 const fs = require('fs'), path = require('path'), { execFileSync } = require('child_process');
 const { chromium } = require('playwright');
@@ -10,14 +12,15 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const ORDER270 = ['films269.js', 'display269.js', 'notices270.js', 'family270.js', 'social270.js', 'jobs270.js', 'strip270.js', 'texts270.js'];
 
 async function page(browser, cfg) {
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext(), served = { prod: false };
   await ctx.route('**/*', r => {
     const u = new URL(r.request().url());
     if (u.hostname !== 'game.local') return r.abort();
     const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '') || 'index.html';
     const f = path.join(ROOT, rel);
     if (!f.startsWith(ROOT) || !fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
-    const body = rel === 'offline-game.js' ? '' : fs.readFileSync(f);
+    let body = rel === 'offline-game.js' ? '' : fs.readFileSync(f);
+    if (rel === 'index.html' && served.prod) body = prodIndex(String(body));
     r.fulfill({ status: 200, body, headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } });
   });
   const pg = await ctx.newPage();
@@ -40,7 +43,21 @@ async function page(browser, cfg) {
     if (!(await pg.evaluate(f => [...document.scripts].some(x => x.src.includes(f)), f))) { await pg.addScriptTag({ path: path.join(ROOT, f) }); loaded.push(f); }
   }
   await pg.evaluate(helpers);
-  return { pg, errors, ctx, loaded };
+  return { pg, errors, ctx, loaded, served };
+}
+// index.html, как его соберёт ведущий: файлы 270, которых в нём ещё нет, — перед bootstrap61.js, по порядку.
+function prodIndex(html) {
+  const tags = ORDER270.filter(f => fs.existsSync(path.join(ROOT, f)) && !html.includes('src="' + f)).map(f => '<script src="' + f + '?v=270"></script>').join('');
+  if (!html.includes('<script src="bootstrap61.js')) throw new Error('index.html: нет bootstrap61.js');
+  return html.replace('<script src="bootstrap61.js', tags + '<script src="bootstrap61.js');
+}
+// Перезагрузка в порядке сборки: game.js берёт сохранение из хранилища, как у игрока, открывшего игру.
+async function reloadProd(pg, served) {
+  served.prod = true;
+  await pg.reload();
+  await pg.waitForFunction("typeof start==='function'&&typeof s!=='undefined'&&document.readyState==='complete'");
+  await pg.evaluate(helpers);
+  return pg.evaluate(() => [...document.scripts].map(x => x.src.split('/').pop().split('?')[0]).filter(x => /270\.js$|^bootstrap61\.js$/.test(x)));
 }
 
 // Помощники внутри страницы.
@@ -123,27 +140,37 @@ const BROKEN = ['Три сёстры', 'Час звёзды', 'смерть ег
 import json
 src=open('tools/text_audit.py',encoding='utf-8').read().replace('\\nmain()\\n','\\n')
 a={'__file__':'tools/text_audit.py'};exec(compile(src,'ta','exec'),a)
-print(json.dumps({'yo':a['YO'],'homo':sorted(a['YO_HOMOGRAPHS'])},ensure_ascii=False))`));
-    const homo = ['сёстры', 'сёстрам', 'звёзды', 'жёны', 'слёзы', 'узнаёт', 'узнаёте', 'мёд'];
-    check('text_audit: омографов нет в словаре ё', homo.every(w => !dict.yo.includes(w)) && homo.every(w => dict.homo.includes(w)) && dict.yo.includes('ещё'), dict.homo);
+plural=["Старые неоплаченные счета сохранены.","Бытовые счета · nl","Деньги, долги и счета"]
+print(json.dumps({'yo':a['YO'],'homo':sorted(a['YO_HOMOGRAPHS']),'flagged':[x for x in plural if a['YO_RE'].search(x)]},ensure_ascii=False))`));
+    const homo = ['сёстры', 'сёстрам', 'звёзды', 'жёны', 'слёзы', 'узнаёт', 'узнаёте', 'мёд', 'счёта'];
+    check('text_audit: омографов нет в словаре ё (и «счёта»: «неоплаченные счета» — множественное число)', homo.every(w => !dict.yo.includes(w)) && homo.every(w => dict.homo.includes(w)) && dict.yo.includes('ещё') && dict.yo.includes('счёт'), dict.homo);
+    check('text_audit: «счета» во множественном числе не считается ошибкой ё', !dict.flagged.length, dict.flagged);
     const fixed = JSON.parse(py(`
 import json,sys,importlib.util
 sys.argv=['yo_fix.py']
 spec=importlib.util.spec_from_file_location('yo','tools/yo_fix.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-t=["'Три сестры'","'Час звезды'","'смерть его жены'","'место сестры'","'Если партнёр узнает, это ударит по доверию.'","'до слезы'","'еще идет'"]
+t=["'Три сестры'","'Час звезды'","'смерть его жены'","'место сестры'","'Если партнёр узнает, это ударит по доверию.'","'до слезы'","'Старые неоплаченные счета сохранены.'","'Бытовые счета · '","'еще идет'"]
 print(json.dumps({'out':[m.fix_text(x)[0] for x in t],'skip':sorted(m.SKIP)},ensure_ascii=False))`));
-    check('yo_fix: омографы не трогает, обычные слова правит', fixed.out.slice(0, 6).join('|') === "'Три сестры'|'Час звезды'|'смерть его жены'|'место сестры'|'Если партнёр узнает, это ударит по доверию.'|'до слезы'" && fixed.out[6] === "'ещё идёт'", fixed.out);
+    const keep = ["'Три сестры'", "'Час звезды'", "'смерть его жены'", "'место сестры'", "'Если партнёр узнает, это ударит по доверию.'", "'до слезы'", "'Старые неоплаченные счета сохранены.'", "'Бытовые счета · '"];
+    check('yo_fix: омографы (и «счета» во множественном числе) не трогает, обычные слова правит', fixed.out.slice(0, keep.length).join('|') === keep.join('|') && fixed.out[keep.length] === "'ещё идёт'", fixed.out);
     check('yo_fix: каталоги v33 пропускает', fixed.skip.includes('catalog245-data.js') && fixed.skip.includes('business-events254-data.js'), fixed.skip);
     const audit = execFileSync('python3', ['tools/text_audit.py'], { cwd: ROOT, encoding: 'utf8' });
-    const n = rule => Number((audit.match(new RegExp('\\n' + rule + ': (\\d+)')) || [])[1]);
+    const num = (text, rule) => Number((text.match(new RegExp('\\n' + rule + ': (\\d+)')) || [])[1]);
+    const n = rule => num(audit, rule);
     const events = Number((audit.match(/и (\d+) строк событий каталогов/) || [])[1]);
     check('text_audit: «ты» 0 (вместе с ' + events + ' строками событий каталогов), имена после предлогов 0, род NPC 0',
       n('ты в повествовании') === 0 && n('имя после предлога') === 0 && n('род NPC без выбора по полу') === 0 && events > 1500, audit.slice(0, 400));
+    // Замены из texts270.js игрок видит, только если файл подключён: аудит об этом говорит, а с --wired считает по данным.
+    const wiredHtml = /<script[^>]+src="texts270\.js/.test(fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'));
+    const strict = execFileSync('python3', ['tools/text_audit.py', '--wired'], { cwd: ROOT, encoding: 'utf8' });
+    const warned = /ВНИМАНИЕ: не подключены в index\.html: [^\n]*texts270\.js/.test(audit), strictTy = num(strict, 'ты в повествовании');
+    check('text_audit: ' + (wiredHtml ? 'texts270.js подключён — предупреждения нет, с --wired «ты» 0' : 'texts270.js ещё не подключён — аудит предупреждает, с --wired видны все 68 мест на «ты»'),
+      wiredHtml ? !warned && strictTy === 0 : warned && strictTy === 68, { warned, strictTy, head: audit.split('\n').slice(0, 2) });
   }
 
   const browser = await chromium.launch();
   try {
-    const { pg, errors, ctx, loaded } = await page(browser, { startAge: '18', country: 'nl' });
+    const { pg, errors, ctx, loaded, served } = await page(browser, { startAge: '18', country: 'nl' });
     console.log('подгружено после старта: ' + (loaded.join(', ') || 'ничего'));
 
     // 3. Замены при загрузке: все 68 мест, id не меняются, данные на «вы».
@@ -215,11 +242,19 @@ print(json.dumps({'out':[m.fix_text(x)[0] for x in t],'skip':sorted(m.SKIP)},ens
       const q3 = catalogOffer245('E0031', { hobby: 'photo' }); out.q3 = !!q3;
       if (q3) { openDecision24('catalog245', q3.id); out.m3 = T.modal(); Math.random = () => 0; try { out.c3 = T.click(/^Пропустить/); } finally { Math.random = rnd; } }
       out.l3 = s.log.slice(0, 12).find(e => e.title === T.event('E0031').title && e.text !== T.event('E0031').text)?.text;
+      // E0033 с той же подругой: друг в событиях бывает и женщиной (friendBinding247 не смотрит на пол).
+      clear(); const q4 = catalogOffer245('E0033', { person: friendId, hobby: 'photo' }); out.q4 = !!q4;
+      if (q4) { openDecision24('catalog245', q4.id); out.m4 = T.modal(); }
+      out.gender = living(friendId)?.gender;
       T.calm(); return out;
     }, show245.friendId);
     check('показ, catalog246: E0057 — запись «Вы благодарите за сюрприз…»', shows.q1 && shows.c1 && shows.l1 === T270('E0057_C01_primary'), shows);
     check('показ, friends247: E0098 — в окне «от вас потребуется», в журнале «Вы отказываетесь участвовать.»',
       shows.q2 && /от вас потребуется/.test(shows.m2?.text) && !/тебя/.test(shows.m2?.text) && / · Вы отказываетесь участвовать\.$/.test(shows.l2 || ''), { m: shows.m2, l: shows.l2 });
+    const he = /(^|[^А-Яа-яЁё])(Он|он|его|ему|ним)(?![А-Яа-яЁё])/;
+    check('показ, friends247: подруга в E0098 и E0033 — в окне нет «он»/«его», текст без рода',
+      shows.gender === 'f' && shows.q4 && !he.test(shows.m2?.text || '') && !he.test(shows.m4?.text || '') &&
+      /берётся за организацию/.test(shows.m2?.text) && /Друг просит научить тому, чем вы давно занимаетесь, и готов/.test(shows.m4?.text), { g: shows.gender, m2: shows.m2?.text, m4: shows.m4?.text });
     check('показ, workshops249: E0031 — в окне «по вашему хобби», в журнале «Вы пропускаете интенсив…»',
       shows.q3 && /по вашему хобби/.test(shows.m3?.text) && shows.l3 === 'Вы пропускаете интенсив и занимаетесь как обычно.', { m: shows.m3, l: shows.l3 });
 
@@ -248,7 +283,7 @@ print(json.dumps({'out':[m.fix_text(x)[0] for x in t],'skip':sorted(m.SKIP)},ens
     });
     check('год: возраст растёт, записи событий каталогов и дела на «вы» (' + year.rows + ' записей)', year.age[1] > year.age[0] && year.ty.length === 0, year);
 
-    // 8. Старое сохранение: тексты на «ты» и строки с лишней ё в журнале, памяти и театральной студии.
+    // 8. Старое сохранение, «Персонажи» → выбор персонажа (loadCharacter): тексты на «ты» и строки с лишней ё.
     const mig = await pg.evaluate(() => {
       T.calm(); const out = {}, f = s.people.find(p => p.alive && p.role === 'Друг');
       const old = (id, list = catalogTexts270) => list.find(r => r.ids.includes(id)).from;
@@ -264,10 +299,6 @@ print(json.dumps({'out':[m.fix_text(x)[0] for x in t],'skip':sorted(m.SKIP)},ens
       out.log = s.log.slice(0, 12).map(e => e.title + ' | ' + e.text);
       out.memory = g.memories.at(-1); out.same = s.saveId === id;
       flushSave264(); out.stored = (readLife(id)?.log || []).slice(0, 12).map(e => e.title + ' | ' + e.text);
-      // Театральная студия: название постановки и история (без отрисовки, как при загрузке).
-      const clubs = s.clubs19; s.clubs19 = { memberships: [{ id: 't270', type: 'theatre', theatre53: { title: 'Три сёстры', history: [{ title: 'Три сёстры' }, { title: 'Ревизор' }] }, project86: { title: 'Три сёстры' } }] };
-      out.clubFixed = textsMigrate270(); const m = s.clubs19.memberships[0];
-      out.club = [m.theatre53.title, ...m.theatre53.history.map(h => h.title), m.project86.title]; s.clubs19 = clubs;
       out.again = textsMigrate270();
       return out;
     });
@@ -276,17 +307,93 @@ print(json.dumps({'out':[m.fix_text(x)[0] for x in t],'skip':sorted(m.SKIP)},ens
       'Премьера · Три сестры | Шесть месяцев репетиций закончились показом студии.',
       'Появился местный постоянный клиент | Сыр · Один из покупателей стал заходить регулярно и приводит знакомых. Он спрашивает, есть ли у вас скидки для постоянных клиентов.',
       'Пригласили на любительский конкурс | Вы отказываетесь участвовать и занимаетесь по прежнему плану.'];
-    check('сохранение: после загрузки журнал на «вы» и без лишней ё (длинный исход не путается с коротким)',
+    check('сохранение, «Персонажи»: после выбора персонажа журнал на «вы» и без лишней ё (длинный исход не путается с коротким)',
       mig.same && want.every(w => mig.log.includes(w)) && mig.log.some(l => /^Друг зовёт в совместный проект \| .+ · Вы отказываетесь участвовать\.$/.test(l)) && !mig.log.some(l => /сёстр|звёзд|(^|[^А-Яа-яЁё])Ты /.test(l)), mig.log);
-    check('сохранение: исправленный журнал записан обратно', JSON.stringify(mig.stored) === JSON.stringify(mig.log), mig.stored);
-    check('сохранение: память близкого на «вы»', /: Вы никому не рассказываете о разговоре\./.test(mig.memory), mig.memory);
-    check('сохранение: театральная студия — «Три сестры» в постановке, истории и проекте; повтор ничего не меняет',
-      mig.club.join('|') === 'Три сестры|Три сестры|Ревизор|Три сестры' && mig.again === 0, mig);
+    check('сохранение, «Персонажи»: исправленный журнал записан обратно, повтор ничего не меняет', JSON.stringify(mig.stored) === JSON.stringify(mig.log) && mig.again === 0, mig.stored);
+    check('сохранение, «Персонажи»: память близкого на «вы»', /: Вы никому не рассказываете о разговоре\./.test(mig.memory), mig.memory);
 
-    // 9. Досье: заголовок про родителей на «вы».
-    const dossier = await pg.evaluate(() => { const h = dossierParents87(); return { html: h, then: /<h4>/.test(h) }; });
-    check('досье: ' + (dossier.then ? '«При вашем рождении» в карточке родителей' : 'карточек родителей «тогда» нет, «твоём» не встречается'),
-      !/твоём/.test(dossier.html) && (!dossier.then || /При вашем рождении/.test(dossier.html)), dossier.html.slice(0, 300));
+    // 9. Старое сохранение, открытие страницы: game.js кладёт сохранение в s сам, без loadCharacter.
+    //    Страница перезагружается в порядке сборки (файлы 270 перед bootstrap61.js), театральная студия — настоящая.
+    const planted = await pg.evaluate(() => {
+      T.calm(); const out = {}, f = s.people.find(p => p.alive && p.role === 'Друг');
+      const old = (id, list = catalogTexts270) => list.find(r => r.ids.includes(id)).from;
+      out.t57 = T.event('E0057').title; out.t120 = businessIndex254.E0120.title;
+      s.log.unshift({ age: s.age, year: s.year, title: out.t57, text: old('E0057_C01_primary'), tag: 'Отношения', major: false });
+      s.log.unshift({ age: s.age, year: s.year, title: out.t120, text: 'Сыр · ' + old('E0120', businessTexts270), tag: 'Своё дело', major: false });
+      s.log.unshift({ age: s.age, year: s.year, title: 'Премьера · Три сёстры', text: 'Шесть месяцев репетиций закончились показом студии.', tag: 'Занятия', major: false });
+      f.memories.push(s.year + ': Премьера Три сёстры');
+      // Студия, в которой репетируют «Три сёстры», как в сохранении 268–269; премьера — в следующем месяце, подруга приглашена.
+      joinClub19('theatre'); T.calm();
+      const m = clubState19().memberships.find(m => m.type === 'theatre' && m.status === 'active');
+      if (m) {
+        const t = theatre53(m), p = clubProject86(m);
+        t.title = 'Три сёстры'; t.began = m.sessions - 11; t.history.push({ title: 'Три сёстры', tick: s.clock.ticks - 1 });
+        p.title = 'Три сёстры'; p.lastPremiere = s.clock.ticks - 1; p.invited = [f.id];
+        out.club = m.id;
+      }
+      save(); flushSave264();
+      return { ...out, id: s.saveId, friend: f.id };
+    });
+    const order = await reloadProd(pg, served);
+    console.log('после перезагрузки: ' + order.join(' → '));
+    const opened = await pg.evaluate(id => {
+      const out = { has: !!s, same: s?.saveId === id.id };
+      if (!s) return out;
+      T.calm();
+      const m = clubState19().memberships.find(m => m.id === id.club), club = m => m && [m.theatre53.title, ...m.theatre53.history.map(h => h.title), m.project86.title];
+      out.log = s.log.slice(0, 15).map(e => e.title + ' | ' + e.text);
+      out.memory = s.people.find(p => p.id === id.friend).memories.filter(x => /Премьера/.test(x));
+      out.club = club(m);
+      flushSave264(); const st = readLife(id.id);
+      out.stored = st.log.slice(0, 15).map(e => e.title + ' | ' + e.text);
+      out.storedMemory = st.people.find(p => p.id === id.friend).memories.filter(x => /Премьера/.test(x));
+      out.storedClub = club(st.clubs19.memberships.find(m => m.id === id.club));
+      out.again = textsMigrate270();
+      return out;
+    }, planted);
+    const want9 = [
+      'Премьера · Три сестры | Шесть месяцев репетиций закончились показом студии.',
+      planted.t120 + ' | Сыр · Постоянный клиент оставил хороший отзыв и посоветовал ваше дело знакомым. Несколько человек уже обратились с вопросами.',
+      planted.t57 + ' | ' + T270('E0057_C01_primary')];
+    check('сохранение, открытие страницы: файлы 270 стоят перед bootstrap61.js', order.at(-1) === 'bootstrap61.js' && order.includes('texts270.js'), order);
+    check('сохранение, открытие страницы: тот же персонаж, журнал на «вы» и без лишней ё',
+      opened.has && opened.same && want9.every(w => opened.log.includes(w)) && !opened.log.some(l => /сёстр|звёзд|(^|[^А-Яа-яЁё])Ты |твоё/.test(l)), opened);
+    check('сохранение, открытие страницы: память — «Премьера Три сестры»', opened.memory?.length && opened.memory.every(x => /Премьера Три сестры$/.test(x)), opened.memory);
+    check('сохранение, открытие страницы: студия — «Три сестры» в постановке, истории и проекте', !!planted.club && opened.club?.join('|') === 'Три сестры|Три сестры|Три сестры', opened.club);
+    check('сохранение, открытие страницы: исправленное записано в хранилище, повтор ничего не меняет',
+      JSON.stringify(opened.stored) === JSON.stringify(opened.log) && JSON.stringify(opened.storedMemory) === JSON.stringify(opened.memory) &&
+      JSON.stringify(opened.storedClub) === JSON.stringify(opened.club) && opened.again === 0, { stored: opened.stored, club: opened.storedClub, again: opened.again });
+
+    // Настоящий месяц: студия показывает премьеру, подруга на ней — всё уже без лишней ё.
+    const premiere = await pg.evaluate(id => {
+      const count = () => s.log.filter(e => e.title === 'Премьера · Три сестры').length, before = count(), out = { months: 0 };
+      while (out.months < 3 && count() === before) { T.calm(); advanceMonth(); out.months++; }
+      T.calm();
+      const f = s.people.find(p => p.id === id.friend), m = clubState19().memberships.find(m => m.id === id.club);
+      out.logged = count() - before; out.bad = s.log.filter(e => /сёстр/.test(e.title + e.text)).length;
+      out.memory = f.memories.filter(x => /Премьера/.test(x)); out.next = m.theatre53.title; out.notice = life61().notices.filter(n => n.type === 'premiere86').map(n => n.title + ' | ' + (n.text || n.body || ''));
+      return out;
+    }, planted);
+    check('месяц: премьера студии — «Премьера · Три сестры», подруга запомнила «Премьера Три сестры»',
+      premiere.logged === 1 && premiere.bad === 0 && premiere.memory.length === 2 && premiere.memory.every(x => /Премьера Три сестры$/.test(x)), premiere);
+
+    // 10. Досье: жизнь с рождения, родитель потом меняет работу — карточка «При вашем рождении» и «Сейчас».
+    await pg.evaluate(() => { save(); flushSave264(); s = null; intro(); });
+    for (const [k, v] of Object.entries({ startAge: '0', country: 'nl' }))
+      await pg.evaluate(([k, v]) => { const e = document.getElementById(k); e.value = v; e.dispatchEvent(new Event('change', { bubbles: true })); }, [k, v]);
+    await pg.click('text=Родиться');
+    await pg.waitForFunction("typeof s!=='undefined'&&s&&s.clock");
+    const dossier = await pg.evaluate(() => {
+      try { if (typeof startupNotice180 === 'function' && startupNotice180()) finishStartup180(false); if (typeof tutorialActive180 === 'function' && tutorialActive180()) endTutorial180('skipped'); } catch (e) {}
+      T.calm();
+      const parent = dossierParents87().find(p => p.alive), was = parent?.occupation;
+      if (parent) parent.occupation = 'Смотритель маяка';
+      const html = dossierView87();
+      const card = html.slice(html.indexOf('<h3>Родители</h3>'));
+      return { age: s.age, then: (dossier87().birth.parents || []).length, was, card: card.slice(0, 1500), birth: (card.match(/<h4>При вашем рождении<\/h4>/g) || []).length, now: /<h4>Сейчас<\/h4>[\s\S]*Смотритель маяка/.test(card), ty: /твоём|твоей|твоих/.test(html) };
+    });
+    check('досье: жизнь с рождения — у ' + dossier.then + ' родителей заголовок «При вашем рождении», рядом «Сейчас» с новой работой',
+      dossier.age === 0 && dossier.then >= 1 && dossier.birth === dossier.then && dossier.now && !dossier.ty, dossier);
 
     check('без ошибок страницы', !errors.length, errors);
     await ctx.close();

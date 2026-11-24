@@ -2,11 +2,14 @@
 """Аудит текстов игры: обращение, ё, имена после предлогов, род NPC.
    python3 tools/text_audit.py            — сводка
    python3 tools/text_audit.py --examples — сводка и по 5 примеров на правило
+   python3 tools/text_audit.py --wired    — замены текстов каталогов только из файлов, которые подключены в index.html
 Строки на кириллице вытаскиваются из всех .js в корне (кроме *-data.js с каталогами). Это эвристики: цифры — порядок,
 примеры — для глаз.
 270: события каталогов (catalog245-data.js, business-events254-data.js) разбираются как JSON и проверяются на «ты»
 после замен по id из texts270.js (catalogTexts270, businessTexts270) — так, как их увидит игрок. Поля "from" этих
-таблиц — прежние тексты каталога для сверки, на экран они не идут и в проверку не попадают."""
+таблиц — прежние тексты каталога для сверки, на экран они не идут и в проверку не попадают. Если файл с таблицей замен
+не подключён в index.html, игрок замен не увидит: аудит об этом предупреждает, а с --wired считает такие события по
+тексту из данных."""
 import re, sys, glob, os, collections, json
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -45,10 +48,12 @@ YO = ['ещё', 'идёт', 'идёте', 'живёт', 'живёте', 'при�
       'вернёт', 'вернёте', 'вернётся', 'начнётся', 'пройдётся', 'придётся', 'остаётся', 'остаётесь', 'даётся',
       'создаёт', 'отдаёт', 'продаёт', 'передаёт', 'встаёте', 'берёте', 'ждёте', 'даёте']
 # 270: омографы — у слова есть другая форма с «е»: «сестры/звезды/жены/слезы» (родительный падеж: «Три сестры», «Час звезды»,
-# «смерть его жены»), «узнает/узнаете» (будущее время: «Если партнёр узнает»), «мед» (медицинский вуз, «мед.»).
+# «смерть его жены»), «узнает/узнаете» (будущее время: «Если партнёр узнает»), «мед» (медицинский вуз, «мед.»),
+# «счета» (множественное число: «неоплаченные счета», «Бытовые счета»; «счёта» — родительный единственного: «со счёта»).
 # Ни аудит, ни tools/yo_fix.py не должны ставить в них ё автоматически: в сборке 268 так испортились 9 строк каталога,
-# «Три сестры» в театральной студии и «Если партнёр узнает». Даже если слово снова попадёт в YO выше, здесь оно отсеется.
-YO_HOMOGRAPHS = {'сёстры', 'сёстрам', 'звёзды', 'жёны', 'слёзы', 'узнаёт', 'узнаёте', 'мёд'}
+# «Три сестры» в театральной студии, «Если партнёр узнает» и 33 строки с «счета» во множественном числе.
+# Даже если слово снова попадёт в YO выше, здесь оно отсеется.
+YO_HOMOGRAPHS = {'сёстры', 'сёстрам', 'звёзды', 'жёны', 'слёзы', 'узнаёт', 'узнаёте', 'мёд', 'счёта'}
 YO = sorted(set(w for w in YO if 'ё' in w and w not in YO_HOMOGRAPHS))
 YO_E = {w.replace('ё', 'е'): w for w in YO}
 YO_RE = re.compile(r'(?<![А-Яа-яЁё])(' + '|'.join(map(re.escape, sorted(YO_E, key=len, reverse=True))) + r')(?![А-Яа-яЁё])', re.I)
@@ -67,13 +72,20 @@ GENDER_HINT = re.compile(r"gender|sex38|petVerb|word\(|\?\s*'а'|'а'\s*:|'ла'
 # 270: замены текстов каталогов по id (texts270.js) и сами события каталогов, разобранные как JSON.
 OVERLAY = re.compile(r'const (\w+Texts\d+)=(\[.*?\n\]);', re.S)
 CATALOGS = [('catalog245-data.js', 'catalog245', 'catalogTexts'), ('business-events254-data.js', 'businessEvents254', 'businessTexts')]
-def overlays():
-    """{имя таблицы: [{"ids", "from", "to"}]} из всех .js в корне."""
+def overlay_files():
+    """{имя таблицы: (файл, [{"ids", "from", "to"}])} из всех .js в корне."""
     out = {}
     for f in sorted(glob.glob(os.path.join(ROOT, '*.js'))):
         if f.endswith('-data.js'): continue
-        for m in OVERLAY.finditer(open(f, encoding='utf-8').read()): out[m.group(1)] = json.loads(m.group(2))
+        for m in OVERLAY.finditer(open(f, encoding='utf-8').read()): out[m.group(1)] = (os.path.basename(f), json.loads(m.group(2)))
     return out
+def overlays():
+    """{имя таблицы: [{"ids", "from", "to"}]} из всех .js в корне — и подключённых в index.html, и ещё нет."""
+    return {k: rows for k, (_, rows) in overlay_files().items()}
+def wired(name):
+    """Подключён ли файл в index.html (<script src="name?v=…">)."""
+    html = open(os.path.join(ROOT, 'index.html'), encoding='utf-8').read()
+    return re.search(r'<script[^>]+src="' + re.escape(name) + r'(?:\?[^"]*)?"', html) is not None
 def catalog_texts(over):
     """(файл, id, текст) для всего, что игрок читает в событиях каталогов: заголовки, тексты, кнопки, исходы — после замен."""
     for fname, var, prefix in CATALOGS:
@@ -102,8 +114,10 @@ def main():
     files = sorted(f for f in glob.glob(os.path.join(ROOT, '*.js')) if not f.endswith('-data.js'))
     count = collections.Counter(); per_file = collections.defaultdict(collections.Counter); samples = collections.defaultdict(list)
     yo_seen = collections.Counter(); yo_missing = collections.Counter(); total = 0; lines = 0
-    over = overlays()
+    files_over = overlay_files(); over = overlays()
     originals = {json.dumps(r['from'], ensure_ascii=False) for rows in over.values() for r in rows}
+    loose = sorted({f for f, _ in files_over.values() if not wired(f)})
+    if '--wired' in sys.argv: over = {k: rows for k, (f, rows) in files_over.items() if wired(f)}
     for f in files:
         name = os.path.basename(f)
         for line, s in strings(f):
@@ -133,6 +147,10 @@ def main():
             count['ты в повествовании'] += 1; per_file['ты в повествовании'][name] += 1
             if len(samples['ты в повествовании']) < 5: samples['ты в повествовании'].append(f'{name}:{i}: {text[:150]}')
     print(f'Строк на кириллице: {total} (из {len(files)} файлов) и {events} строк событий каталогов')
+    if loose:
+        print('ВНИМАНИЕ: не подключены в index.html: ' + ', '.join(loose) + ' — ' +
+              ('события каталогов посчитаны по данным, без их замен' if '--wired' in sys.argv else
+               'замены текстов каталогов учтены, но игрок их не увидит; проверка без них: --wired'))
     for rule in ['ты в повествовании', 'е вместо ё', 'имя после предлога', 'род NPC без выбора по полу']:
         top = ', '.join(f'{k} {v}' for k, v in per_file[rule].most_common(6))
         print(f'\n{rule}: {count[rule]}   больше всего: {top}')
