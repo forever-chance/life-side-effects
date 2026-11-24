@@ -89,6 +89,12 @@ const oneNotice = (st, title) => st.modal && st.notice && st.title === title && 
 const tutorialStarted = st => !st.modal && !st.notice && st.tut && st.status === 'active' && st.step === 0 && st.tutEl && !st.running && st.tab === 'story';
 // Для сравнения рождений: всё, кроме имени, id, даты.
 const birthView = st => { const { id, name, ticks, ...rest } = st; return rest; };
+// «Понятно» настоящим нажатием. Без файла (BASE=1) окна после перезагрузки нет: открываем его так же, как строка
+// «Ожидают ответа» в полосе (openDecision24), чтобы прогон дошёл до конца.
+async function understood(pg) {
+  await pg.evaluate(() => { const n = startupNotice180(); if (n && !$('#modal').open) openDecision24('life61', n.id); });
+  await pg.click('#modal .options button:has-text("Понятно")');
+}
 async function clickNext(pg, state) {
   const steps = [];
   for (let i = 0; i < 20; i++) {
@@ -130,7 +136,7 @@ async function clickNext(pg, state) {
     const c1 = await pg.evaluate(state);
     check('1. окно закрыто без ответа: на «Действиях» «▶ Продолжить»', !c0.modal && c0.notice && /Продолжить/.test(c0.button) && c0.panel === 'right', c0);
     check('1. «▶ Продолжить» до ответа открывает стартовое окно, время стоит', oneNotice(c1, TITLE) && !c1.strip && !c1.running && c1.ticks === c0.ticks, c1);
-    await pg.click('#modal .options button:has-text("Понятно")');
+    await understood(pg);
     const a = await pg.evaluate(state);
     check('1. «Понятно»: окно прочитано, обучение с первого шага', tutorialStarted(a) && !a.hidePopups, a);
     // Перезагрузка посреди обучения: окна нет, обучение на месте, «▶ Продолжить» молчит, как раньше.
@@ -209,7 +215,7 @@ async function clickNext(pg, state) {
     await reload(t);
     const r = await pg.evaluate(state);
     check('4. итоговый порядок, рождение с ' + age + ': после перезагрузки окно открылось само, одно', oneNotice(b, title) && oneNotice(r, title) && !r.strip && r.id === b.id, r);
-    await pg.click('#modal .options button:has-text("Понятно")');
+    await understood(pg);
     const a = await pg.evaluate(state);
     check('4. итоговый порядок, рождение с ' + age + ': «Понятно» запускает обучение', tutorialStarted(a), a);
     check('4. итоговый порядок, рождение с ' + age + ': без ошибок страницы', !t.errors.length, t.errors);

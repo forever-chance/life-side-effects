@@ -60,6 +60,7 @@ function billsRelink270(map){
 }
 function billsJoin270(keep,parts){
  const all=[keep,...parts],sum=k=>all.reduce((n,d)=>n+(Number(d[k])||0),0),min=k=>Math.min(...all.map(d=>d[k]).filter(Number.isFinite));
+ const live=all.filter(d=>(Number(d.balance)||0)>.01);
  for(const d of parts)for(const k of Object.keys(d))if(keep[k]===undefined)keep[k]=d[k];
  keep.balance=sum('balance');keep.principal=sum('principal');keep.paid=sum('paid');
  keep.missed=Math.max(...all.map(d=>Number(d.missed)||0));
@@ -88,7 +89,6 @@ function billsJoin270(keep,parts){
  const asked=[],ids=new Set();for(const q of all.flatMap(d=>d.negotiations35||[]))if(!ids.has(q.id)){ids.add(q.id);asked.push(q);}
  if(asked.length)keep.negotiations35=asked;
  // Статус: закрыт, если долга нет; по графику — только если весь остаток в действующем графике.
- const live=all.filter(d=>(d.balance||0)>.01);
  keep.status32=keep.balance<=.01?'closed':live.length&&live.every(d=>d.status32==='scheduled')&&keep.repayment35?.status==='active'?'scheduled':'overdue';
 }
 function billsMerge270(){
