@@ -11,7 +11,8 @@
 //    в другую страну. Переезд партнёра следом (inviteMove) больше не забирает ребёнка, который живёт со вторым
 //    родителем в другом городе.
 // 3. Починка сохранений: игрок, которого «Пригласить к себе» увезло в город гостя, возвращается в город своей аренды;
-//    несовершеннолетние дети, оставшиеся в другом городе без второго родителя рядом, снова живут с игроком.
+//    несовершеннолетние дети, оставшиеся в другом городе без второго родителя рядом, снова живут с игроком
+//    (в сохранении — сразу, в игре — если так и остались к следующему месяцу).
 // 4. Питомцы: в поездке и при переезде учитываются только ваши питомцы (хозяин — вы или ваш несовершеннолетний
 //    ребёнок, который живёт с вами). Собака мамы или партнёра остаётся с хозяином, гостиница за неё не начисляется,
 //    отложенная из-за неё поездка сама возвращается в план. Питомец умершего близкого вашим сам по себе не становится.
@@ -292,15 +293,22 @@ function familyStrayChildren270(){
   !(typeof campAway54==='function'&&campAway54(p.id)));
 }
 
+// Сохранение чинится сразу при первой проверке. Дальше ребёнок возвращается, только если он оказался в другом городе
+// без второго родителя и так и остался к следующему месяцу: адрес игрока бывает мгновенно пересчитан туда и обратно
+// внутри одного месяца (repairHome62 при смене хозяина в режиме «у родителей»), и детей за таким скачком не тянем.
 function familyRepair270(){
  if(!s||s.dead||s.age<18||!s.housing||!Array.isArray(s.people)||!s.clock)return;
- const z=familyState270();
- if(z.cityChecked===undefined){z.cityChecked=s.clock.ticks;familyRepairCity270();}
- const stray=familyStrayChildren270();
- if(!stray.length)return;
+ const z=familyState270(),now=s.clock.ticks;
+ if(z.cityChecked===undefined){z.cityChecked=now;familyRepairCity270();}
+ const stray=familyStrayChildren270(),first=z.strayChecked===undefined;
+ z.strayChecked??=now;
+ if(!stray.length){delete z.stray;return;}
+ const seen=z.stray||{},due=stray.filter(p=>first||Number.isInteger(seen[p.id])&&seen[p.id]<now);
+ z.stray=Object.fromEntries(stray.filter(p=>!due.includes(p)).map(p=>[p.id,seen[p.id]??now]));
+ if(!due.length)return;
  const city=residenceCity();
- for(const p of stray){p.city18=city;childNote55(p,'Снова живёт с вами · '+city);}
- log('Дети снова живут с вами',city+': '+stray.map(p=>p.name).join(', ')+'.','Семья',true);
+ for(const p of due){p.city18=city;childNote55(p,'Снова живёт с вами · '+city);}
+ log('Дети снова живут с вами',city+': '+due.map(p=>p.name).join(', ')+'.','Семья',true);
  save();
 }
 

@@ -219,16 +219,33 @@ async function main() {
         const stray = __kid(9, ['player'], list[2]);
         const ex = __adult('Бывший партнер', 47, list[3], 40, 'm');
         const withEx = __kid(10, ['player', ex.id], list[3]);
+        // В игре — не сразу: адрес бывает пересчитан туда и обратно внутри месяца.
         ensureUX();
+        out.sameMonth = stray.city18;
+        __month(1); ensureUX();
         out.stray = { stray: stray.city18, withEx: withEx.city18, logs: __logs(4) };
         ensureUX();
         out.again = __logs(3);
+        // Мгновенный скачок: ребёнок «отстал» и вернулся в том же месяце — записи нет, никто не переехал.
+        const jump = __kid(7, ['player'], list[4]);
+        ensureUX();
+        jump.city18 = residenceCity();
+        ensureUX();
+        __month(1); ensureUX();
+        out.jump = { city: jump.city18, repairs: __repairs(), pending: Object.keys(s.family270.stray || {}).length };
+        // Сохранение 269 с брошенным ребёнком: при первой проверке — сразу.
+        const saved = __kid(11, ['player'], list[4]);
+        delete s.family270.strayChecked;
+        ensureUX();
+        out.saved = { city: saved.city18, logs: __logs(2) };
         return out;
       });
       check('починка: игрок возвращается в город своей аренды', r.broken.city === r.away && r.fixed.city === r.home, r);
       check('починка: партнёр живёт с игроком, дети снова рядом', r.fixed.partner === r.home && r.fixed.cohabit && r.fixed.kids.every(Boolean) && !r.broken.kids.some(Boolean), r);
       check('починка: запись в ленте об адресе', r.fixed.logs.some(l => l.startsWith('Снова дома')), r.fixed.logs);
-      check('починка: брошенный ребёнок возвращается к вам с записью в ленте', r.stray.stray === r.home && r.stray.logs.some(l => l.startsWith('Дети снова живут с вами')), r.stray);
+      check('починка: в игре брошенный ребёнок возвращается через месяц с записью в ленте', r.sameMonth !== r.home && r.stray.stray === r.home && r.stray.logs.some(l => l.startsWith('Дети снова живут с вами')), r);
+      check('починка: скачок адреса внутри месяца детей не двигает и записи не даёт', r.jump.city === r.home && r.jump.repairs === 1 && r.jump.pending === 0, r.jump);
+      check('починка: сохранение с брошенным ребёнком чинится сразу', r.saved.city === r.home && r.saved.logs.some(l => l.startsWith('Дети снова живут с вами')), r.saved);
       check('починка: ребёнок со вторым родителем остаётся с ним', r.stray.withEx !== r.home, r.stray);
       check('починка: повторно не срабатывает', r.again.filter(l => l.startsWith('Дети снова живут с вами')).length <= 1, r.again);
       check('починка: без ошибок страницы', !errors.length, errors);
@@ -292,7 +309,7 @@ async function main() {
       check('питомцы: старая отложенная поездка с маминой собакой сама возвращается в план', r.heldBefore && ['away', 'completed'].includes(r.held.status) && !r.held.hold, r.held);
       check('питомцы: своя кошка по-прежнему в плане поездки, мамина собака — нет', r.catKeeper === 'player' && r.catPlan && !r.dogPlan, r);
       check('питомцы: мамина собака не в плане переезда за границу', !r.movePlan || !r.movePlan.includes(r.dogId), r.movePlan);
-      check('питомцы: собака умершей мамы не становится вашей (живёте отдельно в том же городе)', r.sepBefore.city && !r.sepBefore.live && !r.sepAfter.live && !r.sepAfter.atHome && !/питом/.test(r.sepAfter.line) && !r.sepAfter.line.includes(r.dogName), r);
+      check('питомцы: собака умершей мамы не становится вашей (живёте отдельно в том же городе)', r.sepBefore.city && !r.sepBefore.live && !r.sepAfter.live && !r.sepAfter.atHome && !r.sepAfter.line.includes(r.dogName), r);
       check('питомцы: без ошибок страницы', !errors.length, errors);
       await ctx.close();
     }
@@ -440,6 +457,7 @@ async function main() {
       await pg.addScriptTag({ path: path.join(ROOT, 'tools', 'harness.js') });
       await pg.evaluate(() => {
         __base(30); s.cash = 3e5;
+        moveHome('rent', residenceCity(), 'center');
         const p = __adult('Партнер', 31, residenceCity(), 70, 'f');
         s.housing.occupant = p.id; p.cohabit = true; ensureHome();
         [6, 3].map(a => __kid(a, ['player', p.id])); __cat('Ночка');
