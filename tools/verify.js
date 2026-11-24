@@ -500,13 +500,14 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
   // 16. Уведомления и возраст (270).
   {
     const { pg, errors, ctx } = await page(browser, { startAge: '0', country: 'nl' });
-    const reasons = await pg.evaluate(() => { s.age = 3; return Object.fromEntries(actionCatalog24().map(a => [a.id, a.reason])); });
-    const want = { vacancies58: 'С 14 лет', jobReplies58: 'С 14 лет', applications: 'С 14 лет', admission58: 'С 16 лет', dorm68: 'С 16 лет', training68: 'С 16 лет', finance32: 'С 18 лет', agreements: 'С 18 лет', transport56: 'С 12 лет', estates58: 'С 18 лет', justice91: 'С 18 лет', court94: 'С 18 лет' };
+    const reasons = await pg.evaluate(() => { s.clock.running = false; s.age = 3; return Object.fromEntries(actionCatalog24().map(a => [a.id, a.reason])); });
+    const want = { vacancies58: 'С 16 лет', jobReplies58: 'С 16 лет', applications: 'С 16 лет', admission58: 'С 16 лет', dorm68: 'С 16 лет', training68: 'С 16 лет', finance32: 'С 18 лет', agreements: 'С 18 лет', transport56: 'С 12 лет', estates58: 'С 18 лет', justice91: 'С 18 лет', court94: 'С 18 лет', living68: 'С 18 лет', enterprise152: 'С 18 лет' };
     check('найти действие: в 3 года у взрослых пунктов есть возрастная причина', Object.entries(want).every(([id, r]) => reasons[id] === r) && reasons.health === '' && reasons.generations58 === '', Object.fromEntries(Object.keys(want).map(id => [id, reasons[id]])));
     const kid = await pg.evaluate(() => {
-      const out = {}; s.age = 3; s.pending = []; if ($('#modal').open) closeModal();
+      const out = {}; s.clock.running = false; s.age = 3; s.pending = []; if ($('#modal').open) closeModal();
       const pool = s.people.filter(p => p.alive && kin27(p) && p.age >= 18 && !['Мать', 'Отец'].includes(p.role));
       const gp = pool.sort((a, b) => /Бабушка|Дедушка/.test(b.role) - /Бабушка|Дедушка/.test(a.role) || (b.country === s.country) - (a.country === s.country) || b.age - a.age)[0];
+      if (!gp) return { error: 'нет взрослых родственников', roles: s.people.filter(p => p.alive).map(p => p.role) };
       gp.country = s.country; gp.city18 = residenceCity(); gp.age = 86; if (gp.bio27) gp.bio27.health = 55; gp.bond = Math.max(gp.bond || 0, 60);
       const month = () => { s.clock.ticks++; agingMonth58(); };
       for (let i = 0; i < 6; i++) month();
@@ -517,61 +518,97 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       out.helper = care?.status === 'active' && helper?.age >= 18 ? helper.role : null;
       s.age = 16; month(); month();
       out.teen = decisionItems24().filter(i => i.ref.kind === 'elder58').length;
+      out.teenLog = s.log.find(e => e.title === gp.name + ': нужна помощь в быту')?.text || '';
       elderMenu58(gp.id); out.menu = [...document.querySelectorAll('#modal .options button')].map(b => b.textContent); closeModal();
       const cash = s.cash, hours = schedule23().total;
       out.light = setLightHelp270(gp.id, true); out.lightHours = schedule23().total - hours; out.cashSame = s.cash === cash;
       for (let i = 0; i < 14; i++) month();
       out.teenRequests = generations58().requests.filter(q => q.person === gp.id).length;
+      // Родственник далеко: уведомление не обещает «навещать», кнопка объясняет, почему недоступна.
+      const far = s.people.filter(p => p.alive && kin27(p) && p.age >= 18 && p.id !== gp.id && !['Мать', 'Отец'].includes(p.role) && p.id !== care?.helper)[0];
+      if (far) {
+        far.country = Object.keys(countries).find(c => c !== s.country); far.city18 = cities[far.country][0]; far.age = 87; if (far.bio27) far.bio27.health = 50; far.bond = Math.max(far.bond || 0, 60);
+        s.age = 17; for (let i = 0; i < 4; i++) month();
+        out.farLog = s.log.find(e => e.title === far.name + ': нужна помощь в быту')?.text || '';
+        out.farNote = decisionItems24().find(i => i.ref.kind === 'elder58' && i.q.person === far.id)?.note || '';
+        elderMenu58(far.id); out.farButton = [...document.querySelectorAll('#modal .options button')].map(b => b.textContent).find(b => /^Навещать/.test(b)) || ''; closeModal();
+      } else out.farLog = out.farNote = out.farButton = 'нет родственника';
+      // После 18 лет семейная договорённость продлевается и не истекает разом.
+      s.age = 18; const adult = [];
+      for (let i = 0; i < 12; i++) { month(); adult.push(gp.aging58.care?.status === 'active' && !!gp.aging58.care.family270); }
+      out.adultCare = adult.every(Boolean); out.adultRequests = generations58().requests.filter(q => q.person === gp.id && !q.teen270).length;
       return out;
     });
     check('уход за пожилыми: до 16 лет просьбы нет, помощь взял взрослый родственник', kid.need > 0 && kid.items === 0 && kid.requests === 0 && kid.helper && kid.uncovered === 0, kid);
-    check('уход за пожилыми: в 16–17 одно уведомление и только лёгкая помощь без денег', kid.teen === 1 && kid.menu.some(b => /^Навещать и помогать по мелочи · 2 ч\/нед\./.test(b)) && !kid.menu.some(b => /Нанять|Помогать самому|Договориться|Обсудить помощника|Остановить/.test(b)) && kid.light && kid.lightHours === 2 && kid.cashSame && kid.teenRequests === 1, kid);
-    const est = await pg.evaluate(() => {
-      s.age = 3; s.pending = []; if ($('#modal').open) closeModal();
-      const mom = s.people.find(p => p.alive && p.role === 'Мать'); if (!mom) return null;
-      mom.privateCash = 20000; mom.deathCause143 = 'проверка'; mom.alive = false;
-      const before = s.cash, month = () => { s.clock.ticks++; estatesMonth58(); };
-      for (let i = 0; i < 20; i++) month();
-      const q = estates58().cases.find(q => q.person === mom.id), h = q?.heirs.find(h => h.person === 'player');
-      const out = { status: h?.status, held: !!h?.held270, share: h?.share, early: s.cash - before, items: decisionItems24().filter(i => i.ref.kind === 'estate58').length, expected: h ? localAmount16(h.cash, q.country) : 0 };
-      out.feed = s.log.find(e => e.title === 'Наследство · ' + mom.name)?.text || '';
-      estateCaseMenu58(q.id); out.menu = [...document.querySelectorAll('#modal .options button')].map(b => b.textContent); closeModal();
-      s.age = 18; month(); out.after18 = s.cash - before;
-      return out;
-    });
-    check('наследство: после смерти мамы доля трёхлетнего не уходит другим, её хранит опекун', est && est.status === 'accepted' && est.held && est.share > 0 && est.early === 0 && est.items === 0 && /хранит/.test(est.feed) && !est.menu.some(b => /Отказаться от своей доли|Принять свою долю/.test(b)), est);
-    check('наследство: в 18 лет деньги переходят к игроку', est && est.expected > 0 && Math.abs(est.after18 - est.expected) < 1, est);
+    check('уход за пожилыми: в 16–17 одно уведомление и только лёгкая помощь без денег', kid.teen === 1 && /Можно навещать и помогать по мелочи/.test(kid.teenLog) && kid.menu.some(b => /^Навещать и помогать по мелочи · 2 ч\/нед\./.test(b)) && !kid.menu.some(b => /Нанять|Помогать самому|Договориться|Обсудить помощника|Остановить/.test(b)) && kid.light && kid.lightHours === 2 && kid.cashSame && kid.teenRequests === 1, kid);
+    check('уход за пожилыми: родственник далеко — «звонить и приезжать», кнопка объясняет причину', /Живёт далеко/.test(kid.farLog) && !/навещать/i.test(kid.farLog) && /Живёт далеко/.test(kid.farNote) && /Живёт далеко/.test(kid.farButton), { log: kid.farLog, note: kid.farNote, button: kid.farButton });
+    check('уход за пожилыми: после 18 лет семейная помощь продолжается, просьба не приходит', kid.adultCare && kid.adultRequests === 0, { adultCare: kid.adultCare, adultRequests: kid.adultRequests });
     const ill = await pg.evaluate(() => {
-      s.age = 5; s.pending = []; if ($('#modal').open) closeModal();
+      s.clock.running = false; s.age = 5; s.pending = []; if ($('#modal').open) closeModal();
       for (const p of parents17()) p.privateCash = 1e6;
       s.illness = illness23(); s.lastIllnessTick = s.clock.ticks; s.illness.left = 4;
-      autonomousMonth(); s.pending = [];
+      autonomousMonth(); s.pending = []; s.clock.running = false;
       const out = { treated: s.illness?.treated, by: s.illness?.parents270 };
       healthMenu(); out.menu = [...document.querySelectorAll('#modal .options button')].map(b => b.textContent); out.text = $('#modal').innerText; closeModal();
       out.cards = decisionItems24().filter(i => ['health58', 'recovery86'].includes(i.ref.kind) && i.ref.id === 'illness').length;
       return out;
     });
-    check('болезнь до 12 лет: лечение выбирают и оплачивают родители, ребёнку — уведомление', ill.treated && ill.by === 'doctor' && !ill.menu.some(b => /Обратиться к врачу|Помощь без оплаты/.test(b)) && /Лечение выбрали родители/.test(ill.text) && !/игровой модели/.test(ill.text) && ill.cards === 1, ill);
+    check('болезнь до 12 лет: лечение выбирают и оплачивают родители, ребёнку — уведомление', ill.treated && ill.by === 'doctor' && !ill.menu.some(b => /Обратиться к врачу|Помощь без оплаты/.test(b)) && /Родители отвели к врачу и оплатили приём/.test(ill.text) && !/игровой модели/.test(ill.text) && ill.cards === 1, ill);
     const trip = await pg.evaluate(() => {
-      s.age = 6; s.illness = null; s.pending = []; if ($('#modal').open) closeModal();
+      s.clock.running = false; s.age = 6; s.illness = null; s.pending = []; if ($('#modal').open) closeModal();
+      const host = parents17()[0]; if (!host) return { error: 'нет живых родителей' };
       for (const p of parents17()) { p.bond = 90; p.inner.trust = 90; p.inner.strain = 0; p.privateCash = 1e6; }
-      const x = familyTravel53(); x.lastOffer = -100; x.invitations = []; x.hosts = {};
-      const q = offerTravel53(parents17()[0]); if (!q) return null;
-      const item = decisionItems24().find(i => i.ref.kind === 'tripInvite53');
+      const offer = () => { const x = familyTravel53(); x.lastOffer = -100; x.invitations = []; x.hosts = {}; return offerTravel53(host); };
+      const buttons = () => [...document.querySelectorAll('#modal .options button')];
+      const q = offer(); if (!q) return { error: 'нет приглашения' };
+      const party = q.draft.party53.map(id => living(id)?.role), item = decisionItems24().find(i => i.ref.kind === 'tripInvite53');
       openDecision24('tripInvite53', q.id);
-      const out = { item: item?.title, title: $('#modal h2').textContent, buttons: [...document.querySelectorAll('#modal .options button')].map(b => b.textContent) };
-      [...document.querySelectorAll('#modal .options button')].find(b => /^Поехать с семьёй/.test(b.textContent))?.click();
+      const out = { party, pets: livePets57().length, item: item?.title, title: $('#modal h2').textContent, text: [...document.querySelectorAll('#modal p')].map(p => p.textContent).join(' '), buttons: buttons().map(b => b.textContent) };
+      out.label = quickCard59(item).match(/title="([^"]*)"/)?.[1];
+      buttons().find(b => /^Поехать с /.test(b.textContent))?.click();
       out.status = q.status; out.log = s.log.find(e => e.title === 'Семейная поездка · ' + q.draft.city)?.text || '';
+      const q2 = offer(); if (!q2) return { ...out, error: 'нет второго приглашения' };
+      // Второе приглашение — будто дома есть питомец: присмотр за питомцами упоминается.
+      const pets0 = livePets57; livePets57 = () => [{ alive: true }];
+      try { openDecision24('tripInvite53', q2.id); out.pets2 = livePets57().length; out.text2 = [...document.querySelectorAll('#modal p')].map(p => p.textContent).join(' '); } finally { livePets57 = pets0; }
+      buttons().find(b => /^Остаться дома/.test(b.textContent))?.click();
+      out.status2 = q2.status; out.stay = s.log.find(e => e.title === 'Семейная поездка · ' + q2.draft.city)?.text || '';
+      out.badSitter = s.people.filter(p => p.age >= 80 || p.aging58?.need || !kin27(p)).map(p => p.name).filter(n => out.stay.includes(n));
       return out;
     });
-    check('поездка родителей до 12 лет — семейная: поехать или остаться, без виз и дороги', trip && /^Семейная поездка · /.test(trip.item) && /^Семейная поездка · /.test(trip.title) && trip.buttons.length === 2 && /^Поехать с семьёй/.test(trip.buttons[0]) && /^Остаться дома с родственником/.test(trip.buttons[1]) && trip.status === 'family270' && /Съездили всей семьёй/.test(trip.log), trip);
+    const who = /(Папа|Мама|Родители) зов(ёт|ут) вас в поездку: [^,]+, \d+ дн\./;
+    check('поездка родителей до 12 лет — семейная: поехать или остаться, без виз и дороги', !trip.error && /^Семейная поездка · /.test(trip.item) && /^Семейная поездка · /.test(trip.title) && trip.buttons.length === 2 && /^Поехать с (папой|мамой|родителями)/.test(trip.buttons[0]) && /^Остаться дома/.test(trip.buttons[1]) && trip.label === 'Остаться дома' && trip.status === 'family270' && /^Съездили с (папой|мамой|родителями): /.test(trip.log), trip);
+    check('поездка родителей: текст по составу поездки, город без предлога, питомцы — только если есть', !trip.error && who.test(trip.text) && !/ в [А-ЯЁ]/.test(trip.text + trip.log + trip.stay) && (trip.party.filter(r => /Мать|Отец/.test(r)).length >= 2 || !/Родители/.test(trip.text + trip.log)) && /питомц/.test(trip.text) === trip.pets > 0 && /питомц/.test(trip.log) === trip.pets > 0 && trip.pets2 > 0 && /присмотр за питомцами/.test(trip.text2), trip);
+    check('поездка родителей: «остаться дома» — с близким, не с пожилым или чужим', !trip.error && trip.status2 === 'declined' && /без вас: .*Вы остались дома/.test(trip.stay) && !trip.badSitter.length, trip);
+    // Наследство — последним: смерть родителя не должна мешать поездке (в ~3% стартов родитель один).
+    const est = await pg.evaluate(() => {
+      s.clock.running = false; s.age = 3; s.pending = []; if ($('#modal').open) closeModal();
+      const roles = s.people.filter(p => p.alive).map(p => p.role);
+      const mom = s.people.find(p => p.alive && p.role === 'Мать') || parents17()[0];
+      if (!mom) return { error: 'нет живых родителей', roles };
+      mom.privateCash = 20000; mom.deathCause143 = 'проверка'; mom.alive = false;
+      const before = s.cash, month = () => { s.clock.ticks++; estatesMonth58(); };
+      for (let i = 0; i < 20; i++) month();
+      const q = estates58().cases.find(q => q.person === mom.id), h = q?.heirs.find(h => h.person === 'player');
+      if (!q || !h) return { error: q ? 'игрок не наследник' : 'нет наследственного дела', roles, mom: mom.role, heirs: q?.heirs.map(h => h.person) };
+      const g = h.guardian270 && s.people.find(p => p.id === h.guardian270);
+      const out = { mom: mom.role, status: h.status, held: !!h.held270, share: h.share, early: s.cash - before, items: decisionItems24().filter(i => i.ref.kind === 'estate58').length, expected: localAmount16(h.cash, q.country), claims: q.claims.length, guardian: g?.name || null };
+      out.feed = s.log.find(e => e.title === 'Наследство · ' + mom.name)?.text || '';
+      estateCaseMenu58(q.id); out.menu = [...document.querySelectorAll('#modal .options button')].map(b => b.textContent); closeModal();
+      s.age = 18; month(); out.after18 = s.cash - before;
+      out.release = s.log.find(e => e.title === 'Наследство перешло к вам')?.text || '';
+      return out;
+    });
+    check('наследство: после смерти родителя доля трёхлетнего не уходит другим, её хранит опекун', !est.error && est.status === 'accepted' && est.held && est.share > 0 && est.early === 0 && est.items === 0 && /хранит/.test(est.feed) && !est.menu.some(b => /Отказаться от своей доли|Принять свою долю/.test(b)), est);
+    check('наследство: в 18 лет деньги переходят к игроку', !est.error && est.expected > 0 && Math.abs(est.after18 - est.expected) < 1, est);
+    check('наследство: «доли имущества» только при имуществе, в 18 лет назван тот, кто хранил долю', !est.error && /доли имущества/.test(est.feed) === est.claims > 0 && /доли имущества/.test(est.release) === est.claims > 0 && (est.guardian ? est.release.includes(est.guardian) : /опекун/.test(est.release)), est);
     check('уведомления и возраст (ребёнок): без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }
   {
     const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'nl' });
     const ad = await pg.evaluate(() => {
-      const out = {}; s.pending = []; if ($('#modal').open) closeModal();
+      const out = {}; s.clock.running = false; s.pending = []; if ($('#modal').open) closeModal();
       const olds = s.people.filter(p => p.alive && kin27(p) && p.age >= 18 && !['Мать', 'Отец'].includes(p.role)).sort((a, b) => (b.country === s.country) - (a.country === s.country) || b.age - a.age).slice(0, 2);
       for (const p of olds) { p.country = s.country; p.city18 = residenceCity(); p.age = 86; if (p.bio27) p.bio27.health = 55; p.bond = Math.max(p.bond || 0, 60); if (p.aging58) p.aging58.care = null; }
       const month = () => { s.clock.ticks++; agingMonth58(); };
@@ -579,6 +616,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       const reqs = generations58().requests.filter(q => olds.some(p => p.id === q.person) && q.status === 'offered');
       out.created = generations58().requests.map(q => q.created); out.ours = reqs.length;
       const q = reqs[0], other = reqs[1];
+      if (!q) return { ...out, error: 'нет просьбы' };
       out.card = quickCard59(decisionItems24().find(i => i.ref.id === q.id)).match(/title="([^"]*)"/)?.[1];
       elderMenu58(q.person); const b = [...document.querySelectorAll('#modal .options button')].find(b => /^Не сейчас/.test(b.textContent)); out.notNow = !!b; b?.click();
       out.status = q.status; out.x = other ? quickDismiss59('elder58', other.id) && other.status : null;
@@ -590,7 +628,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     check('уход за пожилыми: просьбы нескольких близких приходят в разные месяцы', ad.ours === 2 && new Set(ad.created).size === ad.created.length, ad);
     check('уход за пожилыми: «Не сейчас» и «×» — отказ, 12 месяцев без новой просьбы', ad.card === 'Не сейчас' && ad.notNow && ad.status === 'declined' && ad.x === 'declined' && ad.seen.every(v => !v), ad);
     const hide = await pg.evaluate(() => {
-      const out = {}; s.age = 30; s.cash = 1e8; s.pending = []; if ($('#modal').open) closeModal();
+      const out = {}; s.clock.running = false; s.age = 30; s.cash = 1e8; s.pending = []; if ($('#modal').open) closeModal();
       s.illness = illness23(); s.lastIllnessTick = s.clock.ticks; s.illness.left = 6;
       const keys = () => decisionItems24().map(i => i.ref.kind + ':' + i.ref.id);
       out.illnessCards = keys().filter(k => /^(health58|recovery86):illness$/.test(k)).length;
@@ -605,6 +643,16 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       out.dismiss = [quickDismiss59('business254', c.id), quickDismiss59('childName256', 't-baby270'), quickDismiss59('recovery86', 'illness')];
       const t0 = s.clock.ticks; out.vis = [];
       for (let k = 0; k <= 3; k++) { s.clock.ticks = t0 + k; s.illness.left = 6; const ks = keys(); out.vis.push(want.map(w => ks.includes(w) || w === 'health58:illness' && ks.includes('recovery86:illness'))); }
+      s.clock.ticks = t0;
+      // Свой срок короче трёх месяцев: новая аренда (истекает через 2 мес.) и событие дела (через 3 мес.).
+      b.rentOffer159 = { id: 'enterprise-rent-' + b.id + '-t270', space: b.space157 ?? 'standard', expires: t0 + 2 };
+      const c3 = { ...c, id: b.id + '-case254-t3', expires: t0 + 3 }; businessState254(b).cases.push(c3);
+      const short = [{ kind: 'enterpriseRent239', id: b.rentOffer159.id }, { kind: 'business254', id: c3.id }];
+      out.shortLabels = short.map(r => quickCard59(decisionItems24().find(i => i.ref.kind === r.kind && i.ref.id === r.id) || { ref: r, title: '', note: '' }).match(/class="quick-close59"[^>]*title="([^"]*)"/)?.[1]);
+      out.shortDismiss = short.map(r => quickDismiss59(r.kind, r.id));
+      out.shortVis = [];
+      for (let k = 1; k <= 2; k++) { s.clock.ticks = t0 + k; const ks = keys(); out.shortVis.push(short.map(r => ks.includes(r.kind + ':' + r.id))); }
+      s.clock.ticks = t0 + 3; b.rentOffer159 = null; c3.status = 'declined';
       pruneSnoozed270(); out.left = Object.keys(notices59().snoozed).length;
       s.localEvent99 = { id: 'local99-t270', tick: s.clock.ticks, expires: s.clock.ticks + 2, status: 'offered', country: s.country, city: residenceCity(), title: 'Вечер в районе', text: 'Проверка.', companion: null, holiday130: false, family178: null, price: 1 };
       out.local = quickDismiss59('local99', 'local99-t270') && s.localEvent99.status;
@@ -615,28 +663,42 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     });
     check('«×»: одна карточка на болезнь, без дубля восстановления', hide.illnessCards === 1, hide);
     check('«×»: восстановление, имя ребёнка и событие дела скрыты 3 месяца, потом возвращаются', hide.before.every(Boolean) && hide.dismiss.every(Boolean) && hide.vis.slice(0, 3).every(r => r.every(v => !v)) && hide.vis[3].every(Boolean) && hide.label === 'Скрыть на 3 месяца' && hide.left === 0, hide);
+    check('«×»: пункт со сроком раньше трёх месяцев возвращается до срока, подпись это говорит', hide.shortLabels[0] === 'Напомнить в следующем месяце' && hide.shortLabels[1] === 'Напомнить ближе к сроку' && hide.shortDismiss.every(Boolean) && hide.shortVis[0][0] && !hide.shortVis[0][1] && hide.shortVis[1][1], { labels: hide.shortLabels, dismiss: hide.shortDismiss, vis: hide.shortVis });
     check('«×» у местного события — «Пропустить»', hide.local === 'declined', hide.local);
     check('тексты: без «игровой модели» в болезни, «от вас потребуется» в каталоге', /Тяжесть: /.test(hide.healthText) && !/игровой модели/.test(hide.healthText) && /от вас потребуется/.test(hide.e0098) && hide.ty === 0, { e: hide.e0098, ty: hide.ty });
     const liv = await pg.evaluate(() => {
-      const out = {}; s.age = 19; s.job = null; s.pending = []; if ($('#modal').open) closeModal();
+      const out = {}; s.clock.running = false; s.gender = 'm'; s.age = 19; s.job = null; s.pending = []; if ($('#modal').open) closeModal();
       for (const p of parents17()) { p.privateCash = 1e6; p.inner.trust = 80; }
       const z = students68(); z.offer = null; z.retry = -1; z.support = null;
+      const buttons = () => [...document.querySelectorAll('#modal .options button')];
       out.offer = !!livingOffer68();
-      livingMenu68(); [...document.querySelectorAll('#modal .options button')].find(b => /^Справлюсь сам/.test(b.textContent))?.click();
+      livingMenu68(); buttons().find(b => /^Справлюсь сам(?!а)/.test(b.textContent))?.click();
       out.status = z.offer?.status;
-      const t0 = s.clock.ticks; out.seen = [];
+      // Передумать: кнопка в меню работает и после отказа.
+      livingMenu68(); out.menuText = $('#modal').innerText; const agree = buttons().find(b => /^Договориться о ежемесячной помощи/.test(b.textContent));
+      out.agreeEnabled = !!agree && !agree.disabled; agree?.click(); out.support = z.support?.status || null; if ($('#modal').open) closeModal();
+      z.offer = null; z.support = null; z.retry = -1;
+      const t0 = s.clock.ticks; const q0 = livingOffer68(); out.x0 = !!q0 && quickDismiss59('living68', q0.id) && z.offer.status;
+      out.seen = [];
       for (let k = 1; k <= 12; k++) { s.clock.ticks = t0 + k; out.seen.push(decisionItems24().some(i => i.ref.kind === 'living68')); }
       const q = livingOffer68(); out.x = !!q && quickDismiss59('living68', q.id) && z.offer.status;
+      // Женский род: «Справлюсь сама» и в меню, и у «×».
+      s.gender = 'f'; z.offer = null; z.retry = -1; s.clock.ticks += 13;
+      const qf = livingOffer68(); out.cardF = qf && quickCard59(decisionItems24().find(i => i.ref.kind === 'living68')).match(/class="quick-close59"[^>]*title="([^"]*)"/)?.[1];
+      livingMenu68(); out.menuF = buttons().map(b => b.textContent).find(b => /^Справлюсь/.test(b)) || ''; closeModal();
       return out;
     });
-    check('помощь на жизнь: «Справлюсь сам» и «×» — отказ на 12 месяцев', liv.offer && liv.status === 'declined' && liv.seen.slice(0, 11).every(v => !v) && liv.seen[11] && liv.x === 'declined', liv);
+    check('помощь на жизнь: «Справлюсь сам» и «×» — отказ на 12 месяцев', liv.offer && liv.status === 'declined' && liv.x0 === 'declined' && liv.seen.slice(0, 11).every(v => !v) && liv.seen[11] && liv.x === 'declined', liv);
+    check('помощь на жизнь: после отказа можно передумать в меню', liv.agreeEnabled && liv.support === 'active' && /Вы отказались от регулярной помощи/.test(liv.menuText), liv);
+    check('помощь на жизнь: «Справлюсь сама» для героини', liv.cardF === 'Справлюсь сама' && /^Справлюсь сама/.test(liv.menuF), { card: liv.cardF, menu: liv.menuF });
     const bills = await pg.evaluate(async () => {
-      const out = {}; s.age = 30; s.cash = 30000; s.pending = []; if ($('#modal').open) closeModal();
+      const out = {}; s.clock.running = false; s.gender = 'm'; s.age = 30; s.cash = 30000; s.pending = []; if ($('#modal').open) closeModal();
       s.debts.push({ id: id16('bill32'), type: 'bill32', billKind32: 'rent', creditor32: 'проверка', country: s.country, balance: 1500, principal: 1500, rate: 0, payment: 0, paid: 0, missed: 0, started: s.clock.ticks, due: s.clock.ticks, history32: [] });
       const wait = () => new Promise(r => setTimeout(r, 20));
       life61().nextBills = 0; s.clock.ticks++; monthlyFinance(); await wait();
       out.first = $('#modal').open && $('#modal h2').textContent; if ($('#modal').open) closeModal();
       const q = life61().notices.filter(q => q.type === 'bills').at(-1);
+      out.label = q && quickCard59(decisionItems24().find(i => i.ref.kind === 'life61' && i.ref.id === q.id)).match(/class="quick-close59"[^>]*title="([^"]*)"/)?.[1];
       out.x = !!q && quickDismiss59('life61', q.id);
       out.months = [];
       for (let k = 1; k <= 4; k++) {
@@ -644,9 +706,19 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         out.months.push({ open: $('#modal').open, running: s.clock.running, shown: decisionItems24().some(i => i.ref.kind === 'life61' && decisionRecord24(i.ref)?.type === 'bills') });
         if ($('#modal').open) closeModal();
       }
+      s.clock.running = false;
+      // Через годы после отсрочки новые старые счета снова открывают окно.
+      const z = life61(), last = z.notices.filter(q => q.type === 'bills').at(-1); last.status = 'later'; last.postponed270 = s.clock.ticks - 30; z.nextBills = 0;
+      s.clock.running = true; s.clock.ticks++; monthlyFinance(); await wait();
+      out.later = { open: $('#modal').open, title: $('#modal').open && $('#modal h2').textContent, running: s.clock.running };
+      // «Напомнить через три месяца» в окне — та же отсрочка, что и «×».
+      if ($('#modal').open) [...document.querySelectorAll('#modal .options button')].find(b => /^Напомнить через три месяца/.test(b.textContent))?.click();
+      const q3 = z.notices.filter(q => q.type === 'bills').at(-1); out.menuLater = { status: q3.status, postponed: q3.postponed270 === s.clock.ticks, next: z.nextBills - s.clock.ticks };
+      if ($('#modal').open) closeModal(); s.clock.running = false;
       return out;
     });
-    check('счета: «×» — 3 месяца тишины, окно само не открывается, автоигра идёт', bills.first === 'Закрыть старые счёта' && bills.x && bills.months.every(m => !m.open && m.running) && !bills.months[0].shown && !bills.months[1].shown && bills.months[2].shown, bills);
+    check('счета: «×» — 3 месяца тишины, окно само не открывается, автоигра идёт', bills.first === 'Закрыть старые счёта' && bills.label === 'Скрыть на 3 месяца' && bills.x && bills.months.every(m => !m.open && m.running) && !bills.months[0].shown && !bills.months[1].shown && bills.months[2].shown, bills);
+    check('счета: тишина только сразу после отсрочки, «Напомнить через три месяца» — та же отсрочка', bills.later.open && bills.later.title === 'Закрыть старые счёта' && !bills.later.running && bills.menuLater.status === 'later' && bills.menuLater.postponed && bills.menuLater.next === 3, bills);
     check('уведомления и возраст (взрослый): без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }

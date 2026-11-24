@@ -1,15 +1,17 @@
 'use strict';
 // Сборка 270: уведомления и возраст.
-// 1. «×» в панели «Ожидают ответа» прячет пункт на 3 месяца и действует на все пункты, в том числе на те, что
+// 1. «×» в панели «Ожидают ответа» прячет пункт на 3 месяца (если у решения срок раньше — до месяца перед сроком)
+//    и действует на все пункты, в том числе на те, что
 //    добавлены обёртками позже quick-dismiss59.js (восстановление, имя ребёнка, события своего дела, аренда).
-//    Где генератор пересоздаёт запись с новым id, отсрочка привязана к теме: человек, счета, событие, хозяин поездки.
+//    Где генератор пересоздаёт запись с новым id, отсрочка привязана к теме: человек, счета, болезнь или травма, хозяин поездки.
 //    Для просьбы о помощи пожилому близкому, помощи родителей на жизнь и местных событий «×» — это отказ.
 // 2. Ребёнок не получает просьб об уходе за пожилыми: до 16 лет помощь берёт на себя взрослый родственник,
-//    в 16–17 — одно уведомление и необязательная лёгкая помощь, с 18 — как раньше, но с «Не сейчас».
+//    в 16–17 — одно уведомление и необязательная лёгкая помощь, с 18 — как раньше, но с «Не сейчас». Помощь,
+//    которую семья взяла на себя, продолжается и после 18 лет, пока помощник может помогать.
 // 3. Наследство несовершеннолетнего принимает опекун; деньги и доли ждут 18 лет, отказа за ребёнка нет.
 // 4. Помощь родителей на жизнь: «Справлюсь сам(а)» — повтор не раньше чем через год, но передумать можно в меню.
 // 5. Старые счета: «×» откладывает на 3 месяца, первое напоминание после отсрочки не открывает окно и не останавливает автоигру.
-// 6. До 12 лет лечение выбирают родители, поездка родителей — семейная, без виз, дороги и питомцев.
+// 6. До 12 лет лечение выбирают родители; поездка родителей — семейная: поехать или остаться дома с близким.
 // 7. Возрастные причины в «Найти действие», тексты: «Тяжесть в игровой модели», «от тебя потребуется».
 const notices270Base={decisionItems24,quickDismiss59,dismissKind59,quickCard59,elderCareMonth58,elderCareAvailable58,elderMenu58,
  schedule23,prepareEstate58,respondEstate58,estatesMonth58,estateCaseMenu58,livingOffer68,livingMenu68,agreeLiving68,checkBills61,repayMenu61,
@@ -109,7 +111,8 @@ quickDismiss59=function(kind,id){
  if(kind==='tripInvite53'&&familyTripInvite270(q))return familyTripStay270(id);
  const ok=notices270Base.quickDismiss59(kind,id);
  if(!ok)return ok;
- const z=notices59().snoozed,until=snoozeUntil270(ref,q,item);
+ // Срок самого пункта ограничивает только «скрыть»; после отказа тема (хозяин поездки и т. п.) молчит 3 месяца.
+ const z=notices59().snoozed,until=mode==='snooze'?snoozeUntil270(ref,q,item):s.clock.ticks+snoozeMonths270;
  if(mode==='snooze'){
   if(topic&&(kind==='health58'||kind==='recovery86'))delete z[kind+':'+id];
   else z[kind+':'+id]=until;
@@ -259,7 +262,6 @@ elderMenu58=function(id){
 
 // ---------- 3. Наследство несовершеннолетнего ----------
 const guardianWord270={Мать:'мама',Отец:'папа',Бабушка:'бабушка',Дедушка:'дедушка',Тетя:'тётя',Тётя:'тётя',Дядя:'дядя',Брат:'брат',Сестра:'сестра'};
-const guardianFemale270=['Мать','Бабушка','Тетя','Тётя','Сестра'];
 function guardianText270(g){return g?(guardianWord270[g.role]||'опекун')+' — '+g.name:'опекун';}
 function estateGuardian270(q){
  const adults=s.people.filter(p=>p.alive&&p.age>=18&&p.id!==q.person);
@@ -284,7 +286,7 @@ function releaseEstates270(){
   if(!ok){h.status='accepted';continue;}
   n++;
   const g=h.guardian270?s.people.find(p=>p.id===h.guardian270):null;
-  log('Наследство перешло к вам',q.name+': '+money(localAmount16(h.cash,q.country))+(q.claims?.length?' и ваши доли имущества':'')+'. До 18 лет долю '+(g&&guardianFemale270.includes(g.role)?'хранила ':'хранил ')+guardianText270(g)+'.','Имущество',true);
+  log('Наследство перешло к вам',q.name+': '+money(localAmount16(h.cash,q.country))+(q.claims?.length?' и ваши доли имущества':'')+'. До 18 лет долю '+(['мама','бабушка','тётя','сестра'].includes(guardianWord270[g?.role])?'хранила ':'хранил ')+guardianText270(g)+'.','Имущество',true);
  }
  if(n){save();render();}
  return n;
@@ -362,19 +364,28 @@ livingMenu68=function(){
 
 // ---------- 5. Старые счета ----------
 function postponeBills270(q){
- q.status='later';
  const z=life61(),t=s.clock.ticks;
+ q.status='later';q.postponed270=t;
  z.nextBills=Math.max(z.nextBills||0,t+snoozeMonths270);
  notices59().snoozed['life61:bills']=t+snoozeMonths270;
  pruneSnoozed270();save();render();return true;
 }
 checkBills61=function(){
  const z=s&&life61(),last=z?.notices.filter(q=>q.type==='bills').at(-1);
- if(last?.status!=='later')return notices270Base.checkBills61();
- // После отсрочки — тихое напоминание: окно само не открывается и автоигра не останавливается.
+ if(last?.status!=='later'||last.postponed270==null||s.clock.ticks-last.postponed270>snoozeMonths270+1)return notices270Base.checkBills61();
+ // Первое напоминание после отсрочки — тихое: окно само не открывается и автоигра не останавливается.
  const running=s.clock.running,q=notices270Base.checkBills61();
  if(q){s.clock.running=running;q.quiet270=true;}
  return null;
+};
+// «Напомнить через три месяца» в окне счетов — та же отсрочка, что и «×».
+repayMenu61=function(id,...rest){
+ const old=show;
+ show=function(title,text,opts,...more){
+  const list=opts.map(o=>o.label==='Напомнить через три месяца'?{...o,fn:()=>{const q=life61().notices.find(q=>q.id===id);return q?postponeBills270(q):o.fn();}}:o);
+  return old(title,text,list,...more);
+ };
+ try{return notices270Base.repayMenu61(id,...rest);}finally{show=old;}
 };
 
 // ---------- 6. Дети: лечение и семейные поездки ----------
@@ -384,9 +395,9 @@ function parentsTreat270(){
  const severity=a.severity||'средняя',fee=c().cost*(s.country==='us'?.04:.008)*(severity==='тяжёлая'?2:1),recovery=a.recovery23||2;
  if(canPay23(fee)&&payExpense23(fee,'Лечение: '+a.name,'health:'+s.lastIllnessTick+':'+a.name)){a.treated=true;a.left=recovery;a.parents270='doctor';}
  else{a.treated=true;a.left=recovery+2;a.parents270='free';}
- const text=a.name+'. '+(a.parents270==='doctor'?'Родители отвели к врачу и оплатили приём':'Родители записали к врачу без оплаты')+', восстановление — около '+a.left+' мес.';
+ const text=a.name+'. '+(a.parents270==='doctor'?'Родители отвели к врачу и оплатили приём':'Родители выбрали бесплатную помощь')+', восстановление — около '+a.left+' мес.';
  const e=s.log.slice(0,8).find(e=>e.title==='Самочувствие мешает планам'&&String(e.text||'').startsWith(a.name));
- if(e)e.text=text;else log(a.parents270==='doctor'?'Родители отвели к врачу':'Родители записали к врачу',text,'Здоровье');
+ if(e)e.text=text;else log(a.parents270==='doctor'?'Родители отвели к врачу':'Родители выбрали бесплатную помощь',text,'Здоровье');
  return true;
 }
 healthMenu=function(){
@@ -396,7 +407,7 @@ healthMenu=function(){
  show=function(title,text,opts,...rest){
   let note=String(text??'').replace('Тяжесть в игровой модели: ','Тяжесть: '),list=opts;
   if(small&&a===s.illness&&title===a.name){
-   note='Тяжесть: '+(a.severity||'средняя')+'.\n'+({doctor:'Лечение выбрали родители: приём у врача, его оплатили они.',free:'Лечение выбрали родители: помощь без оплаты, поэтому восстановление идёт дольше.'}[a.parents270]||'Лечение уже идёт.');
+   note='Тяжесть: '+(a.severity||'средняя')+'.\n'+({doctor:'Родители отвели к врачу и оплатили приём.',free:'Родители выбрали бесплатную помощь, поэтому восстановление идёт дольше.'}[a.parents270]||'Лечение уже идёт.');
    list=[{label:'Детские занятия',fn:childActivities23},{label:'Понятно',fn:()=>{}}];
   }
   return old(title,note,list,...rest);
@@ -408,6 +419,27 @@ autonomousMonth=function(...args){
  if(s&&!s.dead){parentsTreat270();pruneSnoozed270();}
  return r;
 };
+// Кто едет: «родители» — только если в поездке оба, иначе мама или папа. Город — после двоеточия, без склонения.
+const tripWords270={
+ Мать:{nom:'мама',dat:'маме',ins:'мамой',pron:'она',call:'зовёт',take:'берёт',took:'взяла',went:'съездила'},
+ Отец:{nom:'папа',dat:'папе',ins:'папой',pron:'он',call:'зовёт',take:'берёт',took:'взял',went:'съездил'},
+ both:{nom:'родители',dat:'родителям',ins:'родителями',pron:'они',call:'зовут',take:'берут',took:'взяли',went:'съездили'}};
+const cap270=x=>x.charAt(0).toUpperCase()+x.slice(1);
+function tripWho270(q){
+ const party=(q?.draft?.party53||[]).map(id=>living(id)).filter(Boolean),host=living(q?.host);
+ const parents=party.filter(p=>['Мать','Отец'].includes(p.role));
+ const w=parents.length>=2?tripWords270.both:tripWords270[host?.role]||tripWords270.both;
+ return {...w,others:party.filter(p=>!parents.includes(p)&&p.id!==q.host)};
+}
+function tripPets270(){return typeof livePets57==='function'?livePets57().length>0:(s.pets||[]).some(p=>p.alive);}
+function tripDuties270(){return tripPets270()?'Дорогу, документы и присмотр за питомцами':'Дорогу и документы';}
+function tripSitter270(q){
+ const party=q?.draft?.party53||[],home=residenceCity();
+ const pool=s.people.filter(p=>p.alive&&p.age>=18&&p.age<80&&!p.aging58?.need&&p.id!==q.host&&!party.includes(p.id)&&guardianWord270[p.role]
+  &&p.country===s.country&&(!p.city18||p.city18===home));
+ const rank=p=>['Мать','Отец'].includes(p.role)?0:['Бабушка','Дедушка'].includes(p.role)?1:2;
+ return pool.sort((a,b)=>rank(a)-rank(b)||(b.bond||0)-(a.bond||0))[0]||null;
+}
 function familyTripParents270(q){
  const x=familyTravel53();
  for(const id of q.draft?.party53||[]){
@@ -418,6 +450,7 @@ function familyTripParents270(q){
 function familyTripGo270(id){
  const q=invite53(id);
  if(!familyTripInvite270(q)||!invitationAvailable53(q))return false;
+ const w=tripWho270(q),duties=tripDuties270();
  q.status='family270';q.decided270=s.clock.ticks;
  familyTripParents270(q);
  for(const [pid,amount] of Object.entries(q.quote?.charges||{})){
@@ -426,31 +459,32 @@ function familyTripGo270(id){
  }
  s.mood=clamp(s.mood+4);
  for(const pid of q.draft.party53||[]){const p=living(pid);if(p&&['Мать','Отец','Брат','Сестра'].includes(p.role)){rel(p,{affection:2});remember(p,'Семейная поездка: '+q.draft.city);}}
- log('Семейная поездка · '+q.draft.city,'Съездили всей семьёй: '+q.draft.city+', '+q.draft.days+' дн. Дорогу, документы и присмотр за питомцами взяли на себя родители.','Отдых',true);
+ log('Семейная поездка · '+q.draft.city,'Съездили с '+w.ins+': '+q.draft.city+', '+q.draft.days+' дн. '+duties+' '+w.pron+' '+w.took+' на себя.','Отдых',true);
  save();render();return true;
 }
 function familyTripStay270(id){
  const q=invite53(id);
- if(!q||!respondTravel53(id,false))return false;
+ if(!q)return false;
+ const w=tripWho270(q),r=tripSitter270(q);
+ if(!respondTravel53(id,false))return false;
  familyTripParents270(q);
- const party=q.draft?.party53||[],r=s.people.filter(p=>p.alive&&p.age>=18&&kin27(p)&&!party.includes(p.id)&&p.country===s.country).sort((a,b)=>(b.bond||0)-(a.bond||0))[0];
- log('Семейная поездка · '+q.draft.city,'Родители съездили в '+q.draft.city+', а вы остались дома'+(r?' с родственниками: '+r.name:'')+'.','Отдых');
+ log('Семейная поездка · '+q.draft.city,cap270(w.nom)+' '+w.went+' без вас: '+q.draft.city+', '+q.draft.days+' дн. Вы остались дома'+(r?', с вами — '+guardianWord270[r.role]+', '+r.name:'')+'.','Отдых');
  save();render();return true;
 }
 travelInviteMenu53=function(id,...rest){
  const q=invite53(id);
  if(!familyTripInvite270(q)||!invitationAvailable53(q))return notices270Base.travelInviteMenu53(id,...rest);
- const d=q.draft;
- show('Семейная поездка · '+d.city,'Родители собираются в '+d.city+' ('+travelName103(d.country)+') на '+d.days+' дн. и зовут вас с собой. Дорогу, документы и присмотр за питомцами берут на себя они.',[
-  {label:'Поехать с семьёй',hint:'Настроение +4 · ближе с родителями',fn:()=>familyTripGo270(id)},
-  {label:'Остаться дома с родственником',fn:()=>familyTripStay270(id)}
+ const d=q.draft,w=tripWho270(q),r=tripSitter270(q);
+ show('Семейная поездка · '+d.city,cap270(w.nom)+' '+w.call+' вас в поездку: '+d.city+(d.country!==s.country?' ('+travelName103(d.country)+')':'')+', '+d.days+' дн. '+tripDuties270()+' '+w.pron+' '+w.take+' на себя.'+(w.others.length?(w.others.length>1?' Также едут: ':' Также едет: ')+w.others.map(p=>p.name).join(', ')+'.':''),[
+  {label:'Поехать с '+w.ins,hint:'Настроение +4 · ближе к '+w.dat,fn:()=>familyTripGo270(id)},
+  {label:'Остаться дома',hint:r?'С вами — '+guardianWord270[r.role]+', '+r.name:'',fn:()=>familyTripStay270(id)}
  ]);
 };
 offerTravel53=function(...args){
  const q=notices270Base.offerTravel53(...args);
  if(familyTripInvite270(q)){
-  const e=s.log.slice(0,8).find(e=>e.title===q.title);
-  if(e){e.title='Семейная поездка · '+q.draft.city;e.text='Родители собираются в '+q.draft.city+' на '+q.draft.days+' дн. и зовут вас с собой.';}
+  const e=s.log.slice(0,8).find(e=>e.title===q.title),w=tripWho270(q);
+  if(e){e.title='Семейная поездка · '+q.draft.city;e.text=cap270(w.nom)+' '+w.call+' вас в поездку: '+q.draft.city+', '+q.draft.days+' дн.';}
  }
  return q;
 };
@@ -465,12 +499,13 @@ incidentMenu56=function(id){
 };
 
 // ---------- 7. Возрастные причины в «Найти действие» ----------
-const actionAges270={vacancies58:14,jobReplies58:14,applications:14,admission58:16,dorm68:16,training68:16,
- finance32:18,agreements:18,transport56:12,estates58:18,justice91:18,court94:18,teaching26:18,crisis29:18};
+// Работа и заявки — с 16, как в jobEligibility16 («Работа с 16 лет») и у пункта «Вакансии и поиск работы».
+// Для пунктов из списка возраст — первая причина: ребёнку не нужно читать «До 25 лет» или «Доступно совершеннолетним».
+const actionAges270={vacancies58:16,jobReplies58:16,applications:16,admission58:16,dorm68:16,training68:16,
+ finance32:18,agreements:18,transport56:12,estates58:18,justice91:18,court94:18,teaching26:18,crisis29:18,living68:18,enterprise152:18};
 actionCatalog24=function(){
  const list=notices270Base.actionCatalog24(),age=s?.age??0;
- for(const a of list){const min=actionAges270[a.id];if(min&&age<min&&!a.reason)a.reason='С '+min+' лет';}
- return list;
+ return list.map(a=>{const min=actionAges270[a.id];return min&&age<min?{...a,reason:'С '+min+' лет'}:a;});
 };
 
 // ---------- Тексты каталога 245: «вы» вместо «ты» ----------
