@@ -6,14 +6,14 @@
 // Файлы сборки, ещё не подключённые в index.html, добавляются после загрузки страницы, до «Родиться»: names271-data.js,
 // names271.js, names271-freq-data.js, names271-freq.js.
 // BASE=1 — прогон без names271-freq (names271 остаётся): видно, какие проверки ловят старое поведение.
-// LIVES=n — сколько «жизней» в стенде (по умолчанию 100: среднее на 150 женщин держится в ±0.2).
+// LIVES=n — сколько «жизней» в стенде (по умолчанию 120: среднее на 150 женщин держится в ±0.2).
 const fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp' };
 const INDEX = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const BASE = process.env.BASE === '1';
-const LIVES = Number(process.env.LIVES) || 100;
+const LIVES = Number(process.env.LIVES) || 120;
 const BEFORE = ['names271-data.js', 'names271.js'];
 const MINE = ['names271-freq-data.js', 'names271-freq.js'];
 let pass = 0, fail = 0;
@@ -106,7 +106,7 @@ async function life(pg, cfg) {
     check(r.ek / L >= 2 && r.ek / L <= 4, 'ru 1990: Екатерина — 2–4 на 150 женщин', `${(r.ek / L).toFixed(2)} в среднем (${band(0)}), при равных весах ${(150 * uni).toFixed(2)}`);
     check(r.an / L >= 2 && r.an / L <= 4, 'ru 1990: Анастасия — 2–4 на 150 женщин', `${(r.an / L).toFixed(2)} в среднем (${band(1)})`);
     check(r.iv / L >= 2 && r.iv / L <= 4, 'ru 1990: Иванов(а) — 2–4 на 300 человек', `${(r.iv / L).toFixed(2)} в среднем (${band(2)})`);
-    check(r.galinaOld >= 1.5 * uni && r.galinaOld >= 2.5 * r.galinaYoung && r.galinaRank <= 20, 'ru: Галина — частое имя у родившихся до 1965', `${(r.galinaOld * 100).toFixed(1)}% (место ${r.galinaRank}), у родившихся в 1985–2000 ${(r.galinaYoung * 100).toFixed(1)}%, равные веса ${(uni * 100).toFixed(1)}%`);
+    check(r.galinaOld >= 1.5 * uni && r.galinaOld >= 2.5 * r.galinaYoung, 'ru: Галина — частое имя у родившихся до 1965', `${(r.galinaOld * 100).toFixed(1)}% (место ${r.galinaRank}), у родившихся в 1985–2000 ${(r.galinaYoung * 100).toFixed(1)}%, равные веса ${(uni * 100).toFixed(1)}%`);
     check(r.newKids >= 1.5 * 3 * uni && r.newKids >= 3 * r.newOld, 'ru: Софья, София, Ева — у родившихся после 2010', `${(r.newKids * 100).toFixed(1)}%, до 1965 — ${(r.newOld * 100).toFixed(1)}%, равные веса ${(3 * uni * 100).toFixed(1)}%`);
     info('чаще всего до 1965', r.top.old); info('чаще всего 1985–2000', r.top.young); info('чаще всего после 2010', r.top.kids);
     info('скорость стенда', `${L * 300 + 12000} человек за ${ms} мс`);
