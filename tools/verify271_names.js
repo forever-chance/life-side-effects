@@ -321,9 +321,11 @@ async function life(pg, cfg) {
       s.age = 30; s.country = 'nl'; s.housing.city = cities.nl[0];
       const p1 = T.mk('Партнер', 31, 'm', 'nl');
       const c = { id: 'kid', role: 'Ребенок', gender: 'm', age: 0, country: 'nl', birthCountry: 'nl', alive: true };
-      return childChoices256(c, [s, p1]).filter(o => o.parts.join(' ').includes(s.surname.replace(/а$/, ''))).map(o => o.parts.join(o.joiner));
+      // мамина фамилия в мужской форме; несклоняемая («Черных», «Шевченко») — как есть
+      const fem = s.surname, masc = genderSurname256(fem, 'm', 'ru'), all = childChoices256(c, [s, p1]).map(o => o.parts.join(o.joiner));
+      return { fem, masc, born: s.birthCountry, all, mine: all.filter(x => x.split(/[\s-]/).includes(masc)), femLeft: fem !== masc && all.some(x => x.split(/[\s-]/).includes(fem)) };
     });
-    check(abroad.length && abroad.every(x => !/(ова|ева|ина)(\s|-|$)/.test(x)), 'сын русской мамы в Нидерландах: фамилия мамы в мужской форме', abroad.join(', '));
+    check(abroad.born === 'ru' && abroad.mine.length && !abroad.femLeft, 'сын русской мамы в Нидерландах: фамилия мамы в мужской форме', JSON.stringify(abroad));
     check(errors.length === 0, 'брак и развод: без ошибок страницы', errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
