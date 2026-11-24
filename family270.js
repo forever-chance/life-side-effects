@@ -22,7 +22,7 @@
 const family270Base={repairHome62,personCity62,currentHome59,moveHome,rentHouse41,acceptStay42,relocateWithFamily,finishMove16,
  returnParentsMenu,householdMenu,householdMenu54,finishTask,livePets57,petPlanWhy57,tripDraft57,travelBeginMonth52,
  travelDepartureWhy52,travelWhy52,childrenCareWhy59,childGuardianHome59,childcareWhy86,childcareMenu86,childrenHome86,
- travelOptions86,ensureUX,show};
+ travelOptions86,ensureUX,show,moveConfirm68,enterDorm68,finishReturn29};
 
 function familyState270(){return s.family270??={version:1};}
 
@@ -75,24 +75,36 @@ function familyCohabitant270(){
 
 function familyMoveParts270(kind=''){
  if(!s||s.dead||s.age<18)return [];
- const parts=[],kids=ownChildren55().filter(childLocal55).map(p=>p.name),pets=livePets57().map(p=>p.name),stay=familyCohabitant270();
- if(kids.length)parts.push('С вами переезжают дети: '+kids.join(', ')+'.');
- if(pets.length&&kind!=='abroad')parts.push('Ваши питомцы тоже: '+pets.join(', ')+'.');
+ const parts=[],kids=ownChildren55().filter(childLocal55).map(p=>p.name),stay=familyCohabitant270();
+ // За границу питомцев выбирают отдельно (movePetsMenu183), строка о них там не нужна.
+ const pets=kind==='abroad'?[]:livePets57().map(p=>p.name),one=pets.length===1;
+ const petList=pets.join(', ');
+ if(kids.length&&pets.length)parts.push('С вами переезжают дети: '+kids.join(', ')+'; '+(one?'ваш питомец':'ваши питомцы')+' тоже: '+petList+'.');
+ else if(kids.length)parts.push('С вами переезжают дети: '+kids.join(', ')+'.');
+ else if(pets.length)parts.push(one?'С вами переезжает ваш питомец: '+petList+'.':'С вами переезжают ваши питомцы: '+petList+'.');
  if(stay&&stay.id!==kind)parts.push(stay.name+' остаётся по прежнему адресу: жить вместе вы перестанете.');
  return parts;
 }
 function familyMoveLine270(kind=''){return familyMoveParts270(kind).join(' ');}
 
 // Кнопки, после которых игрок переезжает. В окне подтверждения дописываем, кто едет и кто остаётся.
-const familyMoveLabels270={'Снять и переехать':'','Переехать сюда':'','Согласиться и переехать':'','Запланировать переезд':'abroad',
+// «Запланировать переезд» (relocation68) бывает и внутри страны, и за границу: вид берём из цели переезда.
+let familyPathKind270=null;
+moveConfirm68=function(kind,id,...rest){
+ const prev=familyPathKind270;
+ try{const target=moveTarget68(kind,id);familyPathKind270=target&&target.country!==s.country?'abroad':'';}catch(e){familyPathKind270='abroad';}
+ try{return family270Base.moveConfirm68(kind,id,...rest);}finally{familyPathKind270=prev;}
+};
+const familyMoveLabels270={'Снять и переехать':'','Переехать сюда':'','Согласиться и переехать':'','Запланировать переезд':()=>familyPathKind270??'abroad',
  'Переехать к этому человеку':'','Вернуться к родителям':''};
+function familyMoveKind270(label){const k=familyMoveLabels270[label];return typeof k==='function'?k():k;}
 show=function(title,text,opts=[],...rest){
  try{
   if(s&&!s.dead&&s.age>=18&&Array.isArray(opts)){
    // Продажа жилья, в котором вы живёте, тоже переезд: в аренду того же района.
    const sell=title==='Продать объект?'&&/Одновременно переедете/.test(text);
    const o=opts.find(o=>o&&Object.hasOwn(familyMoveLabels270,o.label)&&!o.disabled&&!o.move270);
-   const line=o?familyMoveLine270(familyMoveLabels270[o.label]):sell?familyMoveLine270():'';
+   const line=o?familyMoveLine270(familyMoveKind270(o.label)):sell?familyMoveLine270():'';
    if(line&&typeof text==='string'&&text.trim())text=text+'\n'+line;
    else if(line&&o)opts=opts.map(x=>x===o?{...x,hint:[x.hint,line].filter(Boolean).join(' · ')}:x);
   }
@@ -152,7 +164,7 @@ function familyHouseholdPerson270(id){
  const h=s.housing,city=personCity62(p),here=residenceCity(),local=city===here,trust=p.inner?.trust??0;
  const parent=['Мать','Отец'].includes(p.role),hosted=['parents','host'].includes(h.mode);
  const parts=familyMoveParts270(p.id);
- if(parts.length&&/^(С вами|Ваши)/.test(parts[0]))parts[0]=parts[0][0].toLowerCase()+parts[0].slice(1);
+ if(parts.length&&/^С вами/.test(parts[0]))parts[0]=parts[0][0].toLowerCase()+parts[0].slice(1);
  const line=parts.length?'Если переедете вы, '+parts.join(' '):'';
  const text=trust<45?'Сейчас человек не готов жить вместе.':
   local?'Человек готов обсудить совместный быт. Расходы и свободное время изменятся.':
@@ -182,25 +194,31 @@ householdMenu54=function(...args){
 
 // ---------- 2. Переезд игрока: дети едут с ним, партнёра не оставляют молча ----------
 
+// Пока идёт переезд, починка в ensureUX молчит: moveHome сам вызывает render() до того, как дети переехали,
+// и без этого дети «возвращались» записью «Дети снова живут с вами» вместо записи о переезде.
 let familyMoveDepth270=0;
 function familyWithMove270(run){
  if(familyMoveDepth270||!s||s.dead)return run();
  const from={country:s.country,city:residenceCity()},stay=familyCohabitant270();
+ const kids=new Map(ownChildren55().map(p=>[p.id,{country:p.country,city:p.city18||null}]));
  familyMoveDepth270++;
  let result;
  try{result=run();}finally{familyMoveDepth270--;}
- try{familyAfterMove270(from,stay);}catch(e){console.error(e);}
+ try{familyAfterMove270(from,stay,kids);}catch(e){console.error(e);}
  return result;
 }
 
-function familyAfterMove270(from,stay){
+function familyAfterMove270(from,stay,before){
  if(!s||s.dead||s.age<18)return;
- const city=residenceCity(),moved=[];
- if(s.country===from.country&&city!==from.city){
+ const city=residenceCity(),abroad=s.country!==from.country,moved=[];
+ if(abroad||city!==from.city){
   for(const p of ownChildren55()){
-   if(p.country!==from.country||p.city18&&p.city18!==from.city)continue;
+   const b=before?.get(p.id);
+   if(!b||b.country!==from.country||p.country!==s.country)continue;
+   // Внутри страны едут дети, которые жили с вами; за границу — те, кого переезд уже перевёз в новую страну.
+   if(!abroad&&b.city&&b.city!==from.city)continue;
    p.city18=city;
-   p.lastMove={initiator:'family',from:from.country,to:s.country,year:s.year,city:city};
+   p.lastMove={...(p.lastMove||{}),initiator:'family',from:from.country,to:s.country,year:s.year,city};
    childNote55(p,'Переезд вместе с семьёй · '+city);
    moved.push(p.name);
   }
@@ -217,6 +235,8 @@ rentHouse41=function(...args){return familyWithMove270(()=>family270Base.rentHou
 acceptStay42=function(...args){return familyWithMove270(()=>family270Base.acceptStay42(...args));};
 relocateWithFamily=function(...args){return familyWithMove270(()=>family270Base.relocateWithFamily(...args));};
 finishMove16=function(...args){return familyWithMove270(()=>family270Base.finishMove16(...args));};
+enterDorm68=function(...args){return familyWithMove270(()=>family270Base.enterDorm68(...args));};
+finishReturn29=function(...args){return familyWithMove270(()=>family270Base.finishReturn29(...args));};
 
 // Второй взрослый родитель ребёнка, который живёт в его городе: тогда ребёнок живёт с ним, а не брошен.
 function familyCustodian270(child){
@@ -286,7 +306,7 @@ function familyRepair270(){
 
 ensureUX=function(...args){
  const result=family270Base.ensureUX(...args);
- try{familyRepair270();}catch(e){console.error(e);}
+ try{if(!familyMoveDepth270)familyRepair270();}catch(e){console.error(e);}
  return result;
 };
 
@@ -297,9 +317,10 @@ function familyPetMine270(p){
  if(typeof petHousehold183!=='function')return true;
  const h=petHousehold183(p);
  if(h.keeper==='player')return petAtHome183(p);
+ // Чужой питомец ваш, только если хозяин — ваш несовершеннолетний ребёнок, который живёт с вами.
+ // Собака умершего близкого (estates58 её не трогает) вашей сама по себе не становится, как и в 269.
  const keeper=living(h.keeper);
- if(keeper&&keeper.age>=18)return false;
- return h.country===s.country&&h.city===residenceCity();
+ return !!keeper&&keeper.age<18&&ownChild53(keeper)&&childLocal55(keeper)&&h.country===s.country;
 }
 
 livePets57=function(){return (s?.pets||[]).filter(familyPetMine270);};
