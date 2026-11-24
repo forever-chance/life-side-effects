@@ -7,12 +7,17 @@
 // 3. Баги из аудита имён 270: фамилия игрока при рождении, сиблинги и бабушки с дедушками со случайными фамилиями,
 //    удвоенная фамилия в es/mx/br, «Юн»/«Ян», брак и развод по предложению NPC без выбора фамилии, приёмные дети,
 //    повторы имён в семье, порча старых сохранений, рассинхрон имени у друга-подростка и коллеги из истории аренды.
-// Уже записанные имена людей не меняются: правила действуют на новых людей и на новые решения.
+// Уже записанные имена людей не меняются: правила действуют на новых людей и на новые решения. В сохранении до 271
+// уже женатые пары NPC считаются решёнными (oldCouples271).
+// Порядок подключения: после stories271.js (он снимает пулы 270, чтобы у уже виденных премьер 269–270 остались
+// те же режиссёры) и до names271-freq.js и любых других поздних обёрток name(): name() здесь заменяется целиком.
 const names271={data:typeof names271Data==='object'?names271Data:{countries:{},origins:{}},meta:new Map(),life:null};
 const east271=['jp','kr','cn'];
 function shuffle271(list){const a=[...list];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function country271(p){return p===s?(s.birthCountry||s.country):(p?.birthCountry||p?.country||s?.country||'nl');}
 function given271(p){return p===s?s.name:p?.givenName166;}
+// Япония: общая фамилия в браке и фамилия детей — у тех, кто родился в Японии (так же решает и брак игрока).
+function jpBorn271(p){return country271(p)==='jp';}
 function parts271(p){
  if(!p)return [];
  if(p.surnameParts256?.length)return [...p.surnameParts256];
@@ -110,8 +115,12 @@ function originName271(country,gender,origin){
  const given=pick(o[gender==='m'?'m':'f']?.length?o[gender==='m'?'m':'f']:countries[c].names[gender==='m'?1:0]);
  let surname=o.surnames?.length?pick(o.surnames):identitySurname(c,gender);
  const g=originGender271(origin);if(g)surname=genderSurname256(surname,gender,g);
- if(['es','br'].includes(originCulture271[origin])&&o.surnames?.length>1)surname=[surname,pick(o.surnames.filter(x=>x!==surname))].join(' ');
- return {given,surname};
+ const parts=[surname];
+ if(['es','br'].includes(originCulture271[origin])&&o.surnames?.length>1)parts.push(pick(o.surnames.filter(x=>x!==surname)));
+ // Две фамилии (колумбийская, перуанская, португальская семья) — две части, а не одна строка с пробелом:
+ // иначе ребёнок унаследует обе сразу и получит три фамилии. assignFamilyName166 ниже раскладывает их по частям.
+ names271.lastOrigin={surname:parts.join(' '),parts};
+ return {given,surname:parts.join(' ')};
 }
 
 // ---------- 2. Частоты фамилий (Корея, Китай) ----------
@@ -122,7 +131,16 @@ for(const [cc,d] of Object.entries(names271.data.countries||{})){
  const pool=countries[cc].surnames.filter(n=>!listed.has(n));
  const left=Math.max(0,100-[...listed.values()].reduce((a,b)=>a+b,0));
  const rows=[...listed.entries()];
- if(pool.length&&left>0)for(const n of pool)rows.push([n,left/pool.length]);
+ // Остаток долей (люди с редкими фамилиями, которых нет в таблице) — поровну на фамилии пула без доли, а если
+ // все фамилии пула в таблице — на её хвост (доля меньше 1%). Частые фамилии сохраняют свою настоящую долю:
+ // раньше остаток пропадал при нормировке, и Ван, Ли, Чжан выходили на пятую часть чаще.
+ if(left>0){
+  if(pool.length)for(const n of pool)rows.push([n,left/pool.length]);
+  else{
+   const tail=rows.filter(([,v])=>v<1),to=tail.length?tail:rows;
+   for(const row of to)row[1]+=left/to.length;
+  }
+ }
  const total=rows.reduce((a,[,v])=>a+v,0);
  names271.shares[cc]=rows.map(([n,v])=>[n,v/total]);
 }
@@ -270,8 +288,9 @@ function childChoiceList271(child,parents){
  if(rule==='jp'){
   const shared=second&&parts271(first).join(' ')===parts271(second).join(' ');
   if(shared)add('Общая фамилия семьи',conv(parts271(first),first),joiner271(first),first);
-  // Ребёнок японца и иностранца записан на японского родителя — его фамилия первой.
-  const jpParent=second&&[first,second].filter(p=>cultureOf271(p)==='jp');
+  // Ребёнок японца и иностранца записан на японского родителя — его фамилия первой. «Японец» здесь, в браке
+  // игрока и в браке NPC — одно и то же: родился в Японии (country271), а не происхождение семьи.
+  const jpParent=second&&[first,second].filter(jpBorn271);
   const order=jpParent?.length===1?[jpParent[0],jpParent[0]===first?second:first]:[first,second];
   add(label(order[0]),conv(pp(order[0]),order[0]),joiner271(order[0]),order[0]);
   if(order[1])add(label(order[1]),conv(pp(order[1]),order[1]),joiner271(order[1]),order[1]);
@@ -384,8 +403,13 @@ function dedupeFamily271(p){
  };
  const assign=assignFamilyName166;
  assignFamilyName166=function(p,country,origin){
+  names271.lastOrigin=null;
   const r=assign(p,country,origin);
   try{
+   const lo=names271.lastOrigin;names271.lastOrigin=null;
+   if(lo&&lo.parts.length>1&&p.surname===lo.surname&&(p.surnameParts256||[]).length<2){
+    setPersonName256(p,p.givenName166,lo.parts,' ');p.birthSurname256=p.surname;
+   }
    delete p.nameStyle271;
    if((p.birthCountry||country)==='eg'&&(p.country||country)==='eg'&&egOrigin271({origins:[origin]})){
     setPersonName256(p,p.givenName166,egChainParts271(),' ');p.nameStyle271='chain';p.birthSurname256=p.surname;
@@ -415,7 +439,7 @@ function coupleName271(a,b,country,old=false){
  a.marriageDecided271=b.id;b.marriageDecided271=a.id;
  if(egChain271(a)||egChain271(b))return null;
  let rate=marryRates271[country]??.5;if(old&&rate>0)rate=Math.max(rate,.9);
- const jp=country==='jp'&&cultureOf271(a)==='jp'&&cultureOf271(b)==='jp';
+ const jp=country==='jp'&&jpBorn271(a)&&jpBorn271(b);
  if(a.gender!==b.gender){
   const wife=a.gender==='f'?a:b,husband=wife===a?b:a;
   if(jp)return takeName271(...(Math.random()<.95?[wife,husband]:[husband,wife]))?wife:null;
@@ -574,8 +598,20 @@ let teen271=null;
    return;
   }
   // Друг-подросток: пол — по имени из приглашения (раньше пол выбирался заново и мог не совпасть с именем).
-  teen271=q?.type==='teen'&&q.name?{q,tick:s.clock?.ticks}:null;
-  if(teen271&&!q.gender271)q.gender271=names271.meta.get(q.name)?.gender||genderByName271(q.name,s.country);
+  // Имя из приглашения получает только друг, которого создаёт вариант этого окна, пока он выполняется: после
+  // «Остаться готовиться» оно никому не достаётся.
+  teen271=null;
+  if(q?.type==='teen'&&q.name){
+   if(!q.gender271)q.gender271=names271.meta.get(q.name)?.gender||genderByName271(q.name,s.country);
+   const keep=show;
+   show=function(title,text,opts,...rest){
+    show=keep;
+    const mine=Array.isArray(opts)&&String(text||'').includes(q.name);
+    const wrapped=mine?opts.map(o=>o&&typeof o.fn==='function'?{...o,fn:function(...a){teen271={q};try{return o.fn.apply(this,a);}finally{teen271=null;}}}:o):opts;
+    return keep.call(this,title,text,wrapped,...rest);
+   };
+   try{return base.apply(this,args);}finally{show=keep;}
+  }
   return base.apply(this,args);
  };
 }
@@ -588,7 +624,7 @@ function genderByName271(text,country){
  const base=person;
  person=function(...args){
   const t=teen271;
-  if(t&&args[0]==='Друг'&&args[2]===undefined&&!s.pending.includes(t.q)&&(s.clock?.ticks??0)===t.tick){
+  if(t&&args[0]==='Друг'&&args[2]===undefined){
    teen271=null;
    const p=base(args[0],args[1],t.q.gender271,args[3]);
    const meta=names271.meta.get(t.q.name);
@@ -631,6 +667,7 @@ function splitTyped271(text,country,gender){
  const i=t.indexOf(' ');return {given:t.slice(0,i),surname:t.slice(i+1)};
 }
 function startFamily271(typed){
+ s.names271v=1;
  const ps=s.people.filter(p=>p.alive&&['Мать','Отец'].includes(p.role));
  const dad=ps.find(p=>p.role==='Отец'),mom=ps.find(p=>p.role==='Мать');
  const birth=s.birthCountry||s.country,ch=s.family17?.childhood131,rule=customDefault271[birth]||'father';
@@ -734,6 +771,8 @@ function patchRecent271(old,now){
  if(!old||old===now)return;
  for(const e of (s.log||[]).slice(0,8)){if(e.title?.includes(old))e.title=e.title.split(old).join(now);if(e.text?.includes(old))e.text=e.text.split(old).join(now);}
  for(const p of s.people){const h=p.bio27?.history?.at(-1);if(h?.text?.includes(old))h.text=h.text.split(old).join(now);}
+ // Карточки решений этого же месяца («В семье появился младший ребёнок»): там тоже прежнее имя.
+ for(const n of s.life61?.notices||[])if(n.created===s.clock?.ticks)for(const k of ['title','note'])if(typeof n[k]==='string'&&n[k].includes(old))n[k]=n[k].split(old).join(now);
 }
 function adoptName271(child,parents){
  const old=child.name,choice=childChoices256(child,parents)[0];
@@ -798,6 +837,17 @@ function oldSave255fix271(){
  if(surname)for(const p of s.people.filter(p=>p.role==='Ребенок'&&!p.adopted49&&p.givenName166&&!p.naming256)){const g=genderSurname256(surname,p.gender,cultureOf271(s));p.surname=g;p.name=p.givenName166+' '+g;}
  s.namesFixed255=true;
 }
+// Сохранение до 271: пары NPC, которые уже женаты, своё решение о фамилии приняли до обновления. Отмечаем их
+// решёнными, никого не переименовывая, — иначе в первый же месяц одному из супругов меняли фамилию задним числом
+// (с записью «Новая фамилия» в ленте). Новые жизни ставят отметку при рождении (startFamily271).
+function oldCouples271(){
+ for(const p of s.people){
+  if(!p?.alive||p===s)continue;
+  const sp=npcSpouse271(p);
+  if(sp){p.marriageDecided271=sp.id;sp.marriageDecided271=p.id;}
+ }
+ s.names271v=1;
+}
 {
  const base=ensureUX;
  ensureUX=function(...args){
@@ -805,6 +855,7 @@ function oldSave255fix271(){
   names271.loading=true;
   let r;try{r=base.apply(this,args);}finally{names271.loading=false;}
   try{if(s)for(const p of s.people)if(p.naming256&&p.givenName166&&p.name&&!nameHas271(String(p.name).trim(),p.givenName166))rederive271(p);}catch(e){console.error(e);}
+  try{if(s&&!s.names271v)oldCouples271();}catch(e){console.error(e);}
   return r;
  };
 }
@@ -830,7 +881,7 @@ Object.assign(namingNotes256,{
  th:'Таиланд: фамилии появились в начале XX века, и у многих семей своя, ни на чью не похожая. Дети обычно получают фамилию отца, жена может взять фамилию мужа или оставить свою.',
  ma:'Марокко: фамилия наследуется от отца и при браке не меняется.',
  in:'Индия: обычаи зависят от региона и семьи. Чаще всего ребёнку передаётся фамилия отца, жена нередко берёт фамилию мужа.',
- id:'Индонезия: наследуемая фамилия есть не у всех — вторым словом бывает имя отца или просто второе имя. Для единого формата у каждого персонажа есть семейная часть имени.',
+ id:'Индонезия: наследуемая фамилия есть не у всех — вторым словом бывает имя отца или просто второе имя. При браке имя не меняют.',
  tr:'Турция: фамилия передаётся от отца. При браке жена берёт фамилию мужа и может оставить свою рядом с ней.',
  no:'Норвегия: ребёнку дают фамилию одного из родителей или обе. При браке фамилию супруга можно взять, а можно оставить свою.'
 });

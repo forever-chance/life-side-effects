@@ -13,10 +13,13 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const INDEX = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const BASE = process.env.BASE === '1';
 const MINE = ['names271-data.js', 'names271.js'];
+// Доли фамилий kr/cn из файла данных: с ними сравниваются частоты в игре (в BASE=1 их в игре нет — проверка падает).
+const DATA = (() => { try { return new Function(fs.readFileSync(path.join(ROOT, 'names271-data.js'), 'utf8') + ';return names271Data;')(); } catch (e) { return { countries: {}, origins: {} }; } })();
+const shareOf = (cc, n) => Number((DATA.countries[cc]?.surnameShares || []).find(x => x[0] === n)?.[1]) || 0;
 let pass = 0, fail = 0;
 const check = (ok, label, extra = '') => { ok ? pass++ : fail++; console.log((ok ? 'ok   ' : 'FAIL ') + label + (extra ? ' — ' + extra : '')); };
 
-async function open(browser) {
+async function open(browser, { mine = !BASE, before = [] } = {}) {
   const ctx = await browser.newContext();
   await ctx.route('**/*', r => {
     const u = new URL(r.request().url());
@@ -32,7 +35,8 @@ async function open(browser) {
   pg.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push('console: ' + m.text()); });
   await pg.goto('http://game.local/index.html');
   await pg.waitForFunction("typeof start==='function'&&document.querySelector('#country')");
-  if (!BASE) for (const f of MINE) if (!INDEX.includes(f)) await pg.addScriptTag({ path: path.join(ROOT, f) });
+  for (const f of before) if (!INDEX.includes(f)) await pg.addScriptTag({ path: path.join(ROOT, f) });
+  if (mine) for (const f of MINE) if (!INDEX.includes(f)) await pg.addScriptTag({ path: path.join(ROOT, f) });
   await pg.evaluate(() => {
     window.T = {
       click: re => { const b = [...document.querySelectorAll('#modal .options button:not([disabled])')].find(b => re.test(b.textContent)); if (!b) return false; b.click(); return true; },
@@ -40,6 +44,7 @@ async function open(browser) {
       clean: () => { if ($('#modal').open) closeModal(); s.pending = []; },
       mk: (role, age, g, country) => { const p = person(role, age, g, country || s.country); s.people.push(p); enrichPerson(p); p.inner.trust = 95; p.inner.strain = 0; p.inner.affection = 90; p.bond = 90; p.partnerSince = s.year; p.childrenWish = 'yes'; p.orientation = 'hetero'; return p; },
       birth: (pid, method) => { s.familyLife.birth = null; s.flags.childPending = null; startBirth(pid, method); s.familyLife.birth.due = s.clock.ticks; const before = new Set(s.people.map(p => p.id)); autonomousMonth(); if ($('#modal').open) closeModal(); s.pending = []; return s.people.find(p => !before.has(p.id) && p.role === 'Ребенок'); },
+      months: n => { for (let i = 0; i < n; i++) { if ($('#modal').open) closeModal(); s.pending = []; s.clock.running = true; advanceMonth(); } if ($('#modal').open) closeModal(); s.pending = []; },
       words: x => String(x || '').split(/[\s-]+/).filter(Boolean),
       repeats: x => { const w = String(x || '').split(/[\s-]+/).filter(Boolean); return w.length !== new Set(w).size; },
     };
@@ -105,7 +110,7 @@ async function life(pg, cfg) {
     });
     console.log('Пулы после слияния (жен./муж./фамилий):', Object.entries(r.counts).map(([cc, v]) => `${cc} ${v.f}/${v.m}/${v.surnames}`).join(', '));
     check(r.late.every(v => v.f >= 30 && v.m >= 30 && v.surnames >= 30), 'поздние страны: не меньше 30 имён на пол и 30 фамилий', r.late.map(v => `${v.f}/${v.m}/${v.surnames}`).join(' '));
-    check(Object.values(r.counts).every(v => v.dataOk !== false) && Object.values(r.counts).every(v => v.dataOk === true || BASE), 'все 25 стран: пулы игры содержат списки names271Data');
+    check(Object.keys(r.counts).length === 25 && Object.values(r.counts).every(v => v.dataOk === true), 'все 25 стран: пулы игры содержат списки names271Data');
     check(r.bad.length === 0, 'имена и фамилии — только русская кириллица (без ђ ј љ, латиницы)', r.bad.slice(0, 6).join(', '));
     check(r.clash.length === 0, 'фамилия не совпадает с личным именем той же страны (кроме Египта)', r.clash.slice(0, 8).join(', '));
     check(r.ru.alyona && !r.ru.alena && !r.ru.sasha && !r.ru.misha && r.ru.fyodorova && !r.ru.fedorova, 'ru: ё (Алёна, Фёдорова), без Саша/Миша во взрослых пулах', JSON.stringify(r.ru));
@@ -116,7 +121,7 @@ async function life(pg, cfg) {
     check(errors.length === 0, 'пулы: без ошибок страницы', errors.slice(0, 2).join(' | '));
     // ---------- 2. Частоты фамилий, разбор имён ----------
     const f = await pg.evaluate(() => {
-      const share = (cc, names) => { const n = 20000, c = {}; for (let i = 0; i < n; i++) { const x = identitySurname(cc, 'm'); c[x] = (c[x] || 0) + 1; } return Object.fromEntries(names.map(k => [k, Math.round((c[k] || 0) / n * 1000) / 10])); };
+      const share = (cc, names) => { const n = 100000, c = {}; for (let i = 0; i < n; i++) { const x = identitySurname(cc, 'm'); c[x] = (c[x] || 0) + 1; } return Object.fromEntries(names.map(k => [k, Math.round((c[k] || 0) / n * 10000) / 100])); };
       const out = { kr: share('kr', ['Ким', 'Ли', 'Пак']), cn: share('cn', ['Ван', 'Ли', 'Чжан']) };
       // «Юн», «Ян»: все сочетания фамилии и личного имени
       const parse = (cc, gender) => { let bad = 0, total = 0; const ex = []; for (const sur of countries[cc].surnames.slice(0, 40)) for (const g of countries[cc].names[gender === 'm' ? 1 : 0].slice(0, 30)) { const p = { id: 'x', role: 'Знакомый', name: sur + ' ' + g, gender, country: cc, birthCountry: cc, alive: true }; identity256(p); total++; if (p.surname !== sur || p.givenName166 !== g) { bad++; if (ex.length < 3) ex.push(sur + ' ' + g + ' → ' + p.givenName166 + '|' + p.surname); } } return { bad, total, ex }; };
@@ -131,8 +136,13 @@ async function life(pg, cfg) {
       out.eg = Array.from({ length: 30 }, () => name('eg', 'm')).filter(n => n.split(' ').length !== 3);
       return out;
     });
-    check(Math.abs(f.kr['Ким'] - 21.5) < 2 && Math.abs(f.kr['Ли'] - 14.7) < 1.8 && Math.abs(f.kr['Пак'] - 8.4) < 1.5, 'Корея: фамилии по частоте (Ким ~21%, Ли ~15%, Пак ~8%)', JSON.stringify(f.kr));
-    check(f.cn['Ван'] > 5.5 && f.cn['Ли'] > 5.5 && f.cn['Чжан'] > 5, 'Китай: фамилии по частоте (Ван, Ли, Чжан ~7%)', JSON.stringify(f.cn));
+    // Частые фамилии — с той же долей, что в таблице (остаток таблицы не раздувает их): 4 сигмы на 100 000 имён
+    // (Ким ±0.5, Ван ±0.35); раздутие остатком — Ким +0.9, Ван +1.5.
+    const sigma4 = v => 4 * Math.sqrt(v / 100 * (1 - v / 100) / 100000) * 100 + .05;
+    const near = (cc, got) => Object.entries(got).every(([n, v]) => shareOf(cc, n) > 0 && Math.abs(v - shareOf(cc, n)) < sigma4(shareOf(cc, n)));
+    const want = (cc, got) => Object.keys(got).map(n => n + ' ' + shareOf(cc, n)).join(', ');
+    check(near('kr', f.kr) && shareOf('kr', 'Ким') > 20, 'Корея: фамилии по частоте из таблицы (Ким ~21%, Ли ~15%, Пак ~8%)', JSON.stringify(f.kr) + ' / таблица ' + want('kr', f.kr));
+    check(near('cn', f.cn), 'Китай: фамилии по частоте из таблицы (Ван, Ли, Чжан ~7%), без раздувания на 20%', JSON.stringify(f.cn) + ' / таблица ' + want('cn', f.cn));
     check(f.kr2.bad === 0 && f.cn2.bad === 0 && f.cn3.bad === 0, 'разбор «фамилия имя»: «Юн», «Ян» и др. не меняются местами', `kr ${f.kr2.bad}/${f.kr2.total}, cn ${f.cn2.bad + f.cn3.bad}/${f.cn2.total + f.cn3.total} ${f.kr2.ex.concat(f.cn2.ex).join('; ')}`);
     check(f.yun.every(x => x.startsWith('Юн|')), 'kr «Юн Минджун»: фамилия Юн', f.yun.join(', '));
     check(f.live === 0, 'новые NPC: имя, фамилия и полное имя согласованы (kr, cn, jp, eg, es, ru)', 'расхождений ' + f.live + ' ' + f.liveEx.join('; '));
@@ -271,7 +281,7 @@ async function life(pg, cfg) {
     check(r.keepLog && !/Ваша фамилия теперь/.test(r.keepLog), 'брак: «Оставить свою» — без «Ваша фамилия теперь …» в записи', r.keepLog);
     check(r.d2.buttons.some(b => /при рождении/.test(b) && b.includes(r.birthName)) && r.afterD2 === r.birthName, 'второй развод: можно вернуть фамилию при рождении', r.d2.buttons.join(' | ') + ' → ' + r.afterD2);
     check(r.npc.offered && r.npc.modal?.title === 'Фамилия после свадьбы' && r.npc.surname === r.npc.want && r.npc.pre === r.npc.before && r.npc.married && r.npc.pendingAfter === 0, 'предложение партнёра: окно фамилии через очередь, брак один', JSON.stringify(r.npc).slice(0, 300));
-    check(r.npc.divorce?.title === 'Фамилия после развода' && r.npc.afterDivorce === r.npc.before, 'развод по инициативе партнёра: можно вернуть добрачную', JSON.stringify({ d: r.npc.divorce, after: r.npc.afterDivorce, why: r.npc.divorceWhy }));
+    check(r.npc.divorce?.open && r.npc.divorce.title === 'Фамилия после развода' && r.npc.divorce.buttons.some(b => /^Вернуть добрачную/.test(b)) && r.npc.afterDivorce === r.npc.before, 'развод по инициативе партнёра: окно с «Вернуть добрачную», фамилия вернулась', JSON.stringify({ d: r.npc.divorce, after: r.npc.afterDivorce, why: r.npc.divorceWhy }));
     // es: удвоение после фамилии супруга; ru-мама за границей
     await life(pg, { country: 'es', gender: 'f', startAge: '18' });
     const es = await pg.evaluate(() => {
@@ -280,10 +290,32 @@ async function life(pg, cfg) {
       marriageDialog(p1.id); T.click(/Сделать предложение/); T.click(/Взять фамилию партнёра/); T.clean();
       const c1 = T.birth(p1.id, 'birth');
       const menu = childChoices256(c1, childParents256(c1)).map(o => o.label + ' · ' + o.parts.join(o.joiner));
-      return { player: s.surname, own, partner: p1.surname, child: c1.surname, parts: c1.surnameParts256, menu };
+      return { player: s.surname, own, partner: p1.surname, partnerParts: [...(p1.surnameParts256 || [p1.surname])], child: c1.surname, parts: c1.surnameParts256, menu };
     });
-    check(!T_repeats(es.child) && es.parts[0] === es.partner.split(' ')[0] && es.parts[1] === es.own[0], 'es: после фамилии супруга у ребёнка [отец, мать при рождении], без «Мартинес Мартинес»', `${es.player} → ${es.child} | ${es.menu.join(' / ')}`);
+    check((!T_repeats(es.child) || es.partnerParts[0] === es.own[0]) && es.parts[0] === es.partnerParts[0] && es.parts[1] === es.own[0], 'es: после фамилии супруга у ребёнка [отец, мать при рождении], без «Мартинес Мартинес»', `${es.player} → ${es.child} | ${es.menu.join(' / ')}`);
     check(new Set(es.menu.map(x => x.split(' · ')[1])).size === es.menu.length, 'es: в меню фамилии ребёнка нет одинаковых вариантов', es.menu.join(' / '));
+    // es: семья колумбийского, венесуэльского, перуанского происхождения — две фамилии двумя частями, у ребёнка ровно две
+    await life(pg, { country: 'es', gender: 'f', startAge: '18' });
+    const co = await pg.evaluate(() => {
+      s.age = 28; const own = [...s.surnameParts256];
+      const origins = ['колумбийское', 'венесуэльское', 'перуанское', 'португальское', 'каталонское'], spaced = [];
+      let total = 0;
+      for (let i = 0; i < 200; i++) {
+        const o = origins[i % origins.length], p = person('Знакомый', 30, i % 2 ? 'm' : 'f', 'es');
+        p.origins = [o]; assignFamilyName166(p, 'es', o); total++;
+        const parts = p.surnameParts256 || [];
+        if (parts.length !== 2 || parts.some(x => x.includes(' ')) || parts.join(' ') !== p.surname) spaced.push(o + ': ' + p.name + ' ' + JSON.stringify(parts));
+      }
+      const dad = T.mk('Партнер', 29, 'm'); dad.origins = ['колумбийское']; assignFamilyName166(dad, 'es', 'колумбийское');
+      const dadParts = [...(dad.surnameParts256 || [])];
+      marriageDialog(dad.id); T.click(/Сделать предложение/); T.click(/Оставить свою/); T.clean();
+      const c = T.birth(dad.id, 'birth');
+      const menu = c ? childChoices256(c, childParents256(c)).map(o => o.parts) : [];
+      return { spaced: spaced.slice(0, 4), n: spaced.length, total, dad: dad.name, dadParts, own, child: c?.surnameParts256, menu };
+    });
+    check(co.n === 0, 'es: колумбийская и другая испаноязычная семья — две фамилии двумя частями', `${co.n}/${co.total} ` + co.spaced.join('; '));
+    // (у мамы своя фамилия может быть из двух слов — «Айт Талеб» в марокканской семье; это одна фамилия)
+    check(co.dadParts.length === 2 && co.child?.length === 2 && co.child[0] === co.dadParts[0] && co.child[1] === co.own[0] && co.dadParts.every(w => !w.includes(' ')) && co.menu.every(x => x.length <= 2 && !x.some(w => co.dadParts.join(' ') === w)), 'es: ребёнок отца колумбийского происхождения — ровно [первая отца, первая матери], без трёх фамилий', `${co.dad} ${JSON.stringify(co.dadParts)} + ${JSON.stringify(co.own)} → ${JSON.stringify(co.child)} | меню ${JSON.stringify(co.menu)}`);
     await life(pg, { country: 'ru', gender: 'f', startAge: '18' });
     const abroad = await pg.evaluate(() => {
       s.age = 30; s.country = 'nl'; s.housing.city = cities.nl[0];
@@ -331,6 +363,28 @@ async function life(pg, cfg) {
     check(jp.partnerBack === jp.theirs, 'Япония, развод: партнёр возвращает свою фамилию', jp.partnerBack);
     check(jp.took && /^Вернуть добрачную/.test(jp.div.buttons[0] || ''), 'Япония, развод: кто менял — по умолчанию возвращает прежнюю', jp.div.buttons.join(' | '));
     check(jp.foreign.title === 'Фамилия после свадьбы' && /Оставить свою/.test(jp.foreign.buttons[0] || ''), 'Япония и иностранец: каждый со своей, выбор свободный', jp.foreign.buttons.join(' | '));
+    // «Японец» везде один: родился в Японии. Пара NPC, оба из Японии, у мужа китайское происхождение — общая фамилия;
+    // родившийся за границей — со своей. Ребёнок таких родителей с разными фамилиями — первой фамилия отца.
+    const jpn = await pg.evaluate(() => {
+      const mk = (g, born, origin) => { const p = T.mk('Знакомый', 30, g, 'jp'); p.birthCountry = born; if (origin) p.origins = [origin]; return p; };
+      const out = {};
+      const a = mk('m', 'jp', 'китайское'), b = mk('f', 'jp', 'японское');
+      setPersonName256(a, a.givenName166, ['Ло'], ' '); setPersonName256(b, b.givenName166, ['Кикути'], ' ');
+      if (typeof coupleName271 === 'function') coupleName271(a, b, 'jp');
+      out.both = { a: a.surname, b: b.surname };
+      const c = mk('m', 'cn', 'китайское'), d = mk('f', 'jp', 'японское');
+      setPersonName256(c, c.givenName166, ['Ван'], ' '); setPersonName256(d, d.givenName166, ['Икэда'], ' ');
+      if (typeof coupleName271 === 'function') coupleName271(c, d, 'jp');
+      out.mixed = { c: c.surname, d: d.surname };
+      const e = mk('m', 'jp', 'корейское'), f = mk('f', 'jp', 'японское');
+      setPersonName256(e, e.givenName166, ['Сим'], ' '); setPersonName256(f, f.givenName166, ['Катаяма'], ' ');
+      const kid = { id: 'kjp', role: 'Ребенок', gender: 'f', age: 0, country: 'jp', birthCountry: 'jp', alive: true };
+      out.kid = childChoices256(kid, [e, f]).map(o => o.parts.join(o.joiner));
+      const kid2 = { id: 'kjp2', role: 'Ребенок', gender: 'f', age: 0, country: 'jp', birthCountry: 'jp', alive: true };
+      out.kid2 = childChoices256(kid2, [c, d]).map(o => o.parts.join(o.joiner));
+      return out;
+    });
+    check(jpn.both.a === jpn.both.b && jpn.mixed.c === 'Ван' && jpn.mixed.d === 'Икэда' && jpn.kid[0] === 'Сим' && jpn.kid2[0] === 'Икэда', 'Япония: «японец» — родился в Японии (общая фамилия NPC, фамилия ребёнка), происхождение не важно', JSON.stringify(jpn));
     await life(pg, { country: 'eg', gender: 'm', startAge: '18' });
     const eg = await pg.evaluate(() => {
       const out = {}; s.age = 28;
@@ -418,6 +472,28 @@ async function life(pg, cfg) {
         const f = s.people.at(-1); out.teen.push({ qn, g, name: f.name, gender: f.gender, given: f.givenName166, surname: f.surname });
         if ($('#modal').open) closeModal(); s.pending = [];
       }
+      // отказ от приглашения: имя из него не достаётся другу, которого в тот же месяц создаёт что-то другое
+      out.teenLeak = [];
+      for (let i = 0; i < 6; i++) {
+        const qn = name(s.country, i % 2 ? 'f' : 'm');
+        s.pending = [{ type: 'teen', name: qn }]; resolvePending(); T.click(/Остаться/);
+        if ($('#modal').open) closeModal(); s.pending = [];
+        const p = person('Друг', s.age);
+        if (p.name === qn) out.teenLeak.push(qn);
+      }
+      // приёмный ребёнок мамы и её партнёрши: в карточке «В семье появился младший ребёнок» — нынешнее имя
+      const mom = s.people.find(p => p.role === 'Мать' && p.alive);
+      if (mom) {
+        mom.bio27 ??= { parents: [], children: [], history: [], education: [], study: null, job: null, skill: 35, ambition: .5, educationWish: .3, childrenWish: 1, last: s.clock.ticks, born: s.clock.ticks - mom.age * 12, health: 90 };
+        const wife2 = T.mk('Партнёр близкого', mom.age, 'f'); wife2.bio27 = { parents: [], children: [], history: [], education: [], study: null, job: null, skill: 35, ambition: .5, educationWish: .3, childrenWish: 1, last: s.clock.ticks, born: s.clock.ticks - wife2.age * 12, health: 90 };
+        s.family27.unions = s.family27.unions.filter(x => !([x.a, x.b].includes(mom.id) && x.status === 'together'));
+        const u3 = { id: 'u273', a: mom.id, b: wife2.id, status: 'together', since: s.clock.ticks, due: s.clock.ticks };
+        s.family27.unions.push(u3);
+        const kid2 = birthKin27(u3);
+        const notes = (life61().notices || []).filter(n => n.personId === kid2?.id);
+        out.adoptNotice = { kid: kid2?.name, adopted: !!kid2?.adopted49, notes: notes.map(n => n.title + ': ' + n.note), ok: !!kid2 && notes.length > 0 && notes.every(n => String(n.note).includes(kid2.name)) };
+        if ($('#modal').open) closeModal(); s.pending = [];
+      }
       // коллега из истории про аренду
       s.age = 25; s.rentStory = null; s.people = s.people.filter(p => p.role !== 'Друг');
       try { beginRentStory(); } catch (e) { out.rentErr = e.message; }
@@ -433,6 +509,8 @@ async function life(pg, cfg) {
     check(r.dup.kid && r.dup.kid !== r.dup.mom, 'новорождённая не тёзка мамы', JSON.stringify(r.dup));
     const teenBad = r.teen.filter(t => t.name !== t.qn || t.gender !== t.g || !t.name.split(' ').includes(t.given));
     check(teenBad.length === 0, 'друг-подросток: пол по имени из приглашения, поля имени совпадают', teenBad.slice(0, 2).map(t => JSON.stringify(t)).join('; '));
+    check(r.teenLeak.length === 0, 'друг-подросток: после отказа имя из приглашения не достаётся другому новому другу', r.teenLeak.join(', '));
+    check(r.adoptNotice?.ok, 'приёмный ребёнок мамы: в карточке «В семье появился младший ребёнок» — нынешнее имя', JSON.stringify(r.adoptNotice));
     check(r.rent && r.rent.name.split(' ').includes(r.rent.given) && r.rent.name.includes(r.rent.surname), 'коллега из истории про аренду: имя и фамилия совпадают с видимым именем', JSON.stringify(r.rent || r.rentErr));
     await life(pg, { country: 'jp', gender: 'm' });
     const card = await pg.evaluate(() => {
@@ -492,6 +570,72 @@ async function life(pg, cfg) {
     check(r.pre255.length && r.pre255.every(p => p.surname === p.want), 'сохранение до 255: дети получают фамилию игрока в своём роде', JSON.stringify(r.pre255));
     check(errors.length === 0, 'старые сохранения: без ошибок страницы', errors.slice(0, 2).join(' | '));
     await ctx.close();
+  }
+
+  // ---------- 8. Сохранение 270 с женатыми парами NPC: после обновления фамилии не меняются задним числом ----------
+  {
+    const A = await open(browser, { mine: false });
+    await life(A.pg, { country: 'ru', gender: 'm', startAge: '30' });
+    const json = await A.pg.evaluate(() => {
+      // пары, поженившиеся ещё в 270: друзья через свадьбу соцсвязей 270 и брат с женой из семейного древа
+      const couples = [];
+      for (const [r1, r2] of [['Друг', 'Знакомый'], ['Коллега', 'Знакомый'], ['Знакомый', 'Друг']]) {
+        const a = T.mk(r1, 32, 'm'), b = T.mk(r2, 31, 'f');
+        adultState55(a).partner = b.id; adultState55(b).partner = a.id; marrySoc270(a, b); couples.push(a.id, b.id);
+      }
+      familyState27();
+      const bio = () => ({ parents: [], children: [], history: [], education: [], study: null, job: null, skill: 35, ambition: .5, educationWish: .3, childrenWish: 1, last: s.clock.ticks, born: s.clock.ticks - 360, health: 90 });
+      const bro = T.mk('Брат', 33, 'm'), wife = T.mk('Партнёр близкого', 31, 'f'); bro.bio27 = bio(); wife.bio27 = bio();
+      bro.npcMarried54 = wife.npcMarried54 = true; adultState55(bro).partner = wife.id; adultState55(wife).partner = bro.id;
+      s.family27.unions.push({ id: 'u270old', a: bro.id, b: wife.id, status: 'together', since: s.clock.ticks });
+      couples.push(bro.id, wife.id);
+      T.clean();
+      if (typeof flushSave264 === 'function') flushSave264();
+      s.oldCouples = couples;
+      return JSON.stringify(s);
+    });
+    const baseErrors = A.errors.slice();
+    await A.ctx.close();
+    const { pg, errors, ctx } = await open(browser);
+    await life(pg, { country: 'nl', gender: 'f' });
+    const r = await pg.evaluate(json => {
+      const o = JSON.parse(json); o.saveId = 'v271-old270';
+      localStorage.setItem(LIFE_PREFIX + o.saveId, JSON.stringify(o));
+      loadCharacter(o.saveId); if ($('#modal').open) closeModal(); s.pending = [];
+      const ids = new Set(s.oldCouples), snap = () => new Map(s.people.filter(p => ids.has(p.id)).map(p => [p.id, p.name]));
+      const before = snap(), married = s.people.filter(p => ids.has(p.id) && p.npcMarried54).length;
+      T.months(3);
+      // и ещё один месячный проход имён с «выпавшим» обычаем: без отметки 271 каждая пара сменила бы фамилию
+      if (typeof npcNames271 === 'function') { const rnd = Math.random; Math.random = () => 0.1; try { npcNames271(); } finally { Math.random = rnd; } }
+      const after = snap(), diffs = [];
+      for (const [id, v] of before) if (after.get(id) && after.get(id) !== v) diffs.push(v + ' → ' + after.get(id));
+      const logs = s.log.filter(e => /^Новая фамилия|^Фамилия после/.test(e.title)).map(e => e.title + ': ' + e.text);
+      return { n: before.size, married, diffs, logs };
+    }, json);
+    check(r.n === 8 && r.married === 8 && r.diffs.length === 0 && r.logs.length === 0, 'сохранение 270: уже женатые пары NPC после загрузки и трёх месяцев — с прежними фамилиями, без «Новая фамилия»', JSON.stringify(r).slice(0, 300));
+    check(errors.length === 0 && baseErrors.length === 0, 'сохранение 270: без ошибок страницы', [...baseErrors, ...errors].slice(0, 2).join(' | '));
+    await ctx.close();
+  }
+
+  // ---------- 9. Порядок с stories271: премьеры 269–270, уже виденные в старой жизни, — с теми же режиссёрами ----------
+  // stories271.js снимает пулы 270, только если names271 ещё не загружен; поэтому names271 идёт после него.
+  if (fs.existsSync(path.join(ROOT, 'stories271.js')) && fs.existsSync(path.join(ROOT, 'stories271-data.js'))) {
+    const directors = async (opts) => {
+      const { pg, errors, ctx } = await open(browser, opts);
+      await life(pg, { country: 'ru', gender: 'f', startAge: '20' });
+      const out = await pg.evaluate(() => {
+        if (typeof films269 !== 'function' || typeof futureFilm269 !== 'function') return null;
+        const st = films269(); st.seed = 123456789;
+        return [2028 * 12, 2028 * 12 + 5, 2029 * 12 + 2, 2031 * 12 + 7].map(ym => { const f = futureFilm269(ym, 0); return f && /^G/.test(f.id) ? f.id + ' ' + f.director : null; }).filter(Boolean);
+      });
+      await ctx.close();
+      return { out, errors };
+    };
+    const STORIES = ['stories271-data.js', 'stories271.js'];
+    const base = await directors({ mine: false });
+    const ordered = await directors({ before: STORIES });
+    if (!base.out?.length || ordered.errors.length) console.log('skip порядок с stories271: ' + (ordered.errors[0] || 'нет премьер G'));
+    else check(JSON.stringify(ordered.out) === JSON.stringify(base.out), 'порядок stories271 → names271: у премьер 269–270 те же режиссёры', ordered.out.join(', '));
   }
   await browser.close();
   console.log(`\n${pass}/${pass + fail}` + (BASE ? ' (BASE=1: без names271)' : ''));

@@ -181,11 +181,11 @@ if(typeof storyForm189==='function'&&typeof bookGenre189!=='undefined'){
  const st=document.createElement('style');
  st.textContent='.story-form271>button{margin-block:.15rem}'+
   '.story-tones271,.story-chips271{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem;margin-block:.3rem}'+
-  '.story-tones271{margin-block:0}'+
   '.story-tones271 button,.story-chips271 button{padding:6px 12px;line-height:1.35;font-size:14px}'+
+  '.story-tones271{margin-block:0;gap:.3rem}.story-tones271 button{padding-inline:7px;white-space:nowrap;font-size:13px}'+
   '.story-form271 button[aria-pressed="true"],.story-form271 button[aria-pressed="true"]:hover{background:var(--accent);border-color:var(--accent);color:var(--on-dark)}'+
   '.story-note271:empty{display:none}.story-note271{margin:.4rem 0}'+
-  '.story-similar271 h3{font-size:12px;font-weight:600;color:var(--muted);margin:1rem 0 .4rem}'+
+  '.story-similar271 h3{font:inherit;font-size:12px;margin:1rem 0 .4rem}'+
   '.story-similar271 button{display:block;width:100%;margin-block:.35rem;line-height:1.45}'+
   '.story-similar271 small{display:block;color:var(--muted);font-size:11px;margin-top:.2rem}';
  document.head.appendChild(st);
@@ -201,25 +201,26 @@ const storyNames271=(()=>{
   fullName256:typeof fullName256==='function'?fullName256:null};
  if(Object.values(fns).some(f=>!f))return null;
  const pools={};
- for(const [cc,c] of Object.entries(countries))pools[cc]={names:[c.names?.[0],c.names?.[1]],surnames:c.surnames,
+ for(const [cc,c] of Object.entries(countries))if(Array.isArray(c?.names))pools[cc]={names:[c.names[0],c.names[1]],surnames:c.surnames,
   exp:typeof expansion95==='object'&&expansion95[cc]?expansion95[cc].surnames:undefined};
  return {pools,fns};
 })();
 function withOldNames271(fn){
  const L=storyNames271;
  if(!L)return fn();
- const keep={},fnKeep={identitySurname,defaultParts256,surnamePool256,genderSurname256,fullName256};
- for(const [cc,p] of Object.entries(L.pools)){
-  const c=countries[cc];if(!c)continue;
-  const r=typeof expansion95==='object'?expansion95[cc]:null;
-  keep[cc]={names:[c.names[0],c.names[1]],surnames:c.surnames,exp:r?r.surnames:undefined};
-  c.names[0]=p.names[0];c.names[1]=p.names[1];c.surnames=p.surnames;if(r&&p.exp!==undefined)r.surnames=p.exp;
- }
- identitySurname=L.fns.identitySurname;defaultParts256=L.fns.defaultParts256;surnamePool256=L.fns.surnamePool256;
- genderSurname256=L.fns.genderSurname256;fullName256=L.fns.fullName256;
- try{return fn();}
- finally{
-  for(const [cc,k] of Object.entries(keep)){const c=countries[cc],r=typeof expansion95==='object'?expansion95[cc]:null;c.names[0]=k.names[0];c.names[1]=k.names[1];c.surnames=k.surnames;if(r&&k.exp!==undefined)r.surnames=k.exp;}
+ // Всё, что подменено, возвращается в finally — даже если подмена оборвалась на полпути.
+ const keep=[],fnKeep={identitySurname,defaultParts256,surnamePool256,genderSurname256,fullName256};
+ try{
+  for(const [cc,p] of Object.entries(L.pools)){
+   const c=countries[cc],r=typeof expansion95==='object'?expansion95[cc]:null;
+   if(!Array.isArray(c?.names))continue;
+   keep.push([c,r,[c.names[0],c.names[1]],c.surnames,r?r.surnames:undefined]);
+   c.names[0]=p.names[0];c.names[1]=p.names[1];c.surnames=p.surnames;if(r&&p.exp!==undefined)r.surnames=p.exp;
+  }
+  ({identitySurname,defaultParts256,surnamePool256,genderSurname256,fullName256}=L.fns);
+  return fn();
+ }finally{
+  for(const [c,r,names,surnames,exp] of keep){c.names[0]=names[0];c.names[1]=names[1];c.surnames=surnames;if(r&&exp!==undefined)r.surnames=exp;}
   ({identitySurname,defaultParts256,surnamePool256,genderSurname256,fullName256}=fnKeep);
  }
 }

@@ -46,7 +46,9 @@ async function open(browser, ctx, extra = { before: [], after: [] }) {
   const errors = [];
   pg.on('pageerror', e => errors.push(String(e.message)));
   await pg.goto('http://game.local/index.html');
-  await pg.waitForFunction("typeof start==='function'&&document.querySelector('#country')");
+  // Со своими сохранениями в хранилище игра может открыться не на экране рождения — его откроет life().
+  await pg.waitForFunction("typeof start==='function'&&typeof intro==='function'&&!!document.querySelector('#app,main,body')");
+  await pg.waitForTimeout(300);
   for (const f of extra.before || []) if (!wired(f)) await pg.addScriptTag({ path: path.join(ROOT, f) });
   if (!BASE && !extra.base) for (const f of MINE) if (!wired(f)) await pg.addScriptTag({ path: path.join(ROOT, f) });
   for (const f of extra.after || []) if (!wired(f)) await pg.addScriptTag({ path: path.join(ROOT, f) });
