@@ -123,9 +123,17 @@ async function life(pg, cfg) {
       s.birthYear = 1990; s.year = 2030; s.age = 40;
       let li = 0, kim = 0;
       for (let l = 0; l < LIVES; l++) { F.reset(); for (let i = 0; i < 150; i++) { const p = F.born(F.year(1990), i % 2 ? 'f' : 'm'); if (p.surname === 'Ли') li++; if (p.surname === 'Ким') kim++; } }
-      return { li: li / LIVES, kim: kim / LIVES };
+      const out = { li: li / LIVES, kim: kim / LIVES };
+      // Запасной вариант: если names271.js долей не задаёт, доли берутся из names271-freq-data.js.
+      if (typeof freq271 === 'object' && typeof names271 === 'object') {
+        const keep = names271.shares; names271.shares = {};
+        try { let n = 0; F.reset(); for (let i = 0; i < 6000; i++) if (identitySurname('kr', i % 2 ? 'f' : 'm') === 'Ли') n++; out.fallback = n / 6000 * 150; }
+        finally { names271.shares = keep; }
+      }
+      return out;
     }, LIVES);
     check(r.li >= 15 && r.li <= 28, 'kr: около 20 Ли на 150 корейцев', `Ли ${r.li.toFixed(1)}, Ким ${r.kim.toFixed(1)}`);
+    if (!BASE) check(r.fallback >= 15 && r.fallback <= 28, 'kr: без долей в names271.js — доли из данных частот', `Ли ${r.fallback?.toFixed(1)} на 150`);
     check(errors.length === 0, 'kr: без ошибок страницы', errors.slice(0, 2).join(' | '));
     await ctx.close();
   }
