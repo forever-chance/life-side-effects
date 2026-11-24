@@ -31,7 +31,7 @@ async function page(browser, cfg) {
     if ($('#modal').open) closeModal();
     s.pending = [];
   });
-  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js'])
+  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js', 'creative262.js'])
     if (!(await pg.evaluate(f => [...document.scripts].some(x => x.src.includes(f)), f))) await pg.addScriptTag({ path: path.join(ROOT, f) });
   return { pg, errors, ctx };
 }
@@ -179,8 +179,8 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       h.strength = 6; h.years261 = 30; s.illness = null; healthMenu();
       return { withHabit, without, text: [...document.querySelectorAll('#modal p')].map(p => p.textContent).join(' ') };
     });
-    check('привычки: курение опускает потолок здоровья (5 + стаж)', ceil.without - ceil.withHabit >= 11 && ceil.without - ceil.withHabit <= 12, ceil);
-    check('привычки: меню «Самочувствие» говорит, сколько отнимает курение', /Курение сейчас опускает этот уровень на 1[12]/.test(ceil.text), ceil.text);
+    check('привычки: курение опускает потолок здоровья (3.5 + стаж)', ceil.without - ceil.withHabit >= 9 && ceil.without - ceil.withHabit <= 10, ceil);
+    check('привычки: меню «Самочувствие» говорит, сколько отнимает курение', /Курение сейчас опускает этот уровень на (9|10)/.test(ceil.text), ceil.text);
     await pg.evaluate(() => closeModal());
     const wd = await pg.evaluate(() => {
       s.pending = []; s.mood = 70; const h = habits78().smoke; h.strength = 5; h.lastMode261 = undefined; h.mode = 'pause'; h.used = -5;
@@ -213,6 +213,30 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     await pg.evaluate(click('/Попросить помочь бросить/'));
     check('привычки: просьба о помощи — пауза с поддержкой', await pg.evaluate(() => habits78().drink.mode === 'pause' && habits78().drink.supported === s.clock.ticks && s.log[0].title === 'Разговор'), null);
     check('привычки: без ошибок страницы', !errors.length, errors);
+    await ctx.close();
+  }
+
+  // 9. Творческие гонорары (262).
+  {
+    const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'no' });
+    const f = await pg.evaluate(() => {
+      const x = creative47(); const f0 = feeFactor262('finearts');
+      for (let i = 0; i < 40; i++) x.works.push({ id: 'w' + i, track: 'finearts', kind: 'paid', quality: 50, tick: 0 });
+      const f40 = feeFactor262('finearts'); x.works.length = 0; return { f0, f40 };
+    });
+    check('гонорары: первая работа ×1, сороковая ×2.9', Math.abs(f.f0 - 1) < 1e-9 && Math.abs(f.f40 - (1 + .6 * Math.log2(9))) < 1e-9, f);
+    const lv = await pg.evaluate(() => {
+      const x = creative47();
+      for (let i = 0; i < 3; i++) x.works.push({ id: 'l' + i, track: 'finearts', kind: 'paid', quality: 60, tick: 0, specialty184: 'illustration', level184: 2 });
+      const rnd = Math.random; Math.random = () => .999;
+      let o; try { o = creativeBrief184({ id: 't', track: 'finearts', kind: 'commission', title: 'Обложка', fee: 1000, duration: 3, skill: 45, samples: 2, quality: 40, hours: 8 }, 1); } finally { Math.random = rnd; }
+      return { level: o.level184, specialty: o.specialty184, fee: o.fee, factor: feeFactor262('finearts'), title: o.title };
+    });
+    check('гонорары: после трёх работ уровня 2 с качеством 55+ приходит уровень 3', lv.level === 3 && lv.specialty === 'illustration' && lv.fee === Math.round(Math.round(1000 * 2.2) * lv.factor) && /Иллюстрация · Обложка/.test(lv.title), lv);
+    await pg.evaluate(() => creativeTrackMenu47('finearts'));
+    const m = await pg.evaluate(modal);
+    check('гонорары: меню профиля показывает репутацию и множитель', /Репутация: новичок \(1\.0\)/.test(m.text) && /Гонорары сейчас ×\d/.test(m.text), m.text);
+    check('гонорары: без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }
 
