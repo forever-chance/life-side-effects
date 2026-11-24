@@ -58,38 +58,49 @@ function billsRelink270(map){
   p.rows=rows;
  }
 }
+// Поля, которые сводятся по всем долгам сразу. Оставшийся долг не берёт их у слитого как недостающие: иначе график
+// или история слитого долга попадут в сумму дважды (у старого долга графика нет, у нового есть — платёж удвоился бы).
+const billsOwn270=new Set(['balance','principal','paid','missed','started','due','status32','history32','repayment35','previousPlans35','negotiation35','negotiations35','merged270']);
+// Одна и та же договорённость (тот же объект или тот же id) — один раз.
+function billsUniq270(list){
+ const seen=new Set();
+ return list.filter(x=>{const k=x&&typeof x==='object'&&x.id!=null?'id:'+x.id:x;if(seen.has(x)||seen.has(k))return false;seen.add(x);seen.add(k);return true;});
+}
 function billsJoin270(keep,parts){
  const all=[keep,...parts],sum=k=>all.reduce((n,d)=>n+(Number(d[k])||0),0),min=k=>Math.min(...all.map(d=>d[k]).filter(Number.isFinite));
- const live=all.filter(d=>(Number(d.balance)||0)>.01);
- for(const d of parts)for(const k of Object.keys(d))if(keep[k]===undefined)keep[k]=d[k];
+ const live=all.filter(d=>(Number(d.balance)||0)>.01),scheduled=live.length>0&&live.every(d=>d.status32==='scheduled');
+ // Всё, что сводится, — с каждого долга по разу, до того как оставшийся долг возьмёт недостающие поля.
+ const history=all.flatMap(d=>d.history32||[]),plans=billsUniq270(all.map(d=>d.repayment35).filter(Boolean));
+ const earlier=all.flatMap(d=>d.previousPlans35||[]),talks=all.map(d=>d.negotiation35).filter(Boolean),asked=billsUniq270(all.flatMap(d=>d.negotiations35||[]));
+ for(const d of parts)for(const k of Object.keys(d))if(keep[k]===undefined&&!billsOwn270.has(k))keep[k]=d[k];
  keep.balance=sum('balance');keep.principal=sum('principal');keep.paid=sum('paid');
  keep.missed=Math.max(...all.map(d=>Number(d.missed)||0));
  if(Number.isFinite(min('started')))keep.started=min('started');
  if(Number.isFinite(min('due')))keep.due=min('due');
- keep.history32=all.flatMap(d=>d.history32||[]).map((h,i)=>[h,i]).sort((a,b)=>(a[0].tick??0)-(b[0].tick??0)||a[1]-b[1]).map(x=>x[0]);
+ keep.history32=billsUniq270(history).map((h,i)=>[h,i]).sort((a,b)=>(a[0].tick??0)-(b[0].tick??0)||a[1]-b[1]).map(x=>x[0]);
  // График с кредитором: действующие графики складываются в один (платёж и покрытый остаток — сумма,
- // пересмотр одного — пересмотр общего), прочие уходят в прежние договорённости.
- const plans=all.map(d=>d.repayment35).filter(Boolean),current=plans.filter(p=>['active','review'].includes(p.status));
+ // пересмотр одного — пересмотр общего), прочие уходят в прежние договорённости. Если график был только у одного
+ // долга, он остаётся как был: покрывает свою часть, остальное — неоплаченный счёт, как у долга с новыми счетами.
+ const current=plans.filter(p=>['active','review'].includes(p.status));
  const plan=current.find(p=>p===keep.repayment35)||current[0]||keep.repayment35||plans[0]||null;
  if(plan&&current.length>1){
   const nums=k=>current.map(p=>Number(p[k])).filter(Number.isFinite);
   plan.remaining=nums('remaining').reduce((n,v)=>n+v,0);plan.monthly=nums('monthly').reduce((n,v)=>n+v,0);
   if(nums('next').length)plan.next=Math.min(...nums('next'));if(nums('expectedEnd').length)plan.expectedEnd=Math.max(...nums('expectedEnd'));
   plan.missed=Math.max(0,...nums('missed'));plan.status=current.some(p=>p.status==='review')?'review':'active';
-  plan.history=current.flatMap(p=>p.history||[]).map((h,i)=>[h,i]).sort((a,b)=>(a[0].tick??0)-(b[0].tick??0)||a[1]-b[1]).map(x=>x[0]);
+  plan.history=billsUniq270(current.flatMap(p=>p.history||[])).map((h,i)=>[h,i]).sort((a,b)=>(a[0].tick??0)-(b[0].tick??0)||a[1]-b[1]).map(x=>x[0]);
   for(const p of current)if(p!==plan)p.status='merged270';
  }
- const previous=[...all.flatMap(d=>d.previousPlans35||[]),...plans.filter(p=>p!==plan)];
+ const previous=billsUniq270([...earlier,...plans.filter(p=>p!==plan)]).filter(p=>p!==plan);
  if(plan)keep.repayment35=plan;else delete keep.repayment35;
  if(previous.length)keep.previousPlans35=previous;
  // Переговоры: в силе предложение, которое ещё можно принять, иначе последнее по времени.
- const talks=all.map(d=>d.negotiation35).filter(Boolean),now=s.clock?.ticks??0;
- const talk=talks.find(q=>q.status==='offered'&&q.expires>=now)||talks.sort((a,b)=>(b.created??0)-(a.created??0))[0];
+ const now=s.clock?.ticks??0;
+ const talk=talks.find(q=>q.status==='offered'&&q.expires>=now)||[...talks].sort((a,b)=>(b.created??0)-(a.created??0))[0];
  if(talk)keep.negotiation35=talk;
- const asked=[],ids=new Set();for(const q of all.flatMap(d=>d.negotiations35||[]))if(!ids.has(q.id)){ids.add(q.id);asked.push(q);}
  if(asked.length)keep.negotiations35=asked;
  // Статус: закрыт, если долга нет; по графику — только если весь остаток в действующем графике.
- keep.status32=keep.balance<=.01?'closed':live.length&&live.every(d=>d.status32==='scheduled')&&keep.repayment35?.status==='active'?'scheduled':'overdue';
+ keep.status32=keep.balance<=.01?'closed':scheduled&&keep.repayment35?.status==='active'?'scheduled':'overdue';
 }
 function billsMerge270(){
  const groups=new Map();

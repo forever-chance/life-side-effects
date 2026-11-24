@@ -7,6 +7,8 @@
 // как его подключит сборка (на диске index.html не меняется).
 // BASE=1 — прогон без onboarding270.js (файл отдаётся пустым, даже если он уже есть в index.html): видно, какие
 // проверки ловят старое поведение.
+// Часть 5 работает, когда onboarding270.js уже вписан в index.html: проверяет, что strip270.js и verify270_strip.js
+// больше не ждут, что окно после перезагрузки само не возвращается.
 const fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
@@ -220,6 +222,20 @@ async function clickNext(pg, state) {
     check('4. итоговый порядок, рождение с ' + age + ': «Понятно» запускает обучение', tutorialStarted(a), a);
     check('4. итоговый порядок, рождение с ' + age + ': без ошибок страницы', !t.errors.length, t.errors);
     await t.ctx.close();
+  }
+
+  // 5. Соседи по сборке. Когда onboarding270.js уже в index.html, strip270.js и verify270_strip.js не должны ждать
+  // старого поведения «после перезагрузки окно само не возвращается»: иначе verify270_strip.js падает на нажатии
+  // под открытым окном. Заодно — что ни одна проверка в verify270_strip.js не повторена (правка его части 3).
+  if (!IN_INDEX) console.log('5. соседи по сборке: ' + FILE + ' ещё не в index.html — проверки пропущены');
+  else {
+    const src = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
+    const strip = src('strip270.js'), test = src('tools/verify270_strip.js');
+    check('5. strip270.js: в комментарии нет «окно само не возвращается», есть ' + FILE, !/окно само не возвращается/.test(strip) && strip.includes(FILE));
+    check('5. verify270_strip.js: после перезагрузки не ждёт закрытого стартового окна', !/само окно не возвращается|окна нет, полоса ведёт к нему/.test(test));
+    const names = [...test.matchAll(/check\('((?:[^'\\]|\\.)*)',/g)].map(m => m[1]);
+    const dup = names.filter((x, i) => names.indexOf(x) !== i);
+    check('5. verify270_strip.js: ни одна проверка не повторена (' + names.length + ')', names.length > 20 && !dup.length, dup);
   }
 
   await browser.close();
