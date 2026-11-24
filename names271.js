@@ -425,6 +425,8 @@ function restoreName271(x){
 // Вместе: общий союз в семейном древе или брак NPC с этим же человеком.
 function together271(p,sp){
  if(!p||!sp)return false;
+ // Бабушка и дедушка из начала игры: союза в древе у них нет, но они пара, пока оба живы.
+ if(p.oldCouple271===sp.id&&sp.oldCouple271===p.id)return true;
  if(s.family27?.unions?.some(u=>u.status==='together'&&[u.a,u.b].includes(p.id)&&[u.a,u.b].includes(sp.id)))return true;
  return !!(p.npcMarried54&&sp.npcMarried54&&((typeof spouseSoc270==='function'&&spouseSoc270(p)===sp)||p.agency55?.partner===sp.id||sp.agency55?.partner===p.id));
 }
@@ -687,6 +689,7 @@ function grandLine271(gp){
  gp.birthSurname256=gp.surname;
  // Пара бабушки и дедушки: жена по обычаю (их поколение почти всегда брало фамилию мужа, где так принято).
  const other=s.people.find(q=>q!==gp&&parent.bio27.parents.includes(q.id)&&q.alive&&['Бабушка','Дедушка'].includes(q.role));
+ if(other){gp.oldCouple271=other.id;other.oldCouple271=gp.id;}
  if(other&&gp.gender==='m'&&!other.marriageDecided271&&rule!=='jp'&&!((rule==='es'||rule==='br')&&bp.length>=2))coupleName271(other,gp,country271(parent),true);
  if(other&&rule==='jp'&&other.gender==='f'&&other.surname!==gp.surname)setPersonName256(other,other.givenName166,bp.map(x=>genderSurname256(x,'f',culture)),birth.joiner||' ');
 }
