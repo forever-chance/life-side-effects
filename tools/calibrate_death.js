@@ -6,13 +6,14 @@
 // POLICY: random — случайные действия harness.js;
 //         care   — то же плюс «Восстановить силы» всегда в расписании и врач при болезни.
 // DEATH:  off — смерть только в 100 (снять траекторию здоровья);
-//         old — как в игре сейчас; new — подключённая deathChance257.
+//         old — как было до 258 (только после 75); new — mortality258.js, как в игре.
 const fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 
 const ROOT = path.resolve(__dirname, '..');
-const [OUT = 'trajectories.jsonl', N = '4', MAX_AGE = '100', POLICY = 'random', SEED = '1', DEATH = 'off'] = process.argv.slice(2);
+const [OUT = 'trajectories.jsonl', N = '4', MAX_AGE = '100', POLICY = 'random', SEED = '1', DEATH = 'new'] = process.argv.slice(2);
 const HARNESS = fs.readFileSync(path.join(__dirname, 'harness.js'), 'utf8').replace(/console\.log\(/g, '(()=>{})(');
+const NEW_DEATH = 'mortality258()||s.age>=100';
 const OLD_DEATH = 's.age>75&&chance(Math.min(.8,(s.age-74)*.018+(100-s.health)*.002))||s.age>=100';
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml' };
 
@@ -27,11 +28,10 @@ async function serve(ctx) {
     if (!file.startsWith(ROOT) || !fs.existsSync(file)) return route.fulfill({ status: 404, body: '' });
     let body = fs.readFileSync(file);
     if (rel === 'offline-game.js') body = Buffer.from('');
-    if (rel === 'game.js' && DEATH !== 'old') {
+    if (rel === 'game.js' && DEATH !== 'new') {
       const src = body.toString('utf8');
-      if (!src.includes(OLD_DEATH)) throw new Error('death line in game.js changed');
-      const repl = DEATH === 'new' ? 'chance(deathChance257(s.age,s.health))||s.age>=100' : 's.age>=100';
-      body = Buffer.from(src.replace(OLD_DEATH, repl));
+      if (!src.includes(NEW_DEATH)) throw new Error('death line in game.js changed');
+      body = Buffer.from(src.replace(NEW_DEATH, DEATH === 'old' ? OLD_DEATH : 's.age>=100'));
     }
     route.fulfill({ status: 200, body, headers: { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' } });
   });
@@ -43,7 +43,7 @@ const TRACE = `(()=>{let h=s.health;window.__HA={};Object.defineProperty(s,'heal
   if(m&&m[2]!=='harness.js'){src=m[2]+':'+(m[1]||'?').replace(/^Object\\./,'');break}}src+=d<0?' -':' +';__HA[src]=(__HA[src]||0)+d}h=v}})})()`;
 
 const SNAP = `(()=>{const h=habits78();const z=s.health25;const src=window.__HA||{};window.__HA={};return {age:s.age,health:+s.health.toFixed(2),fatigue:Math.round(s.clock.fatigue),mood:Math.round(s.mood),
-  ill:!!s.illness,chronic:(z&&z.conditions||[]).length,smoke:h.smoke.strength||0,drink:h.drink.strength||0,cash:Math.round(s.cash),dead:!!s.dead,
+  ill:!!s.illness,chronic:(z&&z.conditions||[]).length,smoke:h.smoke.strength||0,drink:h.drink.strength||0,cash:Math.round(s.cash),dead:!!s.dead,trend:Number.isFinite(s.healthTrend258)?+s.healthTrend258.toFixed(1):null,
   src:Object.fromEntries(Object.entries(src).map(([k,v])=>[k,+v.toFixed(2)]))}})()`;
 
 // Случайные клики harness.js иногда ставят отдых на паузу: заботливый игрок его возобновляет.
