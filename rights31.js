@@ -13,7 +13,7 @@ const countryRights31={
  cn:{hours:8,auth:true,campus:true,leave:1,notice:2,departure:2,reentry:12,note:'Только согласованная вузом работа в учебной среде, 8 ч/нед.'},
  rs:{hours:16,auth:true,leave:2,notice:3,departure:2,reentry:6,note:'Консервативный игровой маршрут с проверкой документов на подработку'},
  ru:{hours:40,auth:false,leave:2,notice:3,departure:2,reentry:6,note:'Очная программа в условно аккредитованном игровом вузе; работа в свободное время'},
- br:{hours:30,auth:false,leave:3,notice:3,departure:2,reentry:6,note:'Совместимость с учебой; 30 ч — игровой лимит нагрузки, не национальный закон'},
+ br:{hours:30,auth:false,leave:3,notice:3,departure:2,reentry:6,note:'Совместимость с учёбой; 30 ч — игровой лимит нагрузки, не национальный закон'},
  mx:{hours:20,auth:true,related:true,leave:2,notice:3,departure:2,reentry:6,note:'Согласование вуза и работы по направлению; 20 ч — игровой лимит'}
 };
 const rightsBase31={jobDetailData20,mobilityView16,finishTask,monthlyFinance,makeVacancies16,startJob16,pauseStudy16,endStudy16};

@@ -39,7 +39,7 @@ function habitDetail78(kind){
    {label:'Вернуться к обычному режиму',hidden:!habit.mode,fn:()=>{delete habit.mode;}},
    {label:'Сократить',disabled:!habit.strength||habit.mode==='limit',fn:()=>{habit.mode='limit';}},
    {label:'Сделать паузу',disabled:!habit.strength||habit.mode==='pause',fn:()=>{habit.mode='pause';}},
-   {label:support?'Обсудить с '+support.name:'Записать причину для паузы',
+   {label:support?'Попросить поддержки · '+support.name:'Записать причину для паузы',
     disabled:!habit.mode||!habit.strength||tick-(habit.supported??-6)<3,
     fn:()=>{
       habit.supported=tick;

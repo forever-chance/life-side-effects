@@ -97,7 +97,7 @@ function businessWhy254(b,q,plan){
  if(b.cash<plan.cost)return 'Недостаточно денег на счёте предприятия.';
  if(plan.op==='shift'&&!enterpriseStaff155(b).length)return 'Для дополнительной смены нужны сотрудники.';
  if(['refund','return'].includes(plan.op)&&!(plan.op==='refund'?q.salesBacking:q.costBacking))return 'Нет подтверждённой оплаченной суммы для возврата.';
- if(plan.op==='sale'&&(b.partner158||businessState254(b).receivables.some(r=>r.status==='overdue')))return 'Для продажи нужно урегулировать долю совладельца и неоплаченные счета.';
+ if(plan.op==='sale'&&(b.partner158||businessState254(b).receivables.some(r=>r.status==='overdue')))return 'Для продажи нужно урегулировать долю совладельца и неоплаченные счёта.';
  if(plan.op==='collect'&&!plan.revenue)return 'Счёт уже закрыт.';
  if(['rent','rentAccept'].includes(plan.op)&&b.rentOffer159?.id!==q.rent)return 'Условия аренды уже изменились.';
  return '';
@@ -163,7 +163,7 @@ function businessCommit254(id,index){
  log('Решение по делу',b.title+' · '+businessIndex254[q.event].choices[index].label+(q.status==='scheduled'?' · результат через '+p.months+' мес.':''),'Своё дело');save();render();return true;
 }
 function businessSaleMenu254(b,q){
- show('Предложение о покупке',b.title+' · цена активов '+money(q.plan.revenue*fxRate86(b.country))+' плюс остаток счёта. После продажи предприятие перестанет принадлежать тебе.',[{label:'Продать предприятие',fn:()=>businessSell254(b.id,q.id)},{label:'Отказаться',fn:()=>{q.status='resolved';q.result='Предложение о покупке отклонено.';save();enterpriseMenu152();}}]);return true;
+ show('Предложение о покупке',b.title+' · цена активов '+money(q.plan.revenue*fxRate86(b.country))+' плюс остаток счёта. После продажи предприятие перестанет принадлежать вам.',[{label:'Продать предприятие',fn:()=>businessSell254(b.id,q.id)},{label:'Отказаться',fn:()=>{q.status='resolved';q.result='Предложение о покупке отклонено.';save();enterpriseMenu152();}}]);return true;
 }
 function businessSell254(id,caseId){
  const b=businessFind254(id),q=b?.cases254?.cases.find(q=>q.id===caseId);
@@ -187,7 +187,7 @@ function businessOpen254(id){
 function businessFunding254(id){
  const b=businessFind254(id);if(!b)return;
  const unit=Math.max(1,Math.round(enterpriseRent157(b))),token=id16('business-funding254');
- show('Финансирование дела',b.title+' · пополнение из личных средств. Если берёшь личный кредит, долг остаётся твоим даже после закрытия предприятия.',[
+ show('Финансирование дела',b.title+' · пополнение из личных средств. Если берёте личный кредит, долг остаётся вашим даже после закрытия предприятия.',[
   ...[1,3].map(n=>({label:'Внести '+money(unit*n*fxRate86(b.country)),disabled:!businessLocal254(b)||s.cash<unit*n*fxRate86(b.country),fn:()=>{if(businessFund254(id,unit*n,token))businessJournal254(id);else toast('Пополнение сейчас недоступно.');}})),
   {label:'Рассмотреть личный кредит',fn:financeMenu},{label:'Назад',fn:()=>businessJournal254(id)}
  ]);

@@ -20,11 +20,11 @@ function suggestPetName182(kind,sex,country=s.country,extra=[]){
 }
 
 function petNameField182(suggested){
- return '<label class="field">Как назовёшь?<input id="petName182" maxlength="35" value="'+esc(suggested)+'"></label>';
+ return '<label class="field">Как назовёте?<input id="petName182" maxlength="35" value="'+esc(suggested)+'"></label>';
 }
 function openPetName182(pet,confirm,parent=null){
  const suggested=pet.name||suggestPetName182(pet.kind,pet.sex38);
- petShow38('Как назовёшь?',petLabel38(pet)+' · '+(pet.sex38==='f'?'самка':'самец'),[
+ petShow38('Как назовёте?',petLabel38(pet)+' · '+(pet.sex38==='f'?'самка':'самец'),[
   {label:'Подтвердить имя',fn:()=>confirm($('#petName182').value.trim().slice(0,35)||suggested)}
  ],parent);
  petInsert38(petArtHTML38(pet,true)+petNameField182(suggested));

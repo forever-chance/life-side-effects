@@ -8,7 +8,7 @@ function noteKin27(p,text){p.bio27.history.push({tick:s.clock.ticks,text});if(p.
 function birthKin27(union,adopt=false){familyState27();const a=living(union.a),b=living(union.b);if(!a||!b||(union.status!=='together'&&!(union.status==='separated'&&originalParents132(union)))||!Number.isFinite(union.due)||union.due>s.clock.ticks||union.finished===s.clock.ticks)return null;union.finished=s.clock.ticks;union.due=null;union.nextChild=s.clock.ticks+48;const role=['Мать','Отец'].includes(a.role)||['Мать','Отец'].includes(b.role)?'Сиблинг':['Брат','Сестра'].includes(a.role)||['Брат','Сестра'].includes(b.role)?'Племянник':'Потомок';const p=person(role,adopt?2:0,pick(['f','m']),a.country);p.role=role==='Сиблинг'?(p.gender==='f'?'Сестра':'Брат'):role==='Племянник'?(p.gender==='f'?'Племянница':'Племянник'):role;p.parentId=a.id;p.adopted49=adopt;p.birth49={method:adopt?'adoption':'birth',parents:adopt?[]:[a.id,b.id]};p.city18=a.city18||cities[a.country][0];if(!adopt&&typeof childBirthIdentity166==='function')childBirthIdentity166(p,[a,b]);s.people.push(p);familyState27();p.bio27.parents=[a.id,b.id];p.bio27.adopted=adopt;for(const parent of [a,b]){if(!parent.bio27.children.includes(p.id))parent.bio27.children.push(p.id);noteKin27(parent,(adopt?'В семье появился приёмный ребёнок: ':'Родился ребёнок: ')+p.name);}
  if(role==='Сиблинг'){
   const title=adopt?'В семье появился младший ребёнок':p.gender==='f'?'Родилась младшая сестра':'Родился младший брат';
-  const text=p.name+' теперь в твоей семье.';
+  const text=p.name+' теперь в вашей семье.';
   if(typeof notice61==='function')notice61('parentCare136',title,text,{personId:p.id});
   else log(title,text,'Семья',true);
  }
@@ -106,7 +106,7 @@ function separateParents132(union) {
  }
  const terms=s.family17.separation132;
  const text=parents.map(p=>p.name).join(' и ')+' развелись.'+(s.age<18?
-  ' Ты остаёшься с '+caregiver.name+'. '+(terms.contact?'Со вторым родителем можно общаться.':'Регулярного общения со вторым родителем пока нет.')+
+  ' Вы остаётесь '+(caregiver.gender==='f'?'с мамой':'с папой')+' ('+caregiver.name+'). '+(terms.contact?'Со вторым родителем можно общаться.':'Регулярного общения со вторым родителем пока нет.')+
   (terms.support?' Предусмотрены алименты.':' Регулярных выплат пока нет.'):'');
  notice61('parentDivorce132','Родители развелись',text);
  return true;

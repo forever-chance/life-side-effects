@@ -142,7 +142,7 @@ function petVet79(id){
        p.breeding80={enabled,next:s.clock.ticks+1};
      }
    },...(offer?[{label:'Посмотреть кандидата · '+offer.name,fn:()=>breedingOfferMenu80(id)}]:[])]:[]),
-   ...partners.map(other=>({label:'Запланировать помёт с '+other.name,hint:money(breedingFee)+' · осмотр и первичный уход',
+   ...partners.map(other=>({label:'Запланировать помёт · '+other.name,hint:money(breedingFee)+' · осмотр и первичный уход',
      disabled:expenseAvailable231()<breedingFee,fn:()=>planLitter79(id,other.id)})),
    {label:'Назад к питомцу',fn:()=>petDetails(id)}
  ]);

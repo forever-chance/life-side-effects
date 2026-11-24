@@ -158,7 +158,7 @@ function treeCard90(graph,id,pos) {
   const alive = player ? !s.dead : p.alive !== false;
   const fullName = player ? [s.name,s.surname].filter(Boolean).join(' ') : p.name;
   const city = player ? residenceCity() : p.city18 || p.city || '';
-  const role = player ? 'Твой персонаж' :
+  const role = player ? 'Ваш персонаж' :
     p.married ? (p.gender === 'f' ? 'Супруга' : 'Супруг') :
     p.divorced ? (p.gender === 'f' ? 'Бывшая супруга' : 'Бывший супруг') : p.role || 'Родственник';
   return '<div class="tree-node90" data-node="'+esc(id)+'" onpointerenter="highlightTree185(this)" onfocusin="highlightTree185(this)" data-root="'+root+'" style="left:'+pos.x+'px;top:'+pos.y+'px">'+

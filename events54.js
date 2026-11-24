@@ -179,7 +179,7 @@ function reviewHealthCare144(){
     const parent=parents17().find(availableCareAdult144);
     if(parent){
      placeChild140(parent,current.caregiverId,'parent','custodyReturn');
-     parentHealthNews143(parent,'Возвращение домой после заключения','Теперь снова может заботиться о тебе.');
+     parentHealthNews143(parent,'Возвращение домой после заключения','Теперь снова может заботиться о вас.');
     }
    }
    return;
@@ -188,7 +188,7 @@ function reviewHealthCare144(){
   placeChild140(original,current.caregiverId,temporary.kind,temporary.reason==='custody'?'custodyReturn':'healthReturn');
   if(temporary.longTerm149)f.care136.longTerm149=true;
   delete f.temporaryCare144;
-  parentHealthNews143(original,temporary.reason==='custody'?'Возвращение домой после заключения':'Возвращение домой после лечения','Снова может заботиться о тебе.');
+  parentHealthNews143(original,temporary.reason==='custody'?'Возвращение домой после заключения':'Возвращение домой после лечения','Снова может заботиться о вас.');
   return;
  }
  const care=f.care136||f.separation132||f.childhood131;
@@ -223,11 +223,11 @@ function transferCare137(deceased,reason='loss'){
   (['Мать','Отец'].includes(deceased.role)?'parent':'relative')};
  placeChild140(caregiver,deceased.id,residential?'residential':foster?'foster':parent?'parent':'relative',reason);
  if(reason!=='loss'){
-  parentHealthNews143(caregiver,reason==='custody'?'Временный уход на время заключения':'Временный уход на время лечения','Ты временно живёшь здесь. Город — '+residenceCity()+'.');
+  parentHealthNews143(caregiver,reason==='custody'?'Временный уход на время заключения':'Временный уход на время лечения','Вы временно живёте здесь. Город — '+residenceCity()+'.');
   return;
  }
  const city=residenceCity();
- const note='После смерти '+deceased.name+(residential?' тебя устроили в детский дом. Твой воспитатель — '+caregiver.name+'.':foster?' тебя приняли в приёмную семью. Твой опекун — '+caregiver.name+'.':' за тобой теперь ухаживает '+caregiver.name+'.')+
+ const note='После смерти '+deceased.name+(residential?' вас устроили в детский дом. Ваш воспитатель — '+caregiver.name+'.':foster?' вас приняли в приёмную семью. Ваш опекун — '+caregiver.name+'.':' за вами теперь ухаживает '+caregiver.name+'.')+
   (from!==city?' Новый город проживания — '+city+'.':'');
  if(typeof notice61==='function')notice61('parentCare136','Смена опекуна',note,{personId:caregiver.id});
  else log('Смена опекуна',note,'Семья',true);
@@ -260,7 +260,7 @@ function reviewFosterCare140(){
  if(!caregiver)return false;
  placeChild140(caregiver,care.caregiverId,parent?'parent':'relative','reunion');
  const title=care.kind==='residential'?'Возвращение из детского дома':'Возвращение из приёмной семьи';
- const note=caregiver.name+' теперь может взять тебя к себе. Город проживания — '+residenceCity()+'.';
+ const note=caregiver.name+' теперь может взять вас к себе. Город проживания — '+residenceCity()+'.';
  if(typeof notice61==='function')notice61('parentCare136',title,note,{personId:caregiver.id});
  else log(title,note,'Семья',true);
  return true;
@@ -279,7 +279,7 @@ function reviewFosterAdoption141(){
  s.family17.adoption141={parentId:guardian.id,tick:s.clock.ticks,year:s.year,month:s.clock.month};
  placeChild140(guardian,guardian.id,'adopted','adoption');
  const title=s.gender==='f'?'Удочерение после приёмной опеки':'Усыновление после приёмной опеки';
- const note=guardian.name+' теперь твой юридический родитель. Вы продолжаете жить вместе.';
+ const note=guardian.name+' теперь ваш юридический родитель. Вы продолжаете жить вместе.';
  if(typeof notice61==='function')notice61('parentCare136',title,note,{personId:guardian.id});
  else log(title,note,'Семья',true);
  return true;
@@ -293,7 +293,7 @@ function reviewLongTermCare149(){
  if(!availableCareAdult144(guardian)||guardian.bond<55||s.housing.occupant!==guardian.id)return false;
  placeChild140(guardian,guardian.id,care.kind,'longTerm');
  family.care136.longTerm149=true;
- parentHealthNews143(guardian,'Долгосрочная опека','Ты остаёшься жить здесь. Договорённость действует до совершеннолетия или пересмотра опеки.');
+ parentHealthNews143(guardian,'Долгосрочная опека','Вы остаётесь жить здесь. Договорённость действует до совершеннолетия или пересмотра опеки.');
  return true;
 }
 function mortalityMonth54(){const z=events54();for(const p of s.people){if(z.known[p.id]===true&&!p.alive&&!z.deaths.includes(p.id)){z.deaths.push(p.id);p.died54??={tick:s.clock.ticks,year:s.year,age:p.age};p.cohabit=false;transferCare137(p);const host=occasionHosts54().sort((a,b)=>Number(kin27(b))-Number(kin27(a))||b.bond-a.bond)[0];if(host)offerOccasion54(host,'funeral',false,p);for(const a of family54().helpers)if(a.person===p.id)a.status='ended';for(const n of family54().nannies)if(n.person===p.id)n.status='ended';}z.known[p.id]=!!p.alive;}}

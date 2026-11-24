@@ -71,10 +71,10 @@ function petHomeEpisodes81(){
  const p=pick(pets);
  const child=children54().find(q=>q.age>=4&&(!q.city18||q.city18===residenceCity()));
  const scenes=[
-   ['box','Коробка принята','Новая лежанка осталась пустой. '+p.name+' спит в коробке, в которой её привезли.'],
-   ['socks','Пропавший носок',p.name+' обнаружил носок раньше, чем удалось найти второй.']
+   ['box','Коробка принята','Новая лежанка осталась пустой. '+p.name+' спит в коробке, в которой '+(p.sex38==='f'?'её':'его')+' привезли.'],
+   ['socks','Пропавший носок',p.name+' обнаружил'+(p.sex38==='f'?'а':'')+' носок раньше, чем удалось найти второй.']
  ];
- if(p.kind==='cat')scenes.push(['fur','Комок шерсти',p.name+' срыгнул комок шерсти на пол. Из всех поверхностей выбрана та, по которой ходят босиком.']);
+ if(p.kind==='cat')scenes.push(['fur','Комок шерсти',p.name+' срыгнул'+(p.sex38==='f'?'а':'')+' комок шерсти на пол. Из всех поверхностей выбрана та, по которой ходят босиком.']);
  if(child&&['cat','dog'].includes(p.kind))scenes.push(['bed','Новое место для сна',p.name+' теперь засыпает на краю кровати, где спит '+child.name+'.']);
  const choices=scenes.filter(([id])=>s.clock.ticks-(p.episode81?.[id]??-20)>=8);
  if(choices.length)petEpisode81(p,...pick(choices));
@@ -98,7 +98,7 @@ finishTask=function(t){
    const p=ownedPet79(t.petId);
    if(!startTask05(t))return;
    if(t.kind==='petCafe81'){
-     petEpisode81(p,'cafe','Знакомство за соседним столиком',p.name+' пошёл знакомиться с соседями по столику на террасе кафе. Кофе остался остывать.');
+     petEpisode81(p,'cafe','Знакомство за соседним столиком',p.name+' '+(p.sex38==='f'?'пошла':'пошёл')+' знакомиться с соседями по столику на террасе кафе. Кофе остался остывать.');
    }else{
      const score=rnd(0,65)+Math.min(20,(p.training38||0)*4)+Math.round(p.bond*.25);
      const rank=score>=87?3:score>=72?2:score>=52?1:0;
@@ -113,7 +113,7 @@ finishTask=function(t){
  petStoriesBase81.finishTask(t);
  if(walked&&petState38().completed.includes(t.id)&&chance(.4)){
    const p=ownedPet79(t.petId);
-   if(p)petEpisode81(p,'stick','Палка с прогулки',p.name+' притащил домой палку, которая едва прошла в дверь.');
+   if(p)petEpisode81(p,'stick','Палка с прогулки',p.name+' притащил'+(p.sex38==='f'?'а':'')+' домой палку, которая едва прошла в дверь.');
  }
 };
 

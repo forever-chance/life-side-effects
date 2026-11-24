@@ -96,11 +96,11 @@ function dossierBirthStory87(b){
  const caregiverId=b.caregiverId??s.family17?.childhood131?.caregiverId;
  const caregiver=caregiverId&&(b.parents?.find(p=>p.id===caregiverId)||s.people.find(p=>p.id===caregiverId));
  if(caregiver){
-  parts.push((caregiver.role==='Мать'?'С рождения тебя растила ':'С рождения тебя растил ')+caregiver.name+'.');
+  parts.push((caregiver.role==='Мать'?'С рождения вас растила ':'С рождения вас растил ')+caregiver.name+'.');
   parts.push(b.unknownParent?'Второй родитель неизвестен.':'Второй родитель жил отдельно.');
  }
  if(b.siblings?.length){
-  const why=s.gender==='f'?'Когда ты родилась':'Когда ты родился';
+  const why=s.gender==='f'?'Когда вы родились':'Когда вы родились';
   const names=b.siblings.map(p=>(p.role==='Сестра'?'старшая сестра ':'старший брат ')+p.name);
   parts.push(why+', в семье '+(names.length===1?(b.siblings[0].role==='Сестра'?'уже была ':'уже был '):'уже были ')+names.join(', ')+'.');
  }
@@ -109,7 +109,7 @@ function dossierBirthStory87(b){
   const home={parents:'Вы жили у родителей',host:'Вы жили у близких',rent:'Семья снимала жильё',own:'У семьи было своё жильё',dorm:'Семья жила в общежитии',unstable42:'Постоянного жилья у семьи тогда не было'}[mode];
   if(home)parts.push(home+(listing?' ('+(homeKinds41[listing.kind]||'жильё').toLocaleLowerCase('ru')+', '+listing.rooms+' комн., '+listing.areaM2+' м²)':'')+'.');
  }
- if(b.familyMode==='migrant')parts.push('Семья незадолго до твоего рождения переехала в эту страну.');
+ if(b.familyMode==='migrant')parts.push('Семья незадолго до вашего рождения переехала в эту страну.');
  return parts.length?'<p>'+esc(parts.join(' '))+'</p>':'';
 }
 
@@ -209,7 +209,7 @@ const sameCity=b.country===s.country&&b.city===residenceCity();
 const birthPlace=sameCity
  ? '<p>'+esc([b.city,countries[b.country]?.name,districts[b.home?.area]?.name].filter(Boolean).join(' · '))+'</p>'
  : dossierPlace87(b.country,b.city,b.home?.area);
-html+=dossierCard87(s.gender==='f'?'Семья, в которой ты родилась':'Семья, в которой ты родился',
+html+=dossierCard87(s.gender==='f'?'Семья, в которой вы родились':'Семья, в которой вы родились',
  dossierArt114(b.country,b.background==='high')+
  (countries[b.country]?'<h3>Место рождения</h3>'+birthPlace:'')+
  dossierBirthStory87(b)+dossierParentCards207(b.parents,parents));

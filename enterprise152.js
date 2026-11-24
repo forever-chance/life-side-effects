@@ -545,7 +545,7 @@ function drawEnterprise152(id){
  if(!payout)return false;
  const income=distributeEnterprise158(business,payout);
  s.clock.income+=income;
- log('Выплата из своего дела',business.title+' · твоя доля '+money(income)+'.','Работа');
+ log('Выплата из своего дела',business.title+' · ваша доля '+money(income)+'.','Работа');
  save();render();return true;
 }
 function closeEnterprise152(id){

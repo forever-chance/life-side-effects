@@ -125,7 +125,7 @@ finishTask = function(t) {
   archiveTask05(t,'completed');
   if (q.kind==='invite') {
     contact.invitation='met';
-    log('Встреча о сотрудничестве','Состоялся разговор с '+p.name+'. Вступление не оформлено.','Знакомые');
+    log('Встреча о сотрудничестве','Вы и '+p.name+' поговорили. Вступление не оформлено.','Знакомые');
     return;
   }
   if (q.group93) {

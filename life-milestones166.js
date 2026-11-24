@@ -6,8 +6,8 @@ function familyBirthText166(){
  const childhood=s.family17?.childhood131;
  const caregiver=childhood&&living(childhood.caregiverId);
  const home=caregiver
-  ? 'Дома за тобой ухаживает '+caregiver.name+'. '+(childhood.unknown?'О втором родителе ничего не известно.':'Второй родитель живёт отдельно.')
-  : parents.length?'Дома тебя встречают '+parents.join(' и ')+'.':'';
+  ? 'Дома за вами ухаживает '+caregiver.name+'. '+(childhood.unknown?'О втором родителе ничего не известно.':'Второй родитель живёт отдельно.')
+  : parents.length?'Дома вас встречают '+parents.join(' и ')+'.':'';
  const means={low:'Дома внимательно считают расходы.',mid:'На обычную жизнь семье хватает.',high:'У семьи есть накопления на непредвиденное.'};
  const passports=(s.citizenships||[]).map(id=>countries[id]?.name).filter(Boolean);
  const registration=Object.entries(s.identity17?.citizenshipClaims166||{})
@@ -19,7 +19,7 @@ function familyBirthText166(){
 
 const ageMilestones166={
  3:['Мир размером с дом','За порогом уже есть куда пойти. Можно записаться в дошкольную секцию или попросить родителей завести питомца. Решение о питомце остаётся за ними.'],
- 6:['Чужие правила','У тебя теперь есть своя парта. Начинается младшая школа, а вместе с ней появляются уроки, оценки и школьные знакомства.'],
+ 6:['Чужие правила','У вас теперь есть своя парта. Начинается младшая школа, а вместе с ней появляются уроки, оценки и школьные знакомства.'],
  15:['Репетиция самостоятельности','Некоторые встречи теперь могут значить чуть больше. Можно ходить на свидания с ровесниками и решить вместе, хотите ли вы стать парой.'],
  16:['Первые свои деньги','Теперь можно искать подработку. Если хочется попробовать творческое дело, уже можно делать первые работы для портфолио.'],
  17:['Куда после школы','Можно подавать заявки на бакалавриат. У программ разные требования к языку, подготовке и оценкам.'],
@@ -56,7 +56,7 @@ start=function(){
  const baby=$('#startAge')?.value!=='18';
  const result=milestoneBase166.start();
  if(baby&&s?.age===0){
-  queueMilestone166(0,'У этой истории появилось имя','Ты '+(s.gender==='f'?'родилась':'родился')+'. '+familyBirthText166(),typeof startupNotice180!=='function');
+  queueMilestone166(0,'У этой истории появилось имя','Вы родились. '+familyBirthText166(),typeof startupNotice180!=='function');
   save();
  }else if(s?.age===18){
   queueMilestone166(18,...ageMilestones166[18],typeof startupNotice180!=='function');
