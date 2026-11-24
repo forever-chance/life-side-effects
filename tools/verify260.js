@@ -56,6 +56,15 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     await ctx.close();
   }
 
+  // 1б. Смерть посреди открытых событий не оставляет окон после финала.
+  {
+    const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'it' });
+    const r = await pg.evaluate("(()=>{const p=s.people.find(p=>p.alive&&p.age>=18);s.age=60;s.pending=[];if($('#modal').open)closeModal();const m=mortality258;mortality258=()=>{s.pending.push({type:'petCondolence260',personId:p.id,petName:'Рекс'});return true};try{rollYear()}finally{mortality258=m}return {dead:s.dead,pending:s.pending.length,open:$('#modal').open,last:s.log.find(e=>e.title==='Последняя запись')?.text||''}})()");
+    check('смерть: очередь событий очищается, окон после финала нет', r.dead && !r.pending && !r.open && r.last, r);
+    check('смерть: без ошибок страницы', !errors.length, errors);
+    await ctx.close();
+  }
+
   // 2. Смерть питомца дома.
   {
     const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'rs' });

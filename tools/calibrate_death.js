@@ -90,6 +90,7 @@ async function life(browser, idx, cfg) {
       if (Date.now() - t0 > 40 * 60e3) { res.timeout = true; break; }
     }
     res.issues = await pg.evaluate('__H.issues.length');
+    res.issueList = await pg.evaluate('__H.issues.slice(0,10).map(i=>i.kind+": "+String(i.detail).slice(0,120)+" @"+i.age)');
   } catch (e) { res.fatal = String(e).slice(0, 500); }
   res.errors = errors.slice(0, 10);
   res.secs = Math.round((Date.now() - t0) / 1000);

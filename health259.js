@@ -146,3 +146,16 @@ deathChance258=function(age,trend){
  if(age<16)return 0;
  return Math.min(.9,.038*Math.exp(.07*(age-80))*Math.exp(.11*(65-trend)));
 };
+
+// Смерть посреди открытых событий: nextYear в конце открывает следующее окно очереди,
+// и после финальной записи всплывало, например, предложение о работе. Теперь очередь очищается.
+const rollYearBase259=rollYear;
+rollYear=function(...args){
+ const out=rollYearBase259.apply(this,args);
+ if(s&&s.dead&&s.pending.length){
+  s.pending=[];
+  if($('#modal').open)closeModal();
+  save();render();
+ }
+ return out;
+};
