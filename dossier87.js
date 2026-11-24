@@ -189,7 +189,7 @@ function dossierParentCards207(atBirth, parents){
   const place=(now&&birthPlace(now))||(then&&birthPlace(then));
   return '<details><summary>'+esc(parent.role+' · '+parent.name+(now&&!now.alive?' · умер'+(now.gender==='f'?'ла':''):''))+'</summary>'+
    (origin||place?rows([...(origin?[['Происхождение',origin]]:[]),...(place?[['Место рождения',place]]:[])]):'')+
-   (thenRows.length?'<h4>При твоём рождении</h4>'+rows(thenRows):'')+
+   (thenRows.length?'<h4>При вашем рождении</h4>'+rows(thenRows):'')+ // 270: «вы» вместо «ты» в заголовке
    (nowRows.length?'<h4>Сейчас</h4>'+rows(nowRows):'')+
    (now?'<button class="small" data-person="'+esc(id)+'" onclick="personDetail(this.dataset.person)">Открыть карточку</button>':'')+'</details>';
  });

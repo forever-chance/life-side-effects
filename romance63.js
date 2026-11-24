@@ -27,7 +27,7 @@ function proposeSideRelationship63(id){
   const p=living(id);
   if(sideRelationshipReasons63(p).length)return false;
   const partnerId=currentPartner().id;
-  show('Тайные отношения · '+p.name,'Симпатия взаимна. Вы можете договориться встречаться тайно. Если партнёр узнаёт, это ударит по доверию.',[
+  show('Тайные отношения · '+p.name,'Симпатия взаимна. Вы можете договориться встречаться тайно. Если партнёр узнает, это ударит по доверию.',[ // 270: «узнает» — будущее время, ё поставил yo_fix в 268
     {label:'Начать тайные отношения',fn:()=>acceptSideRelationship63(id,partnerId)},
     {label:'Продолжить знакомство',fn:()=>relationshipMenu63(id)}
   ]);
