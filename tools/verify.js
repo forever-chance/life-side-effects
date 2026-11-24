@@ -31,7 +31,7 @@ async function page(browser, cfg) {
     if ($('#modal').open) closeModal();
     s.pending = [];
   });
-  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js', 'creative262.js', 'business263.js', 'save264.js', 'business265.js'])
+  for (const f of ['pets260.js', 'holidays260.js', 'habits261.js', 'creative262.js', 'business263.js', 'save264.js', 'business265.js', 'business266.js', 'taxes266.js'])
     if (!(await pg.evaluate(f => [...document.scripts].some(x => x.src.includes(f)), f))) await pg.addScriptTag({ path: path.join(ROOT, f) });
   return { pg, errors, ctx };
 }
@@ -322,6 +322,57 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     check('экономика дел: дело, сломанное в 263, чинится', r.repaired, r);
     check('экономика дел: кинотеатр отдаёт прокатчикам 47%', r.cinema === .47, r);
     check('экономика дел: без ошибок страницы', !errors.length, errors);
+    await ctx.close();
+  }
+
+  // 13. События своего дела и налоги (266).
+  {
+    const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'nl' });
+    const r = await pg.evaluate(() => {
+      s.age = 30; s.cash = 1e8; s.illness = null; s.pending = [];
+      startEnterprise152('services', 'Мастерская', 'repair'); const b = s.enterprise152; b.opened159 = s.clock.ticks - 30;
+      const p = { id: 'staff-t', name: 'Мира', role: 'Знакомый', alive: true, age: 30, gender: 'f', country: b.country, city18: b.city, privateCash: 0, bond: 40, memories: [], trait: ['', ''], inner: { trust: 50, affection: 50, strain: 0, desire: 0 } };
+      s.people.push(p); b.staff155 = [p.id];
+      const out = {}; const rnd = Math.random;
+      const month = () => { s.clock.ticks++; enterpriseLocationMonth168(b); };
+      Math.random = () => .001; try { month(); } finally { Math.random = rnd; }
+      out.firstEvent = s.pending.map(q => q.type);
+      out.competitorDemand = businessModifier254(b, 'demand');
+      s.pending = []; b.competitor266 = s.clock.ticks;
+      Math.random = () => .001; try { month(); } finally { Math.random = rnd; }
+      out.secondEvent = s.pending.map(q => q.type); out.rentAfterSale = enterpriseRent157(b);
+      return out;
+    });
+    check('дело: конкурент рядом — спрос ×0.82 и окно с ответами', r.firstEvent[0] === 'competitor266' && Math.abs(r.competitorDemand - .89 * .92) < 1e-9, r);
+    check('дело: продажа помещения — аренда +25% и окно выкупа', r.secondEvent[0] === 'landlord266', r);
+    await pg.evaluate(() => resolvePending());
+    let m = await pg.evaluate(modal);
+    check('дело: окно «Помещение продают» предлагает выкуп', m.title === 'Помещение продают' && m.buttons.some(b => /Выкупить помещение/.test(b)), m);
+    await pg.evaluate(click('/Выкупить помещение/'));
+    check('дело: своё помещение — аренда 0', await pg.evaluate(() => s.enterprise152.ownPremises266 && enterpriseRent157(s.enterprise152) === 0), null);
+    const leave = await pg.evaluate(() => {
+      const b = s.enterprise152; s.pending = []; b.landlord266 = 1; const rnd = Math.random;
+      Math.random = () => .001; try { s.clock.ticks++; enterpriseLocationMonth168(b); } finally { Math.random = rnd; }
+      return s.pending.map(q => q.type);
+    });
+    check('дело: ключевой сотрудник собирается уйти', leave[0] === 'staffLeave266', leave);
+    await pg.evaluate(() => resolvePending());
+    await pg.evaluate(() => { const rnd = Math.random; Math.random = () => .1; try { [...document.querySelectorAll('#modal .options button')].find(b => /прибавку/.test(b.textContent)).click(); } finally { Math.random = rnd; } });
+    const kept = await pg.evaluate(() => { const b = s.enterprise152; s.clock.ticks += 2; enterpriseLocationMonth168(b); return { staff: b.staff155.length, bonus: Object.values(b.bonus266 || {})[0], leaving: !!b.leaving266 }; });
+    check('дело: прибавка удерживает сотрудника', kept.staff === 1 && kept.bonus > 0 && !kept.leaving, kept);
+    const tax = await pg.evaluate(() => {
+      const b = s.enterprise152; s.tax266 = null; b.cash += 100000; const before = s.cash;
+      distributeEnterprise158(b, 100000); tax266().creative += 50000;
+      s.cash = 1e8; s.clock.month = s.birthMonth ?? 0; s.clock.yearDue = false; rollYear();
+      const entry = s.log.find(e => e.title === 'Итоги прожитого года');
+      const out = { text: entry?.text || '', rate: taxRate266(), base: 150000 };
+      s.tax266 = { business: 1000, creative: 0, rent: 0, arrears: 0 }; s.cash = 0; const pe = payExpense23; payExpense23 = () => false;
+      try { rollYear(); } finally { payExpense23 = pe; } out.arrears = tax266().arrears;
+      return out;
+    });
+    check('налоги: строка в итогах года с суммой с дела и гонораров', /Налог 30% с дохода \(своё дело, гонорары\): /.test(tax.text), tax);
+    check('налоги: не из чего платить — недоимка на следующий год', tax.arrears === 300, tax);
+    check('дело и налоги: без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }
 
