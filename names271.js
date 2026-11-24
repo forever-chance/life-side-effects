@@ -250,7 +250,9 @@ function motherOf271(list,father){return list.find(p=>p!==father&&(p===s?s.gende
   if(p!==s)identity256(p);
   if(p.legalSurnameParts256?.length)return [...p.legalSurnameParts256];
   const c=cultureOf271(p);
-  if(['es','mx','br','nl'].includes(c)){
+  // Добавленная в Бразилии фамилия мужа («Паола Корси Коста») детям не передаётся: у них фамилия матери — своя,
+  // иначе ребёнок выходил «Коста Коста». Так же у матери не испаноязычного происхождения.
+  if(['es','mx','br','nl'].includes(c)||p!==s&&p.marriageName271?.how==='add'){
    const pre=p===s?s.preMarriageSurname256:p.marriageName271?.prior;
    if(pre?.parts?.length&&pre.surname!==p.surname)return [...pre.parts];
   }
@@ -428,7 +430,7 @@ function takeName271(x,y,how='take'){
  const yParts=parts271(y).map(n=>genderSurname256(n,x.gender,cultureOf271(y)));
  const parts=how==='add'?[parts271(x)[0],yParts.at(-1)]:yParts;
  if(!parts.length||parts.some(n=>!n)||parts.join(joiner271(y))===x.surname)return false;
- x.marriageName271={spouse:y===s?'player':y.id,prior,tick:s.clock?.ticks??0};
+ x.marriageName271={spouse:y===s?'player':y.id,prior,tick:s.clock?.ticks??0,how};
  setPersonName256(x,x.givenName166,parts,how==='add'?' ':joiner271(y));
  x.surnameCulture271=how==='add'?prior.culture:cultureOf271(y);
  return true;

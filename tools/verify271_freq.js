@@ -14,6 +14,8 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const INDEX = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
 const BASE = process.env.BASE === '1';
 const LIVES = Number(process.env.LIVES) || 120;
+// Данные частот читаются и здесь: в BASE=1 их нет на странице, а списки эпох для проверок нужны.
+const FREQ = Function(fs.readFileSync(path.join(ROOT, 'names271-freq-data.js'), 'utf8').replace(/^'use strict';/, '') + ';return namesFreq271Data;')();
 const BEFORE = ['names271-data.js', 'names271.js'];
 const MINE = ['names271-freq-data.js', 'names271-freq.js'];
 let pass = 0, fail = 0;
@@ -131,9 +133,8 @@ async function life(pg, cfg) {
   {
     const { pg, errors, ctx } = await open(browser);
     await life(pg, { country: 'ru', gender: 'm' });
-    const r = await pg.evaluate(() => {
+    const r = await pg.evaluate(data => {
       const out = {};
-      const data = typeof namesFreq271Data === 'object' ? namesFreq271Data.countries.ru.f : {};
       const only = era => Object.entries(data).filter(([k]) => k.split(':')[1] === era).flatMap(([, v]) => v.split('|'));
       const oldOnly = new Set(only('old')), newOnly = new Set(only('new'));
       const shareAt = (y, set, n = 3000) => { F.reset(); let k = 0; for (let i = 0; i < n; i++) if (set.has(F.born(y, 'f').givenName166)) k++; return k / n; };
@@ -173,7 +174,7 @@ async function life(pg, cfg) {
         } finally { familyName166 = keep; }
       }
       return out;
-    });
+    }, FREQ.countries.ru.f);
     const pc = x => (x * 100).toFixed(1) + '%';
     check(r.old1995 < r.old1950 / 3 && Math.abs(r.old2070 - (r.old1950 + r.old2015) / 2) < .035 && r.old2070 > 1.5 * r.old2015, 'ru: с 2050 «старые» имена возвращаются — половина имён как до 1965', `только old: 1950 ${pc(r.old1950)}, 1995 ${pc(r.old1995)}, 2015 ${pc(r.old2015)}, 2070 ${pc(r.old2070)}`);
     check(Math.abs(r.new2070 - (r.new1950 + r.new2015) / 2) < .035 && r.new2070 < .8 * r.new2015, 'ru: с 2050 «новые» имена — другая половина', `только new: 1950 ${pc(r.new1950)}, 2015 ${pc(r.new2015)}, 2070 ${pc(r.new2070)}`);

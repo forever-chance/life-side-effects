@@ -384,6 +384,17 @@ async function life(pg, cfg) {
       out.kid2 = childChoices256(kid2, [c, d]).map(o => o.parts.join(o.joiner));
       return out;
     });
+    // Бразилия: мама итальянского происхождения добавила фамилию мужа («Паола Корси Коста») — ребёнок «Корси Коста», не «Коста Коста»
+    const brm = await pg.evaluate(() => {
+      const mom = T.mk('Знакомый', 30, 'f', 'br'), dad = T.mk('Знакомый', 32, 'm', 'br');
+      mom.birthCountry = dad.birthCountry = 'br'; mom.origins = ['итальянское']; dad.origins = ['бразильское'];
+      setPersonName256(mom, mom.givenName166, ['Корси'], ' '); setPersonName256(dad, dad.givenName166, ['Коррейя', 'Коста'], ' ');
+      const rnd = Math.random; Math.random = () => 0.1;
+      try { if (typeof coupleName271 === 'function') coupleName271(mom, dad, 'br'); else { setPersonName256(mom, mom.givenName166, ['Корси', 'Коста'], ' '); } } finally { Math.random = rnd; }
+      const kid = { id: 'kbr', role: 'Ребенок', gender: 'm', age: 0, country: 'br', birthCountry: 'br', alive: true };
+      return { mom: mom.surname, kid: childChoices256(kid, [dad, mom]).map(o => o.parts.join(o.joiner)) };
+    });
+    check(brm.mom === 'Корси Коста' && brm.kid[0] === 'Корси Коста' && !brm.kid.some(x => T_repeats(x)), 'Бразилия: мама добавила фамилию мужа — у ребёнка её своя фамилия и фамилия отца, без «Коста Коста»', JSON.stringify(brm));
     check(jpn.both.a === jpn.both.b && jpn.mixed.c === 'Ван' && jpn.mixed.d === 'Икэда' && jpn.kid[0] === 'Сим' && jpn.kid2[0] === 'Икэда', 'Япония: «японец» — родился в Японии (общая фамилия NPC, фамилия ребёнка), происхождение не важно', JSON.stringify(jpn));
     await life(pg, { country: 'eg', gender: 'm', startAge: '18' });
     const eg = await pg.evaluate(() => {
