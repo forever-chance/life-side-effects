@@ -141,7 +141,7 @@ async function main() {
         __click('^Снять и переехать');
         out.rent = { city: residenceCity(), kids: kids.map(k => k.city18), local: kids.map(childLocal55), cat: petAtHome183(cat), partner: p.city18, cohabit: p.cohabit, logs: __logs(8) };
         // К другу в другой город.
-        const mom = parents17().find(q => q.role === 'Мать'); mom.city18 = list[1]; mom.inner.trust = 80;
+        const mom = parents17()[0] || __adult('Мать', 66, list[1], 80, 'f'); mom.city18 = list[1]; mom.inner.trust = 80;
         const friend = __adult('Друг', 40, list[3], 70, 'm');
         moveHome('host', list[0], 'suburb', null, friend.id);
         ensureUX();
@@ -221,16 +221,15 @@ async function main() {
     {
       const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'de' });
       const r = await pg.evaluate(() => {
-        const mom = parents17().find(p => p.role === 'Мать'), dad = parents17().find(p => p.role === 'Отец');
-        mom.privateCash = c().cost * 2; if (dad) dad.privateCash = 0;
+        const mom = parents17()[0];
+        for (const q of parents17()) q.privateCash = 0;
+        mom.privateCash = c().cost * 2;
         const age0 = s.age; s.age = 17;
         const R = Math.random; Math.random = () => 0.01;
         let asked; try { asked = askParent67('dog'); } finally { Math.random = R; }
         s.age = age0; s.cash = 50000; s.clock.running = false; s.pending = []; if ($('#modal').open) closeModal();
         const dog = s.pets.find(p => p.kind === 'dog');
         const out = { asked, mode: s.housing.mode, keeper: dog && petHousehold183(dog).keeper === mom.id, atHome: dog && petAtHome183(dog), live: livePets57().map(p => p.id).includes(dog?.id) };
-        // Мама и папа заняты и перегружены — помочь некому.
-        for (const q of parents17()) q.inner.strain = 95;
         let before = travel52().trips.map(t => t.id);
         const d = __trip(0);
         out.draftPets = journeyDraft57(d).journey57.pets.length;
@@ -238,6 +237,8 @@ async function main() {
         out.booked = bookTravel52(d);
         let t = __newTrip(before);
         out.plan = { pets: t?.journey57?.pets?.length, extra: t?.journey57?.quote?.extra57, fee: t?.fee };
+        // К отъезду родители перегружены — дома за собакой смотреть некому.
+        for (const q of parents17()) q.inner.strain = 95;
         __month(2);
         out.trip = { status: t?.status, hold: t?.hold57?.reason || null };
         // Старая отложенная поездка, в плане которой уже лежит мамина собака.
@@ -280,7 +281,7 @@ async function main() {
         moveHome('rent', list[0], 'center');
         for (const q of parents17()) { q.age = 62; q.city18 = list[3]; q.inner.trust = 80; q.inner.strain = 5; }
         const kids = [5, 10].map(a => __kid(a, ['player']));
-        const mom = parents17().find(q => q.role === 'Мать');
+        const mom = parents17()[0] || __adult('Мать', 62, list[3], 80, 'f');
         const out = {};
         // «Отпуск дома» не требует присмотра.
         out.stay = travelWhy52({ country: s.country, city: residenceCity(), days: 7, comfort: 'standard', stayHome86: true, party53: [], pay53: 'all' });
@@ -292,7 +293,7 @@ async function main() {
         const R = Math.random; Math.random = () => 0.01;
         try {
           travelDraftMenu52(d);
-          for (const k of kids) { __click('^Присмотр за детьми'); __click('^' + k.name + '$|^' + k.name); __click('^' + mom.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' · Мать'); }
+          for (const k of kids) { __click('^Присмотр за детьми'); __click('^' + k.name + '$|^' + k.name); __click('^' + mom.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' · ' + mom.role); }
         } finally { Math.random = R; }
         out.draft = __modal();
         const before = travel52().trips.map(t => t.id);
@@ -351,7 +352,7 @@ async function main() {
       check('няня: договор с няней закрывает присмотр', r.hired.every(Boolean) && r.booked && !r.why.some(w => /присмотр/i.test(w)), r);
       check('няня: поездка с няней по договору уезжает и не откладывается каждый месяц', r.contract.states.some(x => /^(away|completed)$/.test(x)) && !r.contract.states.some(x => /hold/.test(x)), r.contract);
       check('няня: без няни поездка ждёт присмотра', r.why2.some(w => /присмотр/i.test(w)), r.why2);
-      check('няня: в меню присмотра есть няня на время поездки с ценой', r.careMenu.buttons.some(b => /^Няня для всех · 2/.test(b) && /\d/.test(b)), r.careMenu);
+      check('няня: в меню присмотра есть няня на время поездки с ценой', r.careMenu.buttons.some(b => /^Няня для всех детей/.test(b) && /\d/.test(b)), r.careMenu);
       check('няня: с няней на время поездки можно запланировать', !!r.planned, r.afterSitter);
       check('няня: поездка уехала, няня оплачена при отъезде', ['away', 'completed'].includes(r.sitter.status) && r.sitter.paid > 0 && r.sitter.paid === r.sitter.fee, r.sitter);
       check('няня: без ошибок страницы', !errors.length, errors);

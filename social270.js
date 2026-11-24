@@ -37,8 +37,8 @@ function nearSoc270(p){return !!(p?.alive&&p.country===s.country&&(!p.city18||p.
 
 // ---------- а) свадьбы близких ----------
 const weddingChanceSoc270=1/30;   // в месяц для пары, которая вместе от года
-const tieRolesSoc270=['Мать','Отец','Бабушка','Дедушка','Брат','Сестра','Тетя','Тётя','Дядя','Сын','Дочь','Ребенок','Ребёнок',
- 'Внук','Внучка','Племянник','Племянница','Родственник'];
+// Роли родни, которые roleGenitive268 склоняет: «муж сестры», «жена сына».
+const tieRolesSoc270=kinRoles27.filter(r=>r!=='Потомок');
 
 weddingEligible132=function(host){
  if(!host?.alive||host.npcMarried54||host.age<20||typeof npcPartner55!=='function')return false;

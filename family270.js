@@ -70,14 +70,15 @@ function familyCohabitant270(){
  return q||null;
 }
 
-function familyMoveLine270(kind=''){
- if(!s||s.dead||s.age<18)return '';
+function familyMoveParts270(kind=''){
+ if(!s||s.dead||s.age<18)return [];
  const parts=[],kids=ownChildren55().filter(childLocal55).map(p=>p.name),pets=livePets57().map(p=>p.name),stay=familyCohabitant270();
  if(kids.length)parts.push('С вами переезжают дети: '+kids.join(', ')+'.');
  if(pets.length&&kind!=='abroad')parts.push('Ваши питомцы тоже: '+pets.join(', ')+'.');
  if(stay&&stay.id!==kind)parts.push(stay.name+' остаётся по прежнему адресу: жить вместе вы перестанете.');
- return parts.join(' ');
+ return parts;
 }
+function familyMoveLine270(kind=''){return familyMoveParts270(kind).join(' ');}
 
 // Кнопки, после которых игрок переезжает. В окне подтверждения дописываем, кто едет и кто остаётся.
 const familyMoveLabels270={'Снять и переехать':'','Переехать сюда':'','Согласиться и переехать':'','Запланировать переезд':'abroad',
@@ -147,12 +148,14 @@ function familyHouseholdPerson270(id){
  const p=living(id);if(!p)return householdMenu();
  const h=s.housing,city=personCity62(p),here=residenceCity(),local=city===here,trust=p.inner?.trust??0;
  const parent=['Мать','Отец'].includes(p.role),hosted=['parents','host'].includes(h.mode);
- const line=familyMoveLine270(p.id);
+ const parts=familyMoveParts270(p.id);
+ if(parts.length&&/^(С вами|Ваши)/.test(parts[0]))parts[0]=parts[0][0].toLowerCase()+parts[0].slice(1);
+ const line=parts.length?'Если переедете вы, '+parts.join(' '):'';
  const text=trust<45?'Сейчас человек не готов жить вместе.':
   local?'Человек готов обсудить совместный быт. Расходы и свободное время изменятся.':
   p.name+' живёт в другом городе: '+city+'. Жить вместе получится, только если кто-то из вас переедет.';
  const why=local?'':followWhy61(p,familyDestination61());
- show('Обсудить совместную жизнь · '+p.name,text+(line&&trust>=45?'\nЕсли переедете вы: '+line:''),[
+ show('Обсудить совместную жизнь · '+p.name,text+(line&&trust>=45?'\n'+line:''),[
   local?{label:'Пригласить к себе',disabled:trust<45||!!h.occupant||hosted,fn:()=>familyInviteHere270(p.id)}:
    {label:'Пригласить переехать к себе',hint:hosted?'Сначала нужно своё жильё':why||'Три месяца · '+money(c().cost*.1)+' · нужно согласие',
     disabled:trust<45||hosted||!!h.occupant&&h.occupant!==p.id,fn:()=>familyMoveMenu61(p.id)},
@@ -458,7 +461,7 @@ childcareMenu86=function(d){
  const kids=familyCareKids270(d),open=kids.filter(p=>!familyCareFor270(p,d)),fee=familySitterFee270(d);
  show('С кем останутся дети',kids.length?'На время поездки рядом с детьми младше 12 лет должен быть взрослый.'+(fee?' Няня: '+money(fee)+' за поездку, оплата при отъезде.':''):'Присмотр не нужен: дети едут с вами или уже под присмотром.',[
   ...kids.map(p=>{const care=familyCareFor270(p,d);return {label:p.name,hint:care?care.label:'Нужно договориться',fn:()=>familyChildCareMenu270(d,p.id)};}),
-  ...(open.length>1?[{label:'Няня для всех · '+open.length,hint:money(familySitterFee270(d,familySitterKids270(d).length+open.length)-fee)+' · оплата при отъезде',fn:()=>familySetSitter270(d,open.map(p=>p.id))}]:[]),
+  ...(open.length>1?[{label:'Няня для всех детей',hint:money(familySitterFee270(d,familySitterKids270(d).length+open.length)-fee)+' · оплата при отъезде',fn:()=>familySetSitter270(d,open.map(p=>p.id))}]:[]),
   {label:'Уход за детьми: няня, лагеря, помощь близких',fn:childcareMenu54},
   {label:'Вернуться к поездке',fn:()=>returnTravel86(d)}
  ]);
