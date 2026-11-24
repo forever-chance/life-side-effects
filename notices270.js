@@ -7,12 +7,12 @@
 // 2. Ребёнок не получает просьб об уходе за пожилыми: до 16 лет помощь берёт на себя взрослый родственник,
 //    в 16–17 — одно уведомление и необязательная лёгкая помощь, с 18 — как раньше, но с «Не сейчас».
 // 3. Наследство несовершеннолетнего принимает опекун; деньги и доли ждут 18 лет, отказа за ребёнка нет.
-// 4. Помощь родителей на жизнь: «Справлюсь сам» — повтор не раньше чем через год.
-// 5. Старые счета: «×» откладывает на 3 месяца, окно после отсрочки само не открывается, автоигра не останавливается.
+// 4. Помощь родителей на жизнь: «Справлюсь сам(а)» — повтор не раньше чем через год, но передумать можно в меню.
+// 5. Старые счета: «×» откладывает на 3 месяца, первое напоминание после отсрочки не открывает окно и не останавливает автоигру.
 // 6. До 12 лет лечение выбирают родители, поездка родителей — семейная, без виз, дороги и питомцев.
 // 7. Возрастные причины в «Найти действие», тексты: «Тяжесть в игровой модели», «от тебя потребуется».
 const notices270Base={decisionItems24,quickDismiss59,dismissKind59,quickCard59,elderCareMonth58,elderCareAvailable58,elderMenu58,
- schedule23,prepareEstate58,respondEstate58,estatesMonth58,estateCaseMenu58,livingOffer68,livingMenu68,checkBills61,
+ schedule23,prepareEstate58,respondEstate58,estatesMonth58,estateCaseMenu58,livingOffer68,livingMenu68,agreeLiving68,checkBills61,repayMenu61,
  travelInviteMenu53,offerTravel53,healthMenu,autonomousMonth,incidentMenu56,actionCatalog24};
 const snoozeMonths270=3;
 
@@ -21,7 +21,6 @@ function topic270(ref,q){
  const k=ref?.kind;
  if(k==='elder58')return q?.person?'elder58:'+q.person:null;
  if(k==='life61')return q?.type==='bills'?'life61:bills':null;
- if(k==='local99')return q?.title?'local99:'+(q.country||'')+':'+q.title:null;
  if(k==='tripInvite53')return q?.host?'tripInvite53:'+q.host:null;
  if(k==='health58'||k==='recovery86'){
   if(ref.id==='illness')return 'health:illness:'+(s.lastIllnessTick??s.illness?.name??'');
@@ -38,17 +37,22 @@ function pruneSnoozed270(){
  const z=s?.notices59?.snoozed;if(!z||!s.clock)return;
  for(const k of Object.keys(z))if(!(z[k]>s.clock.ticks))delete z[k];
 }
-// Решения с собственным сроком (документы на пребывание, суд) возвращаются заранее, даже если скрыты на 3 месяца.
-function snoozeUntil270(ref,q){
+// У многих решений свой срок (аренда, события дела, приглашения, суд, документы на пребывание): скрытый пункт
+// возвращается не позже чем за месяц до него (документы — за три), чтобы ответить можно было до последствий по умолчанию.
+function snoozeUntil270(ref,q,item=null){
  const t=s.clock.ticks;let end=t+snoozeMonths270,deadline=null,margin=1;
- if(ref.kind==='court94')deadline=q?.due;
  if(ref.kind==='safety68'){
   margin=3;
   deadline=q?.type==='family'?safety68().family[q.country]?.expires:q?.type==='study'?path16().permits.find(p=>p.documentId45===q.document)?.expires:null;
+ }else{
+  const list=[item?.expires,q?.expires,ref.kind==='court94'?q?.due:null].filter(Number.isFinite);
+  if(list.length)deadline=Math.min(...list);
  }
  if(Number.isFinite(deadline))end=Math.min(end,deadline-margin);
  return Math.max(t+1,end);
 }
+function decisionItem270(ref){return notices270Base.decisionItems24().find(i=>i.ref.kind===ref.kind&&i.ref.id===ref.id)||null;}
+function declineWord270(){return s?.gender==='f'?'Справлюсь сама':'Справлюсь сам';}
 function familyTripInvite270(q){return !!q&&s.age<12&&q.status==='offered'&&['Мать','Отец'].includes(living(q.host)?.role);}
 decisionItems24=function(){
  const all=notices270Base.decisionItems24();
@@ -64,9 +68,9 @@ decisionItems24=function(){
   }
   if(snoozed270(i.ref,i.q))continue;
   if(k==='elder58'&&!elderRequestVisible270(i.q))continue;
-  if(k==='elder58'&&i.q.teen270)i={...i,note:'Можно навещать и помогать по мелочи'};
+  if(k==='elder58'&&i.q.teen270){const p=living(i.q.person);i={...i,note:p&&elderLocal58(p)?'Можно навещать и помогать по мелочи':'Живёт далеко — можно звонить и приезжать в гости'};}
   if(k==='estate58'&&s.age<18)continue;
-  if(k==='tripInvite53'&&familyTripInvite270(i.q))i={...i,title:'Семейная поездка · '+i.q.draft.city,note:'Поехать с семьёй или остаться дома'};
+  if(k==='tripInvite53'&&familyTripInvite270(i.q))i={...i,title:'Семейная поездка · '+i.q.draft.city,note:'Поехать или остаться дома'};
   out.push(i);
  }
  return out;
@@ -76,26 +80,28 @@ dismissKind59=function(ref){
  if(!mode)return mode;
  return ['elder58','living68','local99'].includes(ref?.kind)?'decline':mode;
 };
-function dismissLabel270(ref,mode){
+function dismissLabel270(ref,mode,item=null){
  const q=decisionRecord24(ref);
  if(ref.kind==='elder58')return q?.teen270?'Прочитано':'Не сейчас';
- if(ref.kind==='living68')return 'Справлюсь сам';
+ if(ref.kind==='living68')return declineWord270();
  if(ref.kind==='local99')return 'Пропустить';
  if(ref.kind==='tripInvite53'&&familyTripInvite270(q))return 'Остаться дома';
  if(mode==='decline')return 'Отказаться';
  if(ref.kind==='life61'&&q&&!['bills','bookReady'].includes(q.type))return 'Убрать из списка';
- return 'Скрыть на 3 месяца';
+ if(ref.kind==='life61'&&q?.type==='bills')return 'Скрыть на 3 месяца';
+ const left=snoozeUntil270(ref,q,item)-s.clock.ticks;
+ return left>=snoozeMonths270?'Скрыть на 3 месяца':left<=1?'Напомнить в следующем месяце':'Напомнить ближе к сроку';
 }
 quickCard59=function(i){
  const html=notices270Base.quickCard59(i),mode=dismissKind59(i.ref);
  if(!mode)return html;
- const old=mode==='decline'?'Отказаться':'Напомнить в следующем месяце',label=esc(dismissLabel270(i.ref,mode));
+ const old=mode==='decline'?'Отказаться':'Напомнить в следующем месяце',label=esc(dismissLabel270(i.ref,mode,i));
  return html.replace('aria-label="'+old+':','aria-label="'+label+':').replace('title="'+old+'"','title="'+label+'"');
 };
 quickDismiss59=function(kind,id){
  const ref={kind,id},mode=dismissKind59(ref);
  if(!mode||!s||s.dead)return false;
- const q=decisionRecord24(ref),topic=topic270(ref,q);
+ const q=decisionRecord24(ref),topic=topic270(ref,q),item=mode==='snooze'?decisionItem270(ref):null;
  if(kind==='elder58')return declineElder270(q?.person,q);
  if(kind==='living68')return declineLiving270();
  if(kind==='local99'){const ok=localChoice99(id,'skip');if(ok)render();return ok;}
@@ -103,7 +109,7 @@ quickDismiss59=function(kind,id){
  if(kind==='tripInvite53'&&familyTripInvite270(q))return familyTripStay270(id);
  const ok=notices270Base.quickDismiss59(kind,id);
  if(!ok)return ok;
- const z=notices59().snoozed,until=snoozeUntil270(ref,q);
+ const z=notices59().snoozed,until=snoozeUntil270(ref,q,item);
  if(mode==='snooze'){
   if(topic&&(kind==='health58'||kind==='recovery86'))delete z[kind+':'+id];
   else z[kind+':'+id]=until;
@@ -128,11 +134,18 @@ function elderFamilyHelper270(p){
  const rank=q=>(['Мать','Отец'].includes(q.role)?0:(p.bio27?.children||[]).includes(q.id)||(q.bio27?.parents||[]).includes(p.id)?1:2);
  return pool.sort((a,b)=>rank(a)-rank(b)||elderCareLoad270(a.id)-elderCareLoad270(b.id))[0]||null;
 }
+// Договорённость, которую семья заключила, пока игрок был младше, продлевается и после 18 лет, пока помощник может
+// помогать: иначе все такие договорённости истекали в один месяц через полгода после совершеннолетия.
+function renewFamilyCare270(p,a){
+ const care=a.care;
+ if(!a.need||care?.status!=='active'||!care.family270||care.mode!=='relative'||!elderCareAvailable58(p,care))return false;
+ care.until=s.clock.ticks+6;care.hours=a.need;return true;
+}
 function familyCare270(p,a){
  if(!a.need||!p.alive||!kin27(p))return null;
  const t=s.clock.ticks,care=a.care;
  if(care?.status==='active'&&care.family270){
-  if(care.mode==='relative'&&elderCareAvailable58(p,care)){care.until=t+6;care.hours=a.need;return care;}
+  if(renewFamilyCare270(p,a))return care;
   if(care.mode==='serviceSelf')return care;
  }
  if(care?.status==='active'&&!care.family270)return care;
@@ -153,7 +166,7 @@ elderCareAvailable58=function(p,care){
  if(care===undefined)care=agingPerson58(p).care;
  if(care?.family270&&care.mode==='relative'&&care.status==='active'){
   const h=living(care.helper);
-  return !!(p.alive&&h&&h.age>=18&&!h.aging58?.need&&care.until>=s.clock.ticks);
+  return !!(p.alive&&h&&h.age>=18&&!h.aging58?.need&&(!h.country||h.country===p.country)&&care.until>=s.clock.ticks);
  }
  return notices270Base.elderCareAvailable58(p,care);
 };
@@ -167,7 +180,7 @@ elderCareMonth58=function(p){
  if(minor){
   familyCare270(p,a);
   for(const q of z.requests)if(q.person===p.id&&q.status==='offered'&&!q.teen270)q.status='expired';
- }
+ }else if(!s.dead)renewFamilyCare270(p,a);
  // Не больше одной новой просьбы в месяц: бабушки и дедушки не просят хором каждые 12 месяцев.
  const block=minor||z.lastNew270===t,last=a.lastRequest,count=z.requests.length;
  if(block)a.lastRequest=t;
@@ -188,7 +201,7 @@ function teenElderNotice270(p,a){
  a.teenNotice270=t;z.lastTeen270=t;
  const q={id:id16('elder-request'),person:p.id,status:'offered',created:t,expires:t+6,title:p.name+': нужна помощь в быту',teen270:true};
  z.requests.push(q);
- log(q.title,(helper?'Основную помощь взяла на себя семья: '+helper.name+'. ':care?.status==='active'?'Помощника уже нашли. ':'Взрослые ищут, кто будет помогать. ')+'Можно навещать и помогать по мелочи — 2 ч/нед.','Семья',true,{kind:'elder58',id:q.id});
+ log(q.title,(helper?'Основную помощь взяла на себя семья: '+helper.name+'. ':care?.status==='active'?'Помощника уже нашли. ':'Взрослые ищут, кто будет помогать. ')+(elderLocal58(p)?'Можно навещать и помогать по мелочи — 2 ч/нед.':'Живёт далеко — можно звонить и приезжать в гости.'),'Семья',true,{kind:'elder58',id:q.id});
  return q;
 }
 function declineElder270(person,q=null){
@@ -230,7 +243,7 @@ elderMenu58=function(id){
    const extra=[];
    if(a.need&&s.age>=16)extra.push(a.light270
     ?{label:'Перестать навещать',fn:()=>setLightHelp270(id,false)}
-    :{label:'Навещать и помогать по мелочи · 2 ч/нед.',hint:'Без денег и договоров · доверие растёт',disabled:!elderLocal58(p)||capacity()-totalHours()<2,fn:()=>setLightHelp270(id,true)});
+    :{label:'Навещать и помогать по мелочи · 2 ч/нед.',hint:!elderLocal58(p)?'Живёт далеко':capacity()-totalHours()<2?'Не хватает свободных часов':'Без денег и договоров · доверие растёт',disabled:!elderLocal58(p)||capacity()-totalHours()<2,fn:()=>setLightHelp270(id,true)});
    if(offered.some(q=>q.teen270))extra.push({label:'Прочитано',fn:()=>declineElder270(id)});
    list=[...extra,...tail];
   }else{
@@ -246,6 +259,8 @@ elderMenu58=function(id){
 
 // ---------- 3. Наследство несовершеннолетнего ----------
 const guardianWord270={Мать:'мама',Отец:'папа',Бабушка:'бабушка',Дедушка:'дедушка',Тетя:'тётя',Тётя:'тётя',Дядя:'дядя',Брат:'брат',Сестра:'сестра'};
+const guardianFemale270=['Мать','Бабушка','Тетя','Тётя','Сестра'];
+function guardianText270(g){return g?(guardianWord270[g.role]||'опекун')+' — '+g.name:'опекун';}
 function estateGuardian270(q){
  const adults=s.people.filter(p=>p.alive&&p.age>=18&&p.id!==q.person);
  return adults.find(p=>['Мать','Отец'].includes(p.role))||adults.filter(kin27).sort((a,b)=>(b.bond||0)-(a.bond||0))[0]||null;
@@ -255,8 +270,7 @@ function holdEstate270(q){
  if(!h)return false;
  const g=estateGuardian270(q),cash=(q.distributable??q.cash??0)*h.share;
  Object.assign(h,{status:'accepted',held270:true,guardian270:g?.id||null,cash,heldAt270:s.clock.ticks});
- const who=g?(guardianWord270[g.role]||'опекун')+' — '+g.name:'опекун';
- log('Наследство · '+q.name,'Ваша доля — '+Math.round(h.share*100)+'%: '+money(localAmount16(cash,q.country))+' и доли имущества. До 18 лет её хранит '+who+', потом всё перейдёт к вам.','Семья',true);
+ log('Наследство · '+q.name,'Ваша доля — '+Math.round(h.share*100)+'%: '+money(localAmount16(cash,q.country))+(q.claims?.length?' и доли имущества':'')+'. До 18 лет её хранит '+guardianText270(g)+', потом всё перейдёт к вам.','Семья',true);
  return true;
 }
 function releaseEstates270(){
@@ -269,7 +283,8 @@ function releaseEstates270(){
   h.released270=s.clock.ticks;
   if(!ok){h.status='accepted';continue;}
   n++;
-  log('Наследство перешло к вам',q.name+': '+money(localAmount16(h.cash,q.country))+' и ваши доли имущества. До 18 лет их хранил опекун.','Имущество',true);
+  const g=h.guardian270?s.people.find(p=>p.id===h.guardian270):null;
+  log('Наследство перешло к вам',q.name+': '+money(localAmount16(h.cash,q.country))+(q.claims?.length?' и ваши доли имущества':'')+'. До 18 лет долю '+(g&&guardianFemale270.includes(g.role)?'хранила ':'хранил ')+guardianText270(g)+'.','Имущество',true);
  }
  if(n){save();render();}
  return n;
@@ -308,7 +323,7 @@ estateCaseMenu58=function(id){
   if(s.age<18||h?.held270&&h.released270==null){
    list=opts.filter(o=>!/^(Принять свою долю|Отказаться от своей доли)$/.test(o.label));
    const g=h?.held270&&living(h.guardian270);
-   if(h?.held270)nextDetail20?.sections?.[0]?.rows.push(fact20('До 18 лет долю хранит',g?(guardianWord270[g.role]||'опекун')+' — '+g.name:'опекун'));
+   if(h?.held270)nextDetail20?.sections?.[0]?.rows.push(fact20('До 18 лет долю хранит',guardianText270(g||null)));
   }
   return old(title,text,list,...rest);
  };
@@ -326,11 +341,21 @@ function declineLiving270(){
  q.status='declined';q.declined270=s.clock.ticks;
  save();render();return true;
 }
+function livingDeclined270(){const q=s&&students68().offer;return q?.status==='declined'&&q.declined270!=null?q:null;}
+// После отказа передумать можно в любой момент: кнопка в меню снова открывает предложение.
+agreeLiving68=function(...args){
+ const q=livingDeclined270();
+ if(q)q.status='offered';
+ const ok=notices270Base.agreeLiving68(...args);
+ if(q&&!ok&&q.status==='offered')q.status='declined';
+ return ok;
+};
 livingMenu68=function(){
- const old=show,q=livingOffer68();
+ const old=show,q=livingOffer68(),declined=livingDeclined270();
  show=function(title,text,opts,...rest){
-  const list=q?[...opts.slice(0,1),{label:'Справлюсь сам',hint:'Предложение вернётся не раньше чем через 12 мес.',fn:declineLiving270},...opts.slice(1)]:opts;
-  return old(title,text,list,...rest);
+  const note=declined?String(text??'').replace('Нужно один раз принять регулярную помощь.','Вы отказались от регулярной помощи. Если передумаете, договориться можно здесь.'):text;
+  const list=q?[...opts.slice(0,1),{label:declineWord270(),hint:'Предложение вернётся не раньше чем через 12 мес.',fn:declineLiving270},...opts.slice(1)]:opts;
+  return old(title,note,list,...rest);
  };
  try{return notices270Base.livingMenu68();}finally{show=old;}
 };
