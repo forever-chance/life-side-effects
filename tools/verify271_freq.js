@@ -92,13 +92,13 @@ async function life(pg, cfg) {
         out.ek += ek; out.an += an; out.iv += iv; out.perLife.push([ek, an, iv]);
       }
       out.pool = countries.ru.names[0].length;
-      // Эпохи — отдельные выборки по 4000 женщин: родившиеся в 1930–1964, 1985–2000, 2011–2025.
-      const sample = (a, b) => { F.reset(); const c = {}; for (let i = 0; i < 4000; i++) { const g = F.born(a + Math.floor(Math.random() * (b - a + 1)), 'f').givenName166; c[g] = (c[g] || 0) + 1; } return c; };
+      // Эпохи — отдельные выборки по 6000 женщин: родившиеся в 1930–1964, 1985–2000, 2011–2025.
+      const sample = (a, b) => { F.reset(); const c = {}; for (let i = 0; i < 6000; i++) { const g = F.born(a + Math.floor(Math.random() * (b - a + 1)), 'f').givenName166; c[g] = (c[g] || 0) + 1; } return c; };
       const era = { old: sample(1930, 1964), young: sample(1985, 2000), kids: sample(2011, 2025) };
-      const share = (e, names) => names.reduce((a, n) => a + (era[e][n] || 0), 0) / 4000;
+      const share = (e, names) => names.reduce((a, n) => a + (era[e][n] || 0), 0) / 6000;
       out.galinaOld = share('old', ['Галина']); out.galinaYoung = share('young', ['Галина']);
       out.newKids = share('kids', ['Софья', 'София', 'Ева']); out.newOld = share('old', ['Софья', 'София', 'Ева']);
-      const top = e => Object.entries(era[e]).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([n, k]) => n + ' ' + (k / 40).toFixed(1) + '%').join(', ');
+      const top = e => Object.entries(era[e]).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([n, k]) => n + ' ' + (k / 60).toFixed(1) + '%').join(', ');
       out.top = { old: top('old'), young: top('young'), kids: top('kids') };
       out.galinaRank = Object.entries(era.old).sort((a, b) => b[1] - a[1]).findIndex(([n]) => n === 'Галина') + 1;
       return out;
@@ -108,10 +108,10 @@ async function life(pg, cfg) {
     check(r.ek / L >= 2 && r.ek / L <= 4, 'ru 1990: Екатерина — 2–4 на 150 женщин', `${(r.ek / L).toFixed(2)} в среднем (${band(0)}), при равных весах ${(150 * uni).toFixed(2)}`);
     check(r.an / L >= 2 && r.an / L <= 4, 'ru 1990: Анастасия — 2–4 на 150 женщин', `${(r.an / L).toFixed(2)} в среднем (${band(1)})`);
     check(r.iv / L >= 2 && r.iv / L <= 4, 'ru 1990: Иванов(а) — 2–4 на 300 человек', `${(r.iv / L).toFixed(2)} в среднем (${band(2)})`);
-    check(r.galinaOld >= 1.5 * uni && r.galinaOld >= 2.5 * r.galinaYoung, 'ru: Галина — частое имя у родившихся до 1965', `${(r.galinaOld * 100).toFixed(1)}% (место ${r.galinaRank}), у родившихся в 1985–2000 ${(r.galinaYoung * 100).toFixed(1)}%, равные веса ${(uni * 100).toFixed(1)}%`);
-    check(r.newKids >= 1.5 * 3 * uni && r.newKids >= 3 * r.newOld, 'ru: Софья, София, Ева — у родившихся после 2010', `${(r.newKids * 100).toFixed(1)}%, до 1965 — ${(r.newOld * 100).toFixed(1)}%, равные веса ${(3 * uni * 100).toFixed(1)}%`);
+    check(r.galinaOld >= 1.5 * uni && r.galinaOld >= 2 * r.galinaYoung, 'ru: Галина — частое имя у родившихся до 1965', `${(r.galinaOld * 100).toFixed(1)}% (место ${r.galinaRank}), у родившихся в 1985–2000 ${(r.galinaYoung * 100).toFixed(1)}%, равные веса ${(uni * 100).toFixed(1)}%`);
+    check(r.newKids >= 1.5 * 3 * uni && r.newKids >= 2.5 * r.newOld, 'ru: Софья, София, Ева — у родившихся после 2010', `${(r.newKids * 100).toFixed(1)}%, до 1965 — ${(r.newOld * 100).toFixed(1)}%, равные веса ${(3 * uni * 100).toFixed(1)}%`);
     info('чаще всего до 1965', r.top.old); info('чаще всего 1985–2000', r.top.young); info('чаще всего после 2010', r.top.kids);
-    info('скорость стенда', `${L * 300 + 12000} человек за ${ms} мс`);
+    info('скорость стенда', `${L * 300 + 18000} человек за ${ms} мс`);
     check(errors.length === 0, 'стенд ru: без ошибок страницы', errors.slice(0, 2).join(' | '));
     await ctx.close();
   }

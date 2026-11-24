@@ -262,7 +262,8 @@ def build(d, write=True):
                     c.notes['surnames'].append('добавлена из таблицы долей: ' + name)
             c.shares = [[n, round(v, 3)] for n, v in shares]
             if len(final['surnames']) <= len(shares):
-                c.notes['surnames'].append('все фамилии страны — из таблицы долей')
+                # names271.js раздаёт остаток до 100% поровну на хвост таблицы (доля < 1%), частые — как в таблице
+                c.notes['surnames'].append('все фамилии страны — из таблицы долей; остаток до 100% игра раздаёт хвосту (доля < 1%)')
             c.notes['surnames'].append('доли: ' + ('surnameOrder' if from_order else 'запасная таблица сборщика') +
                                        f' ({len(shares)} фамилий, {round(sum(v for _, v in shares), 1)}%)')
         # питомцы

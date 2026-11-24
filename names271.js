@@ -250,8 +250,8 @@ function motherOf271(list,father){return list.find(p=>p!==father&&(p===s?s.gende
   if(p!==s)identity256(p);
   if(p.legalSurnameParts256?.length)return [...p.legalSurnameParts256];
   const c=cultureOf271(p);
-  // Добавленная в Бразилии фамилия мужа («Паола Корси Коста») детям не передаётся: у них фамилия матери — своя,
-  // иначе ребёнок выходил «Коста Коста». Так же у матери не испаноязычного происхождения.
+  // Добавленная в Бразилии фамилия мужа («Паола Корси Коста») детям не передаётся: от матери идёт её собственная
+  // фамилия, даже если культура фамилии у неё своя (итальянская семья в Бразилии), — иначе ребёнок выходил «Коста Коста».
   if(['es','mx','br','nl'].includes(c)||p!==s&&p.marriageName271?.how==='add'){
    const pre=p===s?s.preMarriageSurname256:p.marriageName271?.prior;
    if(pre?.parts?.length&&pre.surname!==p.surname)return [...pre.parts];
@@ -607,8 +607,8 @@ let teen271=null;
    if(!q.gender271)q.gender271=names271.meta.get(q.name)?.gender||genderByName271(q.name,s.country);
    const keep=show;
    show=function(title,text,opts,...rest){
-    show=keep;
     const mine=Array.isArray(opts)&&String(text||'').includes(q.name);
+    if(mine)show=keep;
     const wrapped=mine?opts.map(o=>o&&typeof o.fn==='function'?{...o,fn:function(...a){teen271={q};try{return o.fn.apply(this,a);}finally{teen271=null;}}}:o):opts;
     return keep.call(this,title,text,wrapped,...rest);
    };
