@@ -201,7 +201,7 @@ function rederive271(p){
   if(!p.givenName166&&text){const g=parseGiven271(text,country,p.gender);if(g)p.givenName166=g;}
   const r=base(p);
   // Старое сохранение: порядок слов не переворачиваем («Чжан Цзе» у мигранта во втором поколении остаётся как было).
-  if(text&&p.name!==text&&text.split(' ').sort().join(' ')===p.name.split(' ').sort().join(' '))p.name=text;
+  if(names271.loading&&text&&p.name!==text&&text.split(' ').sort().join(' ')===p.name.split(' ').sort().join(' '))p.name=text;
   return r;
  };
 }
@@ -258,8 +258,11 @@ function childChoiceList271(child,parents){
  if(rule==='jp'){
   const shared=second&&parts271(first).join(' ')===parts271(second).join(' ');
   if(shared)add('Общая фамилия семьи',conv(parts271(first),first),joiner271(first),first);
-  add(label(first),conv(pp(first),first),joiner271(first),first);
-  if(second)add(label(second),conv(pp(second),second),joiner271(second),second);
+  // Ребёнок японца и иностранца записан на японского родителя — его фамилия первой.
+  const jpParent=second&&[first,second].filter(p=>cultureOf271(p)==='jp');
+  const order=jpParent?.length===1?[jpParent[0],jpParent[0]===first?second:first]:[first,second];
+  add(label(order[0]),conv(pp(order[0]),order[0]),joiner271(order[0]),order[0]);
+  if(order[1])add(label(order[1]),conv(pp(order[1]),order[1]),joiner271(order[1]),order[1]);
   return out;
  }
  if(['es','br'].includes(rule)&&second){
@@ -371,6 +374,7 @@ function dedupeFamily271(p){
  assignFamilyName166=function(p,country,origin){
   const r=assign(p,country,origin);
   try{
+   delete p.nameStyle271;
    if((p.birthCountry||country)==='eg'&&(p.country||country)==='eg'&&egOrigin271({origins:[origin]})){
     setPersonName256(p,p.givenName166,egChainParts271(),' ');p.nameStyle271='chain';p.birthSurname256=p.surname;
     if(typeof dedupeGiven270==='function')dedupeGiven270(p);
@@ -403,6 +407,8 @@ function coupleName271(a,b,country,old=false){
  if(a.gender!==b.gender){
   const wife=a.gender==='f'?a:b,husband=wife===a?b:a;
   if(jp)return takeName271(...(Math.random()<.95?[wife,husband]:[husband,wife]))?wife:null;
+  // В Японии в браке с иностранцем каждый сохраняет свою фамилию.
+  if(country==='jp')return null;
   if(Math.random()>=rate)return null;
   return takeName271(wife,husband,country==='br'?'add':'take')?wife:null;
  }
@@ -416,6 +422,13 @@ function restoreName271(x){
  delete x.marriageName271;
  return true;
 }
+// Вместе: общий союз в семейном древе или брак NPC с этим же человеком.
+function together271(p,sp){
+ if(!p||!sp)return false;
+ if(s.family27?.unions?.some(u=>u.status==='together'&&[u.a,u.b].includes(p.id)&&[u.a,u.b].includes(sp.id)))return true;
+ return !!(p.npcMarried54&&sp.npcMarried54&&((typeof spouseSoc270==='function'&&spouseSoc270(p)===sp)||p.agency55?.partner===sp.id||sp.agency55?.partner===p.id));
+}
+// Супруг NPC, с которым ещё не решали вопрос фамилии: только настоящий брак (отметка о браке у обоих).
 function npcSpouse271(p){
  if(!p?.alive||!p.npcMarried54)return null;
  let sp=typeof spouseSoc270==='function'?spouseSoc270(p):null;
@@ -432,7 +445,7 @@ function npcNames271(){
   if(m&&m.spouse!=='player'&&!m.kept){
    const sp=s.people.find(q=>q.id===m.spouse);
    if(sp&&!sp.alive)m.kept=true;
-   else if(npcSpouse271(p)!==sp){
+   else if(sp&&!together271(p,sp)){
     const old=p.name;
     if(Math.random()<(p.country==='jp'?1:.8)&&restoreName271(p)){remember(p,(p.gender==='f'?'вернула':'вернул')+' добрачную фамилию: '+p.surname);if(kin27(p)&&p.bond>=40)log('Фамилия после развода · '+p.givenName166,old+' — теперь снова '+p.name+'.','Жизнь близких');}
     else m.kept=true;
@@ -474,8 +487,8 @@ function marriageNames271(p,finish,already=false){
  const giveParts=ownParts.map(n=>genderSurname256(n,p.gender,mine));
  const partnerTakes=()=>{
   if(!valid())return;
-  if(takeName271(p,s)){remember(p,(p.gender==='f'?'взяла':'взял')+' вашу фамилию после свадьбы');log('Общая фамилия',p.name+': теперь у вас одна фамилия.','Семья');}
   apply(ownParts,ownJoiner,mine);
+  if(takeName271(p,s)){remember(p,(p.gender==='f'?'взяла':'взял')+' вашу фамилию после свадьбы');log('Общая фамилия',p.name+': теперь у вас одна фамилия.','Семья');}
  };
  const partnerName=fullName256(p.givenName166,giveParts,country271(p),ownJoiner);
  const jp=(s.birthCountry||s.country)==='jp'&&country271(p)==='jp';
@@ -565,8 +578,8 @@ function genderByName271(text,country){
    teen271=null;
    const p=base(args[0],args[1],t.q.gender271,args[3]);
    const meta=names271.meta.get(t.q.name);
-   if(meta)setPersonName256(p,meta.given,meta.parts,meta.joiner);
-   p.name=t.q.name;rederive271(p);
+   if(meta){setPersonName256(p,meta.given,meta.parts,meta.joiner);p.name=t.q.name;}
+   else{p.name=t.q.name;rederive271(p);}
    return p;
   }
   return base(...args);
@@ -606,52 +619,54 @@ function splitTyped271(text,country,gender){
 function startFamily271(typed){
  const ps=s.people.filter(p=>p.alive&&['Мать','Отец'].includes(p.role));
  const dad=ps.find(p=>p.role==='Отец'),mom=ps.find(p=>p.role==='Мать');
- const birth=s.birthCountry||s.country,ch=s.family17?.childhood131;
- for(const p of ps){p.birthSurname271={surname:p.surname,parts:parts271(p),joiner:joiner271(p),culture:cultureOf271(p)};}
- // Родители вместе — фамилия по обычаю страны рождения игрока.
- if(dad&&mom&&!ch)coupleName271(mom,dad,birth);
- // Имя, введённое при создании: «Имя Фамилия» — фамилия семьи.
- let given=s.name;
+ const birth=s.birthCountry||s.country,ch=s.family17?.childhood131,rule=customDefault271[birth]||'father';
+ const origin=s.origins?.length===1?s.origins[0]:null;
+ // Имя, введённое при создании: «Имя Фамилия» — фамилия семьи (её получает линия, от которой она идёт к детям).
+ let given=s.name,typedParts=null;
  if(typed){
   const sp=splitTyped271(typed,birth,s.gender);given=sp.given;
-  if(sp.surname){
-   const line=customDefault271[birth]==='es'||customDefault271[birth]==='br'?null:(dad||ps[0]);
-   const parts=parseParts256(sp.surname,birth,s.gender);
-   if(line&&birth!=='eg'){
-    for(const p of birth==='jp'?ps:[line])setPersonName256(p,p.givenName166,parts.map(n=>genderSurname256(n,p.gender,birth)),' ');
-   }else if(parts.length===2&&dad&&mom){
-    const [d,m]=customDefault271[birth]==='br'?[1,0]:[0,1];
-    const set=(p,i,x)=>{const cur=parts271(p);if(customDefault271[birth]==='br'){cur[cur.length-1]=x;}else cur[0]=x;setPersonName256(p,p.givenName166,cur,' ');};
-    set(dad,0,parts[d]);set(mom,1,parts[m]);
-   }
-   s.typedSurname271=sp.surname;
+  if(sp.surname&&birth!=='eg'){
+   typedParts=parseParts256(sp.surname,birth,s.gender);
+   if(rule==='es'||rule==='br'){
+    if(typedParts.length===2&&dad&&mom){
+     const put=(p,x)=>{const cur=parts271(p);if(rule==='br')cur[cur.length-1]=x;else cur[0]=x;setPersonName256(p,p.givenName166,cur,' ');};
+     put(dad,rule==='br'?typedParts[1]:typedParts[0]);put(mom,rule==='br'?typedParts[0]:typedParts[1]);
+    }
+   }else for(const p of rule==='jp'?ps:[dad||ps[0]].filter(Boolean))setPersonName256(p,p.givenName166,typedParts.map(n=>genderSurname256(n,p.gender,birth)),' ');
   }
  }
+ // Личное имя — по происхождению семьи; если у родителей разные происхождения, но одна культура (семья мигрантов
+ // из одной страны), — по этой культуре, а не по стране рождения.
+ const cultures=[...new Set(ps.map(cultureOf271))];
+ const givenFor271=g=>origin||cultures.length!==1?familyName166(birth,g,origin).given:familyName166(cultures[0],g,null).given;
+ if(!typed&&!origin&&cultures.length===1&&cultures[0]!==birth)given=givenFor271(s.gender);
  s.name=given;
+ for(const p of ps)p.birthSurname271={surname:p.surname,parts:parts271(p),joiner:joiner271(p),culture:cultureOf271(p)};
+ // Родители вместе — фамилия по обычаю страны рождения игрока.
+ if(dad&&mom&&!ch)coupleName271(mom,dad,birth);
  const kids=[s,...s.people.filter(p=>p.alive&&['Брат','Сестра'].includes(p.role))];
  const parents=ch?.unknown?ps.filter(p=>p.id===ch.caregiverId):[dad,mom].filter(Boolean);
  for(const k of kids){
   if(k!==s){
+   // Сиблинг из той же семьи: та же страна рождения, происхождение и имя из того же источника, что у игрока.
    k.birthCountry=birth;k.origins=[...(s.origins||[])];k.citizenships=[...(s.citizenships||[])];
    k.birthYear=(s.birthYear??s.year)-(k.age-s.age);
-   if(!k.givenName166||!familyLike271(k.givenName166,k.gender,birth))k.givenName166=familyName166(birth,k.gender,s.origins?.length===1?s.origins[0]:null).given;
+   k.givenName166=givenFor271(k.gender);
   }
   const choice=childChoices256(k===s?{gender:s.gender,birthCountry:birth,country:s.country}:k,parents)[0];
   if(choice)applyChoice271(k,choice);
   if(k!==s){k.birthSurname256=k.surname;k.naming256=true;}
  }
- if(s.typedSurname271&&!['eg'].includes(birth)){const p=parseParts256(s.typedSurname271,birth,s.gender);setName271(s,s.name,p,' ');}
+ if(typedParts)setName271(s,s.name,typedParts,' ');
  s.birthSurname256=s.surname;
  s.birthSurname271={surname:s.surname,parts:parts271(s),joiner:joiner271(s),culture:cultureOf271(s)};
  // Повторы имён: игрок не тёзка родителей, сиблинг не тёзка игрока и родителей.
  if(!typed){
   const taken=new Set(ps.map(p=>p.givenName166));
-  for(let i=0;i<20&&taken.has(s.name);i++)s.name=familyName166(birth,s.gender,s.origins?.length===1?s.origins[0]:null).given;
+  for(let i=0;i<20&&taken.has(s.name);i++)s.name=givenFor271(s.gender);
  }
  for(const k of kids)if(k!==s){dedupeFamily271(k);if(typeof dedupeGiven270==='function')dedupeGiven270(k);}
- if(s.surname)s.people.forEach(p=>{if(p.namesake270)return;});
 }
-function familyLike271(given,gender,country){return (countries[country]?.names?.[gender==='m'?1:0]||[]).includes(given)||Object.values(names271.origins).some(o=>(o[gender==='m'?'m':'f']||[]).includes(given));}
 // Бабушка и дедушка — по линии своего ребёнка (родителя игрока).
 function grandLine271(gp){
  const parent=s.people.find(p=>p.bio27?.parents?.includes(gp.id)&&['Мать','Отец'].includes(p.role));if(!parent)return;
@@ -663,7 +678,7 @@ function grandLine271(gp){
  const keepOwn=parts271(gp);
  if(egChain271(parent)||country271(parent)==='eg'&&egOrigin271(parent)){
   if(gp.gender==='m'){setPersonName256(gp,bp[0]||egMale271(),[bp[1]||egMale271(),egMale271()],' ');gp.nameStyle271='chain';}
- }else if(rule==='es'||rule==='br'){
+ }else if((rule==='es'||rule==='br')&&bp.length>=2){
   const mine=rule==='es'?(gp.gender==='m'?bp[0]:bp[1]):(gp.gender==='m'?bp.at(-1):bp[0]);
   if(mine){const rest=keepOwn.filter(x=>x!==mine);const parts=rule==='es'?[mine,rest[0]||identitySurname(culture,gp.gender)]:[rest[0]||identitySurname(culture,gp.gender),mine];setPersonName256(gp,gp.givenName166,parts.map(g),' ');}
  }else if(gp.gender==='m'||rule==='jp'){
@@ -672,7 +687,7 @@ function grandLine271(gp){
  gp.birthSurname256=gp.surname;
  // Пара бабушки и дедушки: жена по обычаю (их поколение почти всегда брало фамилию мужа, где так принято).
  const other=s.people.find(q=>q!==gp&&parent.bio27.parents.includes(q.id)&&q.alive&&['Бабушка','Дедушка'].includes(q.role));
- if(other&&gp.gender==='m'&&!other.marriageDecided271&&rule!=='jp'&&rule!=='es'&&rule!=='br')coupleName271(other,gp,country271(parent),true);
+ if(other&&gp.gender==='m'&&!other.marriageDecided271&&rule!=='jp'&&!((rule==='es'||rule==='br')&&bp.length>=2))coupleName271(other,gp,country271(parent),true);
  if(other&&rule==='jp'&&other.gender==='f'&&other.surname!==gp.surname)setPersonName256(other,other.givenName166,bp.map(x=>genderSurname256(x,'f',culture)),birth.joiner||' ');
 }
 {
@@ -686,7 +701,8 @@ function grandLine271(gp){
    const fresh=(s?.people||[]).filter(p=>!before.has(p.id)&&['Бабушка','Дедушка'].includes(p.role));
    for(const gp of fresh.filter(p=>p.gender==='m'))grandLine271(gp);
    for(const gp of fresh.filter(p=>p.gender!=='m'))grandLine271(gp);
-   for(const gp of fresh){dedupeFamily271(gp);if(typeof dedupeGiven270==='function')dedupeGiven270(gp);}
+   // У дедушки в Египте имя — часть цепочки отца, его не меняем.
+   for(const gp of fresh)if(!(gp.nameStyle271==='chain'&&gp.gender==='m')){dedupeFamily271(gp);if(typeof dedupeGiven270==='function')dedupeGiven270(gp);}
    if(ctx){
     const entry=s.log.find(q=>q.age===0&&q.title==='У этой истории появилось имя');
     if(entry&&typeof familyBirthText166==='function')entry.text=familyBirthText166();
@@ -769,7 +785,8 @@ function oldSave255fix271(){
  const base=ensureUX;
  ensureUX=function(...args){
   try{if(s&&!s.namesFixed255&&typeof cleanSurname255==='function')oldSave255fix271();}catch(e){console.error(e);}
-  const r=base.apply(this,args);
+  names271.loading=true;
+  let r;try{r=base.apply(this,args);}finally{names271.loading=false;}
   try{if(s)for(const p of s.people)if(p.naming256&&p.givenName166&&p.name&&!nameHas271(String(p.name).trim(),p.givenName166))rederive271(p);}catch(e){console.error(e);}
   return r;
  };
