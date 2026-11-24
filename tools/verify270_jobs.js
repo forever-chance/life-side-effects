@@ -91,6 +91,7 @@ function helpers() {
   };
 }
 
+const __fmtCommute = 'Офис · поездки в другой город';
 const results = [];
 const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.log((ok ? 'ok   ' : 'FAIL ') + name + (ok ? '' : '  ' + JSON.stringify(info).slice(0, 500))); };
 
@@ -251,6 +252,8 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         check('моя работа: строка с дорогой вместо старой «зарплата · формат»', w.job && /Дорога до работы: \d+ мин\. в одну сторону/.test(w.near.text) && (w.near.text.match(/\/год/g) || []).length === 1 && !/Очная работа|Рядом с домом/.test(w.near.text), w.near);
         check('моя работа: место в другом районе — «другой конец города»', w.job && w.far.head === w.farWant, w.far);
         check('моя работа: удалённая — «Удалённо», без дороги; гибрид — «Гибрид»', w.job && w.remote.head === w.remoteWant && !/Дорога до работы/.test(w.remote.text) && w.hybrid.head === w.hybridWant, { remote: w.remote, hybrid: w.hybrid });
+        check('моя работа: у гибрида дорога названа средней («в среднем N мин.»), у офиса — без «в среднем»',
+          w.job && /Дорога до работы: в среднем \d+ мин\. в одну сторону/.test(w.hybrid.text) && !/в среднем/.test(w.near.text), { near: w.near.text, hybrid: w.hybrid.text });
 
         // 6. Внутренние вакансии в разговоре о карьере.
         const iv = await pg.evaluate(() => {
@@ -270,6 +273,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         check('внутренние вакансии: есть хотя бы одна', iv.list > 0, iv);
         check('внутренние вакансии: в названии варианта — зарплата и формат', iv.list > 0 && iv.title === 'Другая команда, тот же работодатель' && iv.want.every((t, i) => iv.buttons[i]?.label === t), iv);
         check('внутренние вакансии: сумма не повторяется в подсказке', iv.list > 0 && iv.buttons.every(b => !/\/год/.test(b.hint) && b.hint.length > 0), iv.buttons);
+        check('внутренние вакансии: подсказка начинается с заглавной, как у соседних вариантов', iv.list > 0 && iv.buttons.every(b => /^[A-ZА-ЯЁ0-9]/.test(b.hint)), iv.buttons.map(b => b.hint.slice(0, 40)));
 
         // Старое предложение работы из очереди и записи без формата не ломаются.
         const legacy = await pg.evaluate(() => {
@@ -305,6 +309,93 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       check('другая страна: порог «1» — средняя зарплата страны вакансий в текущей валюте (€)', /€\/год$/.test(r.sel) && Math.abs(r.floor - r.plWage) / r.plWage < .06, r);
       check('другая страна: заголовки и порог работают', !r.bad.length, r);
       check('другая страна: без ошибок страницы', !errors.length, errors);
+      await ctx.close();
+    }
+
+    // 8. «Офис · переезд за рубеж» при своей стране в фильтре: вакансии другой страны, и шаги «Зарплата от» — по ней.
+    {
+      const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'ru' });
+      const r = await pg.evaluate(() => {
+        __ready();
+        const x = path16();
+        Object.assign(x.view, { country: s.country, field: 'computing', format: 'abroad', page: 0, fit68: 'all', fte28: 'all', salary270: '1', sort270: 'none' });
+        openPath16('vacancies58');
+        const where = [...new Set(x.vacancies.map(v => v.country))];
+        const vc = where[0];
+        const sel = [...document.querySelectorAll('.trajectory select[aria-label="Зарплата от"] option')].find(o => o.selected)?.textContent || '';
+        const floor = +sel.replace(/[^\d]/g, '');
+        const wage = localAmount16(countries[vc].wage, vc), home = localAmount16(countries[s.country].wage, s.country);
+        const list = __allPages();
+        // Вакансии дороже средней зарплаты своей страны, но заметно дешевле средней в стране вакансий:
+        // с порогом «1» их быть не должно (с порогом по своей стране они проходили).
+        const between = x.vacancies.filter(v => { const p = Math.round(__pay(v)); return p >= home * 1.06 && p < wage * .94; });
+        const passing = x.vacancies.filter(v => matchesCareer45(v));
+        return { where, home: s.country, sel, floor, wage: Math.round(wage), homeWage: Math.round(home), n: list.length,
+          below: list.filter(c => Math.round(__pay(__vac(c.id))) < floor).map(c => c.head), between: between.length,
+          betweenPass: between.filter(v => passing.includes(v)).length, above: x.vacancies.filter(v => Math.round(__pay(v)) >= floor).length, passing: passing.length };
+      });
+      check('за рубеж: вакансии в другой стране', r.where.length === 1 && r.where[0] !== r.home, r);
+      check('за рубеж: шаг «1» — средняя зарплата страны вакансий, а не своей', Math.abs(r.floor - r.wage) / r.wage < .06 && Math.abs(r.floor - r.homeWage) / r.homeWage > .2, r);
+      check('за рубеж: в списке нет вакансий дешевле порога, включая те, что дороже «домашнего» порога', r.n > 0 && !r.below.length && r.between > 0 && r.betweenPass === 0 && r.passing === r.above, r);
+
+      // Фоновый поиск с тем же фильтром: отклик только на вакансию не дешевле порога страны вакансий.
+      const b = await pg.evaluate(([floor, wage]) => {
+        const x = path16();
+        for (const a of x.jobApplications) a.status = 'rejected';
+        x.search = false; toggleSearch16(); x.lastSearch = -10;
+        const n0 = x.jobApplications.length;
+        // Тот же экран, но открыт другой формат: поиск берёт фильтры на момент включения.
+        Object.assign(x.view, { format: 'near', salary270: 'all' });
+        __month(1);
+        const apps = x.jobApplications.slice(n0).map(a => ({ title: a.vacancy.title, country: a.vacancy.country, pay: Math.round(__pay(a.vacancy)) }));
+        x.search = false; s.jobSearch.enabled = false;
+        return { apps, floor, wage, view: { format: x.view.format, salary270: x.view.salary270 } };
+      }, [r.floor, r.wage]);
+      check('за рубеж: фоновый поиск откликается только на вакансии не дешевле порога страны вакансий',
+        b.apps.length === 1 && b.apps[0].country === r.where[0] && b.apps[0].pay >= b.floor && b.apps[0].pay >= b.wage * .94 && b.view.format === 'near', b);
+      check('за рубеж: без ошибок страницы', !errors.length, errors);
+      await ctx.close();
+    }
+
+    // 9. Настоящий наём на «Офис · поездки в другой город»: подпись в записи о первом дне и в «Моей работе» одна и та же.
+    {
+      const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'ru' });
+      const r = await pg.evaluate(() => {
+        __ready();
+        const x = path16();
+        Object.assign(x.view, { country: s.country, field: 'computing', format: 'commute', page: 0, fit68: 'all', fte28: 'all', salary270: 'all', sort270: 'none' });
+        makeVacancies16();
+        const v = x.vacancies.filter(v => !jobEligibility16(v).why.length && v.fraction28 === 1)[0];
+        if (!v) return { v: null };
+        applyJob16(v.id);
+        const app = x.jobApplications.at(-1);
+        app.roll = 0; app.interviewRoll = 0;
+        __month(1); interview16(app.id); __month(1);
+        const status = app.status;
+        acceptJob16(app.id); startJob16(app.id);
+        if (!s.job) return { v: v.id, status, job: null };
+        const entry = s.log.find(e => e.title === 'Первый рабочий день');
+        openPath16('jobs');
+        const sec = [...document.querySelectorAll('.trajectory section.path-card')].find(q => /ТЕКУЩАЯ РАБОТА/i.test(q.textContent));
+        const out = { v: v.id, status, city: v.city, home: residenceCity(), entry: entry?.text || '', head: sec?.querySelector('h2')?.textContent || '', text: sec?.textContent || '',
+          want: __title(s.job.title) + ' · ' + money(s.job.salary) + '/год · ' + __fmt.commute };
+        // Место работы оказалось в городе дома (как после переезда): «поездки» уже не к месту, формат — по району.
+        // Дом не трогаем: адрес чинит residence62.js, а место работы — поле самой работы.
+        Object.assign(s.job.workplace, { city: residenceCity(), area: s.housing.area });
+        openPath16('jobs');
+        const sec2 = [...document.querySelectorAll('.trajectory section.path-card')].find(q => /ТЕКУЩАЯ РАБОТА/i.test(q.textContent));
+        out.moved = sec2?.querySelector('h2')?.textContent || '';
+        out.movedWant = __title(s.job.title) + ' · ' + money(s.job.salary) + '/год · ' + __fmt.near;
+        return out;
+      });
+      if (!r.v) check('поездки: нашлась вакансия в другом городе', false, r);
+      else {
+        check('поездки: наём прошёл до первого рабочего дня', r.status === 'offered' && r.head && r.city !== r.home, r);
+        check('поездки: в записи о первом дне и в «Моей работе» — «Офис · поездки в другой город»',
+          r.entry.includes(__fmtCommute) && r.head === r.want, r);
+        check('поездки: место работы в городе дома, тот же район — «Офис · рядом с домом»', r.moved === r.movedWant, r);
+      }
+      check('поездки: без ошибок страницы', !errors.length, errors);
       await ctx.close();
     }
   } finally {

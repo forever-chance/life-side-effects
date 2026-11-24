@@ -1,7 +1,9 @@
 // Сборка 270, strip270.js: верхняя полоса на телефоне и на широком экране, остановка часов на «Персонаже»
 // и «Личном деле». Игра раздаётся с диска, сервер не нужен:  node tools/verify270_strip.js
 // Файлы сборки 270, которых ещё нет в index.html, подгружаются после старта жизни в порядке сборки,
-// чтобы полоса проверялась вместе с соседними частями.
+// чтобы полоса проверялась вместе с соседними частями. Последний прогон раздаёт index.html, в который эти файлы
+// вписаны перед bootstrap61.js (как их подключит сборка), и проходит рождение, стартовое окно и обучение
+// настоящими нажатиями.
 const fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
@@ -44,6 +46,33 @@ async function page(browser, cfg, viewport) {
   return { pg, errors, ctx, loaded };
 }
 
+// index.html с файлами 270 перед bootstrap61.js: на диске index.html не меняется, правка только в ответе.
+async function pageFinal(browser, viewport) {
+  const ctx = await browser.newContext({ viewport });
+  const injected = [];
+  await ctx.route('**/*', r => {
+    const u = new URL(r.request().url());
+    if (u.hostname !== 'game.local') return r.abort();
+    const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '') || 'index.html';
+    const f = path.join(ROOT, rel);
+    if (!f.startsWith(ROOT) || !fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
+    let body = rel === 'offline-game.js' ? '' : fs.readFileSync(f);
+    if (rel === 'index.html') {
+      const html = body.toString();
+      const add = ORDER.filter(x => fs.existsSync(path.join(ROOT, x)) && !html.includes('src="' + x));
+      injected.splice(0, injected.length, ...add);
+      body = html.replace('<script src="bootstrap61.js', add.map(x => '<script src="' + x + '?v=270"></script>').join('') + '<script src="bootstrap61.js');
+    }
+    r.fulfill({ status: 200, body, headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } });
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  pg.on('pageerror', e => errors.push(String(e.message)));
+  await pg.goto('http://game.local/index.html');
+  await pg.waitForFunction("typeof start==='function'&&document.querySelector('#country')");
+  return { pg, errors, ctx, injected };
+}
+
 const results = [];
 const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.log((ok ? 'ok   ' : 'FAIL ') + name + (ok ? '' : '  ' + JSON.stringify(info).slice(0, 500))); };
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -78,6 +107,20 @@ const layout = () => {
     stripHeight: st ? st.getBoundingClientRect().height : null, innerHeight, innerWidth, wide,
     rows: getComputedStyle(app).gridTemplateRows
   };
+};
+// Контраст текста полосы с фоном под ним (WCAG), для строки последнего события.
+const contrast = () => {
+  const rgb = c => { const m = c.match(/[\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 }; };
+  const lum = ({ r, g, b }) => { const f = v => (v /= 255) <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+  const bg = n => { for (; n; n = n.parentElement) { const c = rgb(getComputedStyle(n).backgroundColor); if (c.a >= 1) return c; } return { r: 255, g: 255, b: 255 }; };
+  const ratio = n => { const a = lum(rgb(getComputedStyle(n).color)), b = lum(bg(n)); return +((Math.max(a, b) + .05) / (Math.min(a, b) + .05)).toFixed(2); };
+  const row = document.querySelector('#app>.top-strip270 .strip-latest270');
+  return { kicker: ratio(row.querySelector('.strip-kicker270')), text: ratio(row.querySelector('.strip-text270')), title: ratio(row.querySelector('.strip-title270')) };
+};
+// Подпись строки над записью или в одну строку с ней.
+const kickerInline = () => {
+  const row = document.querySelector('#app>.top-strip270 .strip-row270'), k = row.querySelector('.strip-kicker270').getBoundingClientRect(), l = row.querySelector('.strip-line270').getBoundingClientRect();
+  return { inline: l.left >= k.right - 1 && k.top < l.bottom && l.top < k.bottom, above: k.bottom <= l.top + 1 };
 };
 const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($('#modal').open) closeModal(); s.clock.running = false; if (panel) s.ui05.panel = panel; if (t) tab = t; render(); }, [panel, t]);
 
@@ -132,6 +175,30 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     }, st.latestId);
     check('нажатие на событие: открыта «История», запись на экране', opened.panel === 'center' && opened.tab === 'story' && opened.visible, opened);
 
+    // Подпись и текст читаются: не меньше 4.5:1 и без наведения, и при наведении.
+    await go(pg, 'right', 'story');
+    check('телефон стоя: подпись строки над записью, а не в одну строку', (await pg.evaluate(kickerInline)).above, await pg.evaluate(kickerInline));
+    const c0 = await pg.evaluate(contrast);
+    await pg.hover('#app>.top-strip270 .strip-latest270 .strip-open270');
+    await wait(400);
+    const c1 = await pg.evaluate(contrast);
+    await pg.mouse.move(0, 0);
+    check('контраст полосы: подпись, заголовок и текст не меньше 4.5:1, при наведении тоже', [c0, c1].every(c => c.kicker >= 4.5 && c.text >= 4.5 && c.title >= 4.5), { c0, c1 });
+
+    // Запись без описания (или описание, которое eventDescription204 убирает целиком) — без висящего « — ».
+    const bare = await pg.evaluate(() => {
+      const out = {};
+      for (const [k, text] of [['пусто', ''], ['хвост', 'Работодатель и накопленный стаж сохраняются.']]) {
+        log('Запись без описания · ' + k, text, 'Проверка', true); render();
+        const row = document.querySelector('#app>.top-strip270 .strip-latest270');
+        out[k] = { title: row?.querySelector('.strip-title270')?.textContent, span: !!row?.querySelector('.strip-text270'), line: row?.querySelector('.strip-line270')?.textContent };
+      }
+      log('С описанием', 'Обычное описание.', 'Проверка', true); render();
+      out.full = document.querySelector('#app>.top-strip270 .strip-latest270 .strip-line270')?.textContent;
+      return out;
+    });
+    check('запись без описания: только заголовок, без « — »', bare['пусто'].title === 'Запись без описания · пусто' && !bare['пусто'].span && !/—/.test(bare['пусто'].line) && bare['хвост'].title === 'Запись без описания · хвост' && !bare['хвост'].span && !/—/.test(bare['хвост'].line) && bare.full === 'С описанием — Обычное описание.', bare);
+
     // «История»: сверху то, что ждёт ответа. Ответ (свидание) раньше состояния здоровья (усталость).
     const setup = await pg.evaluate(() => {
       s.clock.running = false;
@@ -147,11 +214,9 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     const firstAnswer = await pg.evaluate(() => decisionItems24().find(i => i.ref.kind !== 'health58')?.title);
     check('телефон «История»: сверху «Ожидают ответа», без последнего события', st.shown && st.waiting && !st.latest, { st, setup });
     check('телефон «История»: число совпадает с decisionItems24, первым — ответ, а не усталость', st.count === total && total >= 2 && st.waitingTitle === firstAnswer && !/^Усталость/.test(st.waitingTitle) && setup.items.some(x => /^health58:Усталость/.test(x)) && st.all, { st, total, firstAnswer, setup });
-    // Первым ставим разговор с родственником и нажимаем: должно открыться именно это решение.
-    await pg.evaluate(() => { const old = decisionItems24; window.__strip270Items = old; decisionItems24 = () => { const a = old(); return a.filter(i => i.ref.kind === 'pending').concat(a.filter(i => i.ref.kind !== 'pending')); }; render(); });
-    st = await pg.evaluate(strip);
+    // Первым в полосе стоит разговор с родственником (усталость ушла в конец) — нажатие открывает именно его.
     await pg.click('#app>.top-strip270 .strip-waiting270 .strip-open270');
-    const m = await pg.evaluate(() => { decisionItems24 = window.__strip270Items; return { open: $('#modal').open, title: document.querySelector('#modal h2')?.textContent || '' }; });
+    const m = await pg.evaluate(() => ({ open: $('#modal').open, title: document.querySelector('#modal h2')?.textContent || '' }));
     check('нажатие на решение: открыто само решение', st.waitingTitle === 'Разговор с родственником' && m.open && m.title.includes(setup.name), { m, st: st.waitingTitle });
     await pg.evaluate(() => { if ($('#modal').open) closeModal(); });
     await pg.click('#app>.top-strip270 .strip-all270');
@@ -269,10 +334,6 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     st = await pg.evaluate(strip);
     check('длинное событие: нет горизонтальной прокрутки, полоса в одну-две строки', st.latest && !lay.pageScrollX && !lay.stripOverflow && !lay.wide && lay.stripHeight < 110, { lay, st: { ...st, text: '' } });
 
-    // Обучение и стартовое окно — полоса не мешает подсветке.
-    const tut = await pg.evaluate(() => { const old = window.tutorialActive180; tutorialActive180 = () => true; const html = topStrip270(), hold = clockHold270(); tutorialActive180 = old; return { html, hold }; });
-    check('обучение: полосы нет, часы не держим', tut.html === '' && !tut.hold, tut);
-
     // Поворот через 1000px: на «Люди» с «Персонажа» — широкий экран показывает событие и не держит часы.
     await pg.evaluate(() => { s.clock.running = false; s.ui05.panel = 'left'; tab = 'people'; render(); });
     const before = await pg.evaluate(() => ({ st: !!document.querySelector('#app>.top-strip270'), hold: clockHold270() }));
@@ -323,6 +384,93 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     check('широкий: нажатие открывает «Историю», полоса исчезает', r.tab === 'story' && !r.st && r.active === 'История', r);
 
     check('широкий: без ошибок страницы', !errors.length, errors);
+    await ctx.close();
+  }
+
+  // 3. Итоговый порядок: файлы 270 в index.html перед bootstrap61.js, рождение, стартовое окно, обучение
+  // и часы — настоящими нажатиями.
+  {
+    const { pg, errors, ctx, injected } = await pageFinal(browser, PHONE);
+    console.log('в index.html перед bootstrap61.js: ' + (injected.join(', ') || 'ничего (уже подключены)'));
+    const state = () => ({
+      notice: typeof startupNotice180 === 'function' && !!startupNotice180(), tut: tutorialActive180(), step: s.onboarding180?.step,
+      modal: $('#modal').open, title: document.querySelector('#modal h2')?.textContent || '',
+      strip: !!document.querySelector('#app>.top-strip270'), hold: clockHold270(),
+      waitingTitle: document.querySelector('#app>.top-strip270 .strip-waiting270 .strip-title270')?.textContent || ''
+    });
+    const clk = () => ({ ticks: s.clock.ticks, running: s.clock.running, modal: $('#modal').open, title: document.querySelector('#modal h2')?.textContent || '', pending: s.pending.length, label: document.querySelector('.clock-bar small')?.textContent || '', button: document.querySelector('.clock-controls .primary')?.textContent || '' });
+    await pg.selectOption('#startAge', '18');
+    await pg.selectOption('#country', 'nl');
+    await pg.click('text=Родиться');
+    await pg.waitForFunction("typeof s!=='undefined'&&s&&s.clock");
+    const birth = await pg.evaluate(state);
+    check('итоговый порядок: strip270 подключён из index.html', await pg.evaluate(() => typeof topStrip270 === 'function' && [...document.scripts].some(x => /^strip270\.js/.test(x.getAttribute('src') || ''))), injected);
+    check('рождение: стартовое окно открыто, полосы под ним нет', birth.notice && birth.modal && !birth.tut && !birth.strip, birth);
+
+    // Перезагрузка со стартовым окном: само окно не возвращается, строка «Ожидают ответа» ведёт к нему.
+    await pg.evaluate(() => { if (typeof flushSave264 === 'function') flushSave264(); });
+    await pg.reload();
+    await pg.waitForFunction("typeof s!=='undefined'&&s&&s.clock&&document.getElementById('app').classList.contains('playing')");
+    await pg.click('.mobile-panels button:has-text("История")');
+    const re = await pg.evaluate(state);
+    check('перезагрузка до ответа на стартовое окно: окна нет, полоса ведёт к нему', re.notice && !re.modal && !re.tut && re.strip && re.waitingTitle === birth.title, { re, birth: birth.title });
+    await pg.click('#app>.top-strip270 .strip-waiting270 .strip-open270');
+    const reopened = await pg.evaluate(state);
+    check('нажатие на полосу: открыто стартовое окно', reopened.modal && reopened.notice && reopened.title === birth.title, reopened);
+    await pg.click('#modal .options button:has-text("Понятно")');
+
+    // Обучение: все шаги кнопкой «Далее», на каждом — без полосы и без остановки часов.
+    const steps = [];
+    for (let i = 0; i < 20; i++) {
+      const t = await pg.evaluate(state);
+      if (!t.tut) break;
+      steps.push({ step: t.step, strip: t.strip, hold: t.hold });
+      const last = await pg.evaluate(() => onboarding180().step === tutorialSteps180.length - 1);
+      await pg.click('#tutorial180 .tutorial-buttons180 button:has-text("' + (last ? 'Начать жизнь' : 'Далее') + '")');
+    }
+    const total = await pg.evaluate(() => tutorialSteps180.length);
+    check('обучение: все ' + total + ' шагов без полосы и без остановки часов', steps.length === total && steps.every((t, i) => t.step === i && !t.strip && !t.hold), steps);
+    const done = await pg.evaluate(() => ({ tut: tutorialActive180(), status: s.onboarding180?.status, blocked: stripBlocked270(), strip: !!document.querySelector('#app>.top-strip270'), want: waitingItems270().length > 0 && s.ui05.panel === 'center' && tab === 'story' }));
+    check('после обучения полоса вернулась', !done.tut && done.status === 'finished' && !done.blocked && done.strip === done.want, done);
+
+    // Часы: «Персонаж», 8×, «▶ Продолжить» — месяцы стоят; событие из очереди открывается; «История» — время пошло.
+    await pg.evaluate(() => { if ($('#modal').open) closeModal(); s.pending = []; });
+    await pg.click('.mobile-panels button:has-text("Персонаж")');
+    await pg.click('.clock-controls button[onclick="setSpeed(8)"]');
+    if (!(await pg.evaluate(() => s.clock.running))) await pg.click('.clock-controls .primary');
+    const k0 = await pg.evaluate(clk);
+    await wait(1600);
+    let k = await pg.evaluate(clk);
+    check('часы (кнопки): на «Персонаже» месяцы стоят, подпись объясняет почему', k0.running && k.running && k.ticks === k0.ticks && /Время стоит, пока открыт персонаж/.test(k.label) && /Пауза/.test(k.button), { k0, k });
+    const parent = await pg.evaluate(() => { const p = s.people.find(p => p.alive && ['Мать', 'Отец'].includes(p.role)); s.pending.push({ type: 'familyContact05', id: p.id }); return p.name; });
+    await wait(800);
+    k = await pg.evaluate(clk);
+    check('часы (кнопки): событие из очереди на «Персонаже» открывается само, месяцы не идут', k.modal && k.title.includes(parent) && k.ticks === k0.ticks, { k, parent });
+    for (let i = 0; i < 4 && (await pg.evaluate(() => $('#modal').open)); i++) await pg.click('#modal .options button:not([disabled]) >> nth=0');
+    await wait(1200);
+    k = await pg.evaluate(clk);
+    check('часы (кнопки): после ответа на «Персонаже» ход возвращён, месяцы по-прежнему стоят', !k.modal && k.running && k.ticks === k0.ticks, { k0, k });
+    await pg.click('.mobile-panels button:has-text("История")');
+    await wait(1600);
+    k = await pg.evaluate(clk);
+    check('часы (кнопки): ушли на «Историю» — время пошло', k.ticks > k0.ticks, { k0, k });
+    await pg.evaluate(() => { if ($('#modal').open) closeModal(); s.pending = []; if (s.clock.running) toggleClock(); s.clock.running = false; render(); });
+
+    // Телефон боком, 844×390: обе строки полосы в одну строку каждая, под колонку остаётся место.
+    await pg.setViewportSize({ width: 844, height: 390 });
+    await wait(300);
+    await pg.evaluate(() => { const p = s.people.find(p => p.alive && ['Мать', 'Отец'].includes(p.role)); s.clock.fatigue = 75; s.pending = [{ type: 'familyContact05', id: p.id }]; decisionState24(); });
+    for (const label of ['Люди', 'Траектория']) {
+      await pg.click('.center .tabs button:has-text("' + label + '")');
+      const st = await pg.evaluate(strip), lay = await pg.evaluate(layout), inl = await pg.evaluate(kickerInline);
+      check('телефон боком 844×390, «' + label + '»: обе строки, полоса до 80px, колонке больше 100px', st.latest && st.waiting && lay.stripHeight <= 80 && lay.shellBottom - lay.shellTop > 100 && inl.inline && !lay.pageScrollX && !lay.stripOverflow && !lay.wide, { st: { ...st, text: '' }, lay, inl });
+    }
+    await pg.setViewportSize(PHONE);
+    await wait(300);
+    const lay = await pg.evaluate(layout), inl = await pg.evaluate(kickerInline);
+    check('обратно стоя: подпись снова над записью', inl.above && lay.stripHeight < 110, { lay, inl });
+
+    check('итоговый порядок: без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }
 

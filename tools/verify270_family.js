@@ -470,10 +470,9 @@ async function main() {
       }
       const ours = [...issues.filter(x => x.kind === 'exception').map(x => x.detail), ...errors].filter(x => /family270|familyCare|familyMove|familyRepair|familyPet|familyHousehold/.test(x));
       const state = await pg.evaluate(() => ({ age: s.age, kids: ownChildren55().length, repairs: __repairs(),
-        moves: s.log.filter(l => (l.title || l[0]) === 'Дети переехали с вами').length,
-        homes: s.log.filter(l => (l.title || l[0]) === 'Новый адрес').length }));
+        moves: s.log.filter(l => (l.title || l[0]) === 'Дети переехали с вами').length }));
       console.log('случайная игра: до ' + state.age + ' лет, исключений всего ' + issues.filter(x => x.kind === 'exception').length + ', ошибок страницы ' + errors.length +
-        ', переездов ' + state.homes + ', записей «Дети переехали с вами» ' + state.moves);
+        ', записей «Дети переехали с вами» ' + state.moves);
       check('случайная игра: обёртки family270 не падают', !ours.length, ours.slice(0, 3));
       // Починка в ensureUX молчит, пока переезды сами забирают детей: запись «Дети снова живут с вами» в игре — признак
       // пути, который оставил детей в старом городе.

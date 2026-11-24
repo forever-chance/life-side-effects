@@ -116,8 +116,12 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         const w2 = planWeddingSoc270(fr), q = w2 && z.invitations.find(q => q.id === w2.invite);
         out.inviteLinked = !!q && q.local && q.wedding270 === w2.id;
         out.accepted = q ? respondOccasion54(q.id, true) : false;
-        T.month(1); out.notYet = !fr.npcMarried54;
-        for (let i = 0; i < 6 && !fr.npcMarried54; i++) T.month(1);
+        // По месяцам: брак не раньше праздника и в тот же месяц, когда вы на нём побывали (а не в плановый срок).
+        out.months = [];
+        for (let i = 0; i < 7 && !fr.npcMarried54; i++) { T.month(1); out.months.push({ q: q?.status, married: !!fr.npcMarried54 }); }
+        out.notYet = out.months.every(m => !m.married || m.q === 'completed');
+        out.sameMonth = out.months.findIndex(m => m.q === 'completed') === out.months.findIndex(m => m.married);
+        out.dueAhead = w2.due > w2.held;
         out.friendMarried = fr.npcMarried54 && fp.npcMarried54 && fr.marriage270?.spouse === fp.id;
         out.guest = s.log.find(e => e.title === 'Свадьба · ' + fr.name)?.text || null;
         out.qStatus = q?.status;
@@ -137,10 +141,108 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       check('свадьба: карточка супруга — «Муж/Жена сестры — имя»', r.cardTie && /^(Муж|Жена) сестры — /.test(r.cardTie), r.cardTie);
       check('свадьба: вдовство снимает отметку о браке', r.widowCleared && r.widowAgain, r);
       check('свадьба: приглашение связано со свадьбой и принято', r.inviteLinked && r.accepted, r);
-      check('свадьба: брак не пишется через месяц после рассылки', r.notYet, r);
+      check('свадьба: брак не пишется до праздника', r.notYet, r.months);
+      check('свадьба: брак пишется в месяц праздника, не дожидаясь планового срока', r.sameMonth && r.dueAhead, r.months);
       check('свадьба: после праздника — брак и «Вы были среди гостей»', r.friendMarried && /среди гостей/.test(r.guest || ''), r);
       check('свадьба: планировщик берёт пару друга, но не бабушку', r.planFriend && !r.planGran, r);
       check('свадьба: без ошибок страницы', !errors.length, errors);
+      await ctx.close();
+    }
+
+    // а2) После свадьбы: расставание, новая семья, вдовство; свадьба родственника и generationPairs58; отмена свадьбы.
+    {
+      const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'de' });
+      const r = await pg.evaluate(() => {
+        s.age = 30; s.cash = 1e7; s.illness = null; const out = {};
+        const z = events54(); z.invitations = []; z.lastOffer = -100; familyState27();
+        const row = (p, sec, label) => personSections42(p).find(x => x.title === sec)?.rows?.find(r => r.label === label)?.value || null;
+        const solo = p => { s.family27.unions = s.family27.unions.filter(u => ![u.a, u.b].includes(p.id)); return p; };
+        // Расставание так, как его делает игра (autonomy55 adultSocial55, ветка current).
+        const breakup = p => { const a = adultState55(p); a.pairedAt = s.clock.ticks - 30; a.plan = { roll: .01 }; adultSocial55(p); a.plan = null; };
+        // 1. Друг женился и расстался: в карточке нет «в браке» с бывшей, запись о браке снята у обоих.
+        const fr = T.mk('Друг', 30, { bond: 75, trust: 70, strain: 5 }), fp = T.pair(fr, 14);
+        marrySoc270(fr, fp);
+        out.frBefore = row(fr, 'Собственная жизнь', 'Пара');
+        breakup(fr);
+        out.frNow = { married: fr.npcMarried54, pair: row(fr, 'Собственная жизнь', 'Пара') };
+        T.month(1);
+        out.frCleared = !fr.marriage270 && !fp.marriage270;
+        // 2. Сестра: брак, «решили жить отдельно», расставание — у бывшего мужа нет «Муж сестры».
+        const sis = solo(T.mk('Сестра', 29, { gender: 'f', bond: 70 })), a = T.pair(sis, 14);
+        marrySoc270(sis, a);
+        const u = s.family27.unions.find(u => u.married270 != null && [u.a, u.b].includes(sis.id));
+        out.sisUnion = !!u; out.tieBefore = row(a, 'О человеке', 'Родство');
+        if (u) { u.since = s.clock.ticks - 40; adultState55(sis).plan = { roll: .01 }; adultSocial55(sis); adultState55(sis).plan = null; out.unionStatus = u.status; }
+        breakup(sis);
+        out.tieAfter = row(a, 'О человеке', 'Родство'); out.sisPair = row(sis, 'Собственная жизнь', 'Пара');
+        out.edge = treeGraph90().edges.find(e => [e.a, e.b].includes(sis.id) && [e.a, e.b].includes(a.id))?.kind || null;
+        T.month(1);
+        out.sisCleared = !sis.marriage270 && !a.marriage270;
+        // 3. Новый партнёр, через два года generationPairs58 делает их семьёй; он умирает — сестра вдова и может снова выйти замуж.
+        const b = T.pair(sis, 25); b.age = 30; generationPairs58();
+        out.withB = { married: sis.npcMarried54, pair: row(sis, 'Собственная жизнь', 'Пара'), b: b.name };
+        b.alive = false; T.month(2);
+        out.widow = { married: sis.npcMarried54, unavailable: sis.unavailable18, widowed: sis.widowed270?.spouse === b.id };
+        T.pair(sis, 13); out.again = weddingEligible132(sis);
+        // 4. Свадьба брата назначена позже двух лет вместе; вы отказались. generationPairs58 успевает раньше — свадьба всё равно в свой срок.
+        z.invitations = []; z.lastOffer = -100;
+        const bro = solo(T.mk('Брат', 30, { gender: 'm', bond: 80, trust: 70, strain: 5 })), bp = T.pair(bro, 22); bp.age = 30;
+        const w = planWeddingSoc270(bro), q = w && z.invitations.find(q => q.id === w.invite);
+        if (w) w.due = s.clock.ticks + 4;
+        out.declined = q ? respondOccasion54(q.id, false) : 'нет приглашения';
+        T.month(3);
+        out.family = { married: bro.npcMarried54, m270: !!bro.marriage270, w: w?.status };
+        for (let i = 0; i < 4 && w?.status === 'planned'; i++) T.month(1);
+        out.broHeld = { w: w?.status, m: bro.marriage270?.spouse === bp.id && bp.marriage270?.spouse === bro.id,
+          unions: s.family27.unions.filter(u => u.status === 'together' && [u.a, u.b].includes(bro.id)).map(u => !!u.married270) };
+        out.broLog = s.log.find(e => e.title === 'Свадьба · ' + bro.name)?.text || null;
+        out.broEdge = treeGraph90().edges.find(e => [e.a, e.b].includes(bro.id) && [e.a, e.b].includes(bp.id))?.kind || null;
+        // 5. Приглашение принято, вы идёте на праздник — свадьба на месте, generationPairs58 не мешает.
+        z.invitations = []; z.lastOffer = -100;
+        const sis2 = solo(T.mk('Сестра', 30, { gender: 'f', bond: 80, trust: 70, strain: 5 })), sp2 = T.pair(sis2, 22); sp2.age = 30;
+        const w2 = planWeddingSoc270(sis2), q2 = w2 && z.invitations.find(q => q.id === w2.invite);
+        out.acc2 = q2 ? respondOccasion54(q2.id, true) : 'нет приглашения';
+        for (let i = 0; i < 6 && w2?.status === 'planned'; i++) T.month(1);
+        out.sis2 = { w: w2?.status, q: q2?.status, m: sis2.marriage270?.spouse === sp2.id,
+          unions: s.family27.unions.filter(u => [u.a, u.b].includes(sis2.id) && u.status === 'together').length };
+        out.sis2Log = s.log.find(e => e.title === 'Свадьба · ' + sis2.name && /поженились/.test(e.text))?.text || null;
+        // 6. Пара рассталась до свадьбы: приглашение, дело в расписании и поездка отменяются.
+        z.invitations = []; z.lastOffer = -100;
+        const f3 = T.mk('Друг', 31, { bond: 75, trust: 70, strain: 5 }), p3 = T.pair(f3, 14);
+        const w3 = planWeddingSoc270(f3), q3 = w3 && z.invitations.find(q => q.id === w3.invite);
+        breakup(f3); T.month(1);
+        out.offered = { w: w3?.status, q: q3?.status, log: s.log.find(e => e.title === 'Свадьба · ' + f3.name)?.text || null };
+        z.invitations = []; z.lastOffer = -100;
+        const f4 = T.mk('Друг', 32, { bond: 75, trust: 70, strain: 5 }), p4 = T.pair(f4, 14);
+        const w4 = planWeddingSoc270(f4), q4 = w4 && z.invitations.find(q => q.id === w4.invite);
+        out.acc4 = q4 ? respondOccasion54(q4.id, true) : 'нет приглашения';
+        const t4 = s.clock.tasks.find(t => t.kind === 'occasion54' && t.occasion54 === q4?.id);
+        breakup(f4); weddingsDueSoc270();
+        out.active = { w: w4?.status, q: q4?.status, task: t4?.state };
+        z.invitations = []; z.lastOffer = -100; familyTravel53().invitations = [];
+        const f5 = T.mk('Брат', 33, { gender: 'm', bond: 85, trust: 70, strain: 5, cash: 1e6, city: T.otherCity() }); solo(f5); const p5 = T.pair(f5, 14);
+        const w5 = planWeddingSoc270(f5), q5 = w5 && z.invitations.find(q => q.id === w5.invite), inv5 = q5?.travelInvite && invite53(q5.travelInvite);
+        out.acc5 = q5 ? respondOccasion54(q5.id, true) : 'нет приглашения';
+        const t5 = inv5?.trip && travel52().trips.find(t => t.id === inv5.trip);
+        out.trip5Before = t5?.status;
+        breakup(f5); weddingsDueSoc270();
+        out.trip = { w: w5?.status, q: q5?.status, inv: inv5?.status, trip: t5?.status, reason: t5?.reason || null };
+        return out;
+      });
+      check('брак: до расставания «Пара — имя · в браке»', / · в браке$/.test(r.frBefore || ''), r.frBefore);
+      check('брак: после расставания карточка не пишет «в браке»', !r.frNow.married && !/в браке/.test(r.frNow.pair || ''), r.frNow);
+      check('брак: после расставания запись о браке снята у обоих', r.frCleared && r.sisCleared, r);
+      check('брак: бывший муж сестры — без «Муж сестры», в древе не «Брак»', r.sisUnion && /сестры/.test(r.tieBefore || '') && !r.tieAfter && !/в браке/.test(r.sisPair || '') && r.edge !== 'married', r);
+      check('брак: новая семья сестры — в карточке новый партнёр', r.withB.married && r.withB.pair === r.withB.b, r.withB);
+      check('брак: новый партнёр умер — вдова, может снова выйти замуж', !r.widow.married && !r.widow.unavailable && r.widow.widowed && r.again, r);
+      check('свадьба брата: generationPairs58 раньше свадьбы — свадьба не отменена', r.declined === true && r.family.married && !r.family.m270 && r.family.w === 'planned', r.family);
+      check('свадьба брата: в срок — брак записан, союз один, в древе «Брак»', r.broHeld.w === 'held' && r.broHeld.m && r.broHeld.unions.length === 1 && r.broHeld.unions[0] && r.broEdge === 'married', r.broHeld);
+      check('свадьба брата: запись «поженились», вас не было', /поженились/.test(r.broLog || '') && /не было/.test(r.broLog || ''), r.broLog);
+      check('свадьба сестры: гость на празднике — брак сразу, союз один', r.acc2 === true && r.sis2.w === 'held' && r.sis2.q === 'completed' && r.sis2.m && r.sis2.unions === 1 && /среди гостей/.test(r.sis2Log || ''), r);
+      check('отмена: расстались до свадьбы — приглашение отменено, запись с причиной', r.offered.w === 'cancelled' && r.offered.q === 'cancelled' && /Свадьбы не будет: .+ расстались\.$/.test(r.offered.log || ''), r.offered);
+      check('отмена: принятое приглашение — дело в расписании снято', r.acc4 === true && r.active.w === 'cancelled' && r.active.q === 'cancelled' && r.active.task === 'cancelled', r);
+      check('отмена: поездка на свадьбу в другой город отменена', r.acc5 === true && ['planned', 'requested', 'approved'].includes(r.trip5Before) && r.trip.w === 'cancelled' && r.trip.trip === 'cancelled' && r.trip.inv === 'cancelled' && r.trip.q === 'cancelled' && /Свадьбы не будет/.test(r.trip.reason || ''), r);
+      check('брак и отмена: без ошибок страницы', !errors.length, errors);
       await ctx.close();
     }
 
@@ -175,6 +277,18 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         for (let i = 0; i < 4 && q2 && q2.status !== 'completed'; i++) T.month(1);
         out.q2Status = q2?.status;
         out.hostMemory = (bro.memories || []).some(m => /побывали вместе/.test(m));
+        // Старое сохранение: приглашение создано до 270, хозяин в составе поездки. Через месяц его в составе нет, принять можно.
+        z.lastOffer = -100;
+        const aunt = T.mk('Сестра', 40, { gender: 'f', bond: 85, trust: 30, strain: 10, cash: 1e6, city: T.otherCity() });
+        // Каждый платит за себя: до 270 хозяин оплачивал и собственную дорогу в свой же город.
+        const qOld = socialFix270Base.offerOccasion54(aunt, 'birthday', false), invOld = qOld && invite53(qOld.travelInvite);
+        out.oldParty = !!invOld?.draft.party53.includes(aunt.id) && aunt.id in (invOld.quote.charges || {});
+        T.month(1);
+        out.migrated = invOld && { party: invOld.draft.party53.includes(aunt.id), hostOff: !!invOld.hostOff270, inv: invOld.status, q: qOld.status,
+          fee: qOld.fee === invOld.quote.player, charges: Object.keys(invOld.quote.charges || {}).includes(aunt.id) };
+        out.oldAccept = qOld ? respondOccasion54(qOld.id, true) : false;
+        const tOld = invOld?.trip && travel52().trips.find(t => t.id === invOld.trip);
+        out.oldTripParty = tOld ? (tOld.party53 || []).includes(aunt.id) : 'нет поездки';
         return out;
       });
       check('приглашение: старая проверка не пускала сестру', r.oldHost === false, r);
@@ -185,6 +299,8 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       check('приглашение: отказ не меняет отношений', r.relSame, r);
       check('приглашение: согласие на поездку проходит', r.accept2 === true, r.why2);
       check('приглашение: поездка состоялась, хозяину — воспоминание', r.q2Status === 'completed' && r.hostMemory, r);
+      check('приглашение: старое сохранение — хозяин убран из поездки за месяц', r.oldParty && r.migrated && !r.migrated.party && r.migrated.hostOff && r.migrated.inv === 'offered' && r.migrated.q === 'offered' && r.migrated.fee && !r.migrated.charges, { oldParty: r.oldParty, migrated: r.migrated });
+      check('приглашение: старое сохранение — согласие проходит, хозяин не попутчик', r.oldAccept === true && r.oldTripParty === false, r);
       check('приглашение: без ошибок страницы', !errors.length, errors);
       await ctx.close();
     }
@@ -283,6 +399,9 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         m = open(a); out.again = m.buttons.filter(x => /пространство|планах|напряжение/.test(x.t));
         mood = s.mood; T.click(/пространство/); out.d1b = s.mood - mood;
         open(b); mood = s.mood; T.click(/пространство/); out.d2 = s.mood - mood;
+        // С этим человеком ещё не говорили: «недавно уже говорили» неправда; про настроение — своя пометка и только там, где оно есть.
+        const d = T.mk('Друг', 33, { bond: 50, trust: 40, strain: 50 });
+        m = open(d); out.fresh = m.buttons.filter(x => /пространство|планах|напряжение/.test(x.t)).map(x => x.t);
         T.month(1);
         open(c); let st = c.inner.strain; T.click(/напряжение/); out.freshStrain = st - c.inner.strain;
         m = open(a); out.weakHint = m.buttons.find(x => /напряжение/.test(x.t));
@@ -297,6 +416,10 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       check('разговор: первый раз — настроение +6', r.d1 === 6, r);
       check('разговор: повтор в том же месяце закрыт с причиной', r.again.length >= 3 && r.again.every(x => x.off && /уже был/.test(x.t)) && r.d1b === 0, r);
       check('разговор: настроение от второго человека в месяц слабее', r.d2 > 0 && r.d2 < 6, r);
+      const freshSpace = r.fresh.find(t => /пространство/.test(t)) || '', freshPlans = r.fresh.find(t => /планах/.test(t)) || '', freshStrain = r.fresh.find(t => /напряжение/.test(t)) || '';
+      check('разговор: с новым человеком нет «недавно уже говорили»', r.fresh.length === 3 && r.fresh.every(t => !/недавно уже говорили/.test(t)), r.fresh);
+      check('разговор: с новым человеком — меньше настроения и пометка только там', /настроение \+[1-5]\b/.test(freshSpace) && /поднимали настроение/.test(freshSpace)
+        && /доверие \+7/.test(freshPlans) && !/поднимали/.test(freshPlans) && /напряжение −12/.test(freshStrain) && !/поднимали/.test(freshStrain), r.fresh);
       check('разговор: через месяц с тем же человеком слабее, подсказка говорит об этом', r.freshStrain === 12 && r.repeatStrain > 0 && r.repeatStrain < 12 && /слабее/.test(r.weakHint?.t || ''), r);
       check('разговор: подросток — «Обозначить границу» раз в месяц', r.teen1 > 0 && r.teenAgain.length >= 2 && r.teenAgain.every(x => x.off), r);
       check('разговор: без ошибок страницы', !errors.length, errors);
@@ -361,9 +484,20 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         const bad = [];
         for (let m = 0; m < 120 && !s.dead; m++) {
           T.month(1);
+          // Супруг — тот, с кем общий союз, или нынешний партнёр (marriage270 мог остаться от прежнего брака — на него не опираемся).
+          const together = p => (s.family27?.unions || []).filter(u => u.status === 'together' && [u.a, u.b].includes(p.id)).map(u => u.a === p.id ? u.b : u.a);
           for (const p of s.people) if (p.alive && p.npcMarried54) {
-            const id = p.marriage270?.spouse || unionOtherSoc270(p) || p.agency55?.partner;
-            if (!id || !living(id)) bad.push(p.role + ':' + m);
+            if (!together(p).some(id => living(id)) && !(p.agency55?.partner && living(p.agency55.partner))) bad.push(p.role + ':' + m);
+          }
+          // Запись о браке — только о нынешнем: супруг жив, отмечен, это партнёр или общий союз, и запись взаимна.
+          for (const p of s.people) if (p.alive && p.marriage270) {
+            const sp = living(p.marriage270.spouse);
+            if (!sp || !p.npcMarried54 || sp.marriage270?.spouse !== p.id || !(p.agency55?.partner === sp.id || sp.agency55?.partner === p.id || together(p).includes(sp.id))) bad.push('stale:' + p.role + ':' + m);
+          }
+          // Отменённая свадьба не оставляет действующего приглашения.
+          for (const w of socialFix270().weddings) if (w.status === 'cancelled' && w.invite) {
+            const q = events54().invitations.find(q => q.id === w.invite);
+            if (q && ['offered', 'active'].includes(q.status)) bad.push('invite:' + m);
           }
           if (!Number.isFinite(s.mood) || !Number.isFinite(s.cash) || !Number.isFinite(schedule23().total)) bad.push('NaN:' + m);
         }

@@ -7,10 +7,11 @@
 //  - «Персонаж» и «Личное дело» — без полосы, но время стоит, пока они открыты, и идёт дальше, когда игрок уходит.
 // Широкий экран: полоса только с последним событием, когда в центре открыта не «История».
 // Нажатие на событие открывает «Историю» на этой записи, нажатие на решение — само решение.
+// Пока идёт обучение или на экране стартовое окно (startupNotice180), полосы нет.
 // Полоса — отдельная строка грида #app вне колонок-скроллеров: запоминание прокрутки (capturePanels/restorePanels)
 // и якоря ленты её не видят.
 
-const stripBase270={render,clockView,pulse};
+const stripBase270={render,clockView,pulse,start};
 const stripMq270=typeof window.matchMedia==='function'?window.matchMedia('(max-width:1000px)'):null;
 function mobile270(){return !!stripMq270?.matches;}
 
@@ -25,8 +26,11 @@ function view270(){
  const panel=s?.ui05?.panel;
  return panel==='left'?'character':panel==='right'?'actions':center;
 }
+// Стартовое окно держит полосу, только пока оно открыто: если страницу перезагрузили, окно само не возвращается,
+// и тогда строка «Ожидают ответа» — самый короткий путь к нему.
 function stripBlocked270(){
- return !s||(typeof tutorialActive180==='function'&&tutorialActive180())||(typeof startupNotice180==='function'&&!!startupNotice180());
+ return !s||(typeof tutorialActive180==='function'&&tutorialActive180())||
+  (typeof startupNotice180==='function'&&!!startupNotice180()&&!!document.getElementById('modal')?.open);
 }
 // Какие строки полосы показывать.
 function stripRows270(){
@@ -58,10 +62,10 @@ function stripDate270(e){return ((e.month!==undefined&&typeof months!=='undefine
 function stripText270(text){return typeof eventDescription204==='function'?eventDescription204(text||''):String(text||'');}
 // id записей и решений идут через data-атрибуты: в onclick строкой их пришлось бы экранировать дважды.
 function stripLatestRow270(e){
- const date=stripDate270(e);
+ const date=stripDate270(e),text=stripText270(e.text).trim();
  return '<div class="strip-row270 strip-latest270"><button class="strip-open270" data-strip-event="'+esc(e.uiId||'')+'" onclick="openHistory270(this.dataset.stripEvent)">'+
   '<span class="strip-body270"><span class="strip-kicker270">Последнее событие'+(date?' · '+esc(date):'')+'</span>'+
-  '<span class="strip-line270"><b class="strip-title270">'+esc(e.title||'')+'</b><span class="strip-text270"> — '+esc(stripText270(e.text))+'</span></span></span>'+
+  '<span class="strip-line270"><b class="strip-title270">'+esc(e.title||'')+'</b>'+(text?'<span class="strip-text270"> — '+esc(text)+'</span>':'')+'</span></span>'+
   '<span class="strip-go270" aria-hidden="true">→</span></button></div>';
 }
 function stripWaitingRow270(items){
@@ -98,11 +102,19 @@ function placeStrip270(){
  if(el&&typeof yoScreen269==='function')yoScreen269(el);
 }
 
+// Ошибка полосы не должна ломать отрисовку и то, что идёт после render() (save() в panelSelect и т. п.),
+// но и прятать её нельзя: отдаём её странице отдельно.
+function placeStripSafe270(){try{placeStrip270();}catch(e){setTimeout(()=>{throw e;});}}
 render=function(...args){
  const out=stripBase270.render.apply(this,args);
- // Ошибка полосы не должна ломать отрисовку и то, что идёт после render() (save() в panelSelect и т. п.),
- // но и прятать её нельзя: отдаём её странице отдельно.
- try{placeStrip270();}catch(e){setTimeout(()=>{throw e;});}
+ placeStripSafe270();
+ return out;
+};
+// Новая жизнь: onboarding180 открывает стартовое окно уже после последней отрисовки внутри start(),
+// поэтому полосу под окном убираем здесь.
+start=function(...args){
+ const out=stripBase270.start.apply(this,args);
+ placeStripSafe270();
  return out;
 };
 
@@ -131,8 +143,9 @@ function openHistory270(id){
 function clockHold270(){
  return !!s&&!s.dead&&!!s.clock&&mobile270()&&['character','world'].includes(view270())&&!(typeof tutorialActive180==='function'&&tutorialActive180());
 }
+// Держим только ход месяцев: то, что уже ждёт в очереди (s.pending), базовый pulse открывает как обычно.
 pulse=function(now,...rest){
- if(s&&s.clock?.running&&clockHold270()){clockStamp=now;clockCarry=0;return;}
+ if(s&&s.clock?.running&&!s.pending?.length&&clockHold270()){clockStamp=now;clockCarry=0;return;}
  return stripBase270.pulse.call(this,now,...rest);
 };
 clockView=function(...args){
@@ -167,16 +180,21 @@ if(stripMq270){
   '.strip-inner270{max-width:1700px;margin:0 auto;padding:6px 26px;display:grid;gap:2px;max-height:22vh;overflow-y:auto;overflow-x:hidden}'+
   '.strip-row270{display:flex;align-items:stretch;gap:6px;min-width:0}'+
   '.top-strip270 .strip-open270{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px;border:0;border-radius:6px;padding:5px 8px;background:transparent;color:inherit;text-align:left;line-height:1.35}'+
-  '.top-strip270 .strip-open270:hover{background:var(--hover)}'+
+  // Наведение светлее полосы: на var(--hover) приглушённый текст опускается ниже 4.5:1.
+  '.top-strip270 .strip-open270:hover{background:var(--surface)}'+
   '.strip-body270{flex:1 1 auto;min-width:0;display:block}'+
-  '.strip-kicker270{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
+  '.strip-kicker270{display:block;font-size:10px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
   '.strip-line270{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13px}'+
   '.strip-title270{font-weight:600}.strip-text270{color:var(--muted)}'+
   '.strip-go270{flex:none;color:var(--accent);font-size:15px}'+
   '.top-strip270 .strip-all270{flex:none;align-self:center;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;background:transparent;color:inherit}'+
   '.event.strip-target270{background:var(--highlight);border-radius:0 8px 8px 0;transition:background .6s}'+
   '@media(max-width:1000px){.strip-inner270{padding:4px 12px;max-height:24vh}.top-strip270 .strip-open270{padding:5px 6px}}'+
-  '@media(max-width:460px){.strip-inner270{padding:3px 8px}.strip-line270{font-size:12px}}';
+  '@media(max-width:460px){.strip-inner270{padding:3px 8px}.strip-line270{font-size:12px}}'+
+  // Телефон боком (высота до 500px): подпись и запись в одну строку, обе строки полосы — около 57px.
+  '@media(max-width:1000px) and (max-height:500px){.strip-inner270{padding:2px 12px;gap:0}'+
+  '.top-strip270 .strip-open270{padding:2px 6px;min-height:26px}.strip-body270{display:flex;align-items:baseline;gap:8px}'+
+  '.strip-kicker270{flex:0 1 auto;max-width:42%}.strip-line270{flex:1 1 0;min-width:0}.top-strip270 .strip-all270{padding:2px 10px}}';
  document.head.appendChild(st);
 })();
 

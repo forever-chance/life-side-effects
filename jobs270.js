@@ -17,13 +17,15 @@ const jobFormats270={near:'Офис · рядом с домом',far:'Офис �
 Object.assign(formats16,jobFormats270);
 function jobFormat270(format){return jobFormats270[format]||'Офис';}
 // Формат текущей работы: место работы сравнивается с нынешним домом, а не с тем, что было при найме.
+// Работа в другом городе той же страны называется так же, как вакансия «поездки в другой город»: подпись не меняется
+// после выхода на работу. «Переезд» после переезда уже не к месту — тогда формат считается по месту работы.
 function jobFormatNow270(j){
  if(!j)return '';
  if(j.format==='remote'||j.format==='hybrid')return jobFormat270(j.format);
  const w=j.workplace;
  if(!w||!w.city)return jobFormat270(j.format);
  if(w.country&&w.country!==s.country)return 'Офис · в другой стране';
- if(w.city!==residenceCity())return 'Офис · в другом городе';
+ if(w.city!==residenceCity())return jobFormats270.commute;
  if(!w.area||!s.housing?.area)return jobFormat270(j.format);
  return w.area===s.housing.area?jobFormats270.near:jobFormats270.far;
 }
@@ -41,13 +43,19 @@ function vacancyMeta270(v){return [v.hours28?v.hours28+' ч/нед.':'',v.city,c
 // Зарплатный фильтр. Шаги — доли средней зарплаты страны, суммы округлены до двух значащих цифр в текущей валюте.
 const salarySteps270=[.25,.5,.75,1,1.25,1.5,2,3];
 function roundPay270(n){if(!(n>0))return 0;const step=Math.pow(10,Math.max(0,Math.floor(Math.log10(n))-1));return Math.round(n/step)*step;}
-function salaryStepAmount270(k,country){const c=countries[country]?country:s.country;return roundPay270(localAmount16(countries[c].wage*k,c));}
-function salaryFloor270(view=path16().view){const k=Number(view?.salary270);return k>0?salaryStepAmount270(k,view.country):0;}
+// Страна вакансий — по тому же правилу, что в makeVacancies16 (trajectory16.js): «Офис · переезд за рубеж» при своей
+// стране в фильтре показывает вакансии первой другой страны.
+function vacancyCountry270(view=path16().view){
+ const c=view?.format==='abroad'&&view.country===s.country?Object.keys(countries).find(k=>k!==s.country):view?.country;
+ return countries[c]?c:s.country;
+}
+function salaryStepAmount270(k,view=path16().view){const c=vacancyCountry270(view);return roundPay270(localAmount16(countries[c].wage*k,c));}
+function salaryFloor270(view=path16().view){const k=Number(view?.salary270);return k>0?salaryStepAmount270(k,view):0;}
 function salaryFits270(v,view=path16().view){const floor=salaryFloor270(view);return !floor||Math.round(vacancyPay270(v))>=floor;}
 function salaryFilters270(){
  const v=path16().view;
  return '<div class="path-filters salary-filters270">'+
-  select16('salary270',[['all','Любая'],...salarySteps270.map(k=>[String(k),money(salaryStepAmount270(k,v.country))+'/год'])],'Зарплата от')+
+  select16('salary270',[['all','Любая'],...salarySteps270.map(k=>[String(k),money(salaryStepAmount270(k,v))+'/год'])],'Зарплата от')+
   select16('sort270',[['none','Как в объявлениях'],['salary','Сначала выше зарплата']],'Порядок')+'</div>';
 }
 matchesCareer45=function(v){return jobs270Base.matchesCareer45(v)&&salaryFits270(v);};
@@ -101,7 +109,8 @@ jobDetailData20=function(v,a){
  return d;
 };
 
-// «Моя работа»: заголовок «Должность · зарплата/год · Формат», строкой ниже — дорога.
+// «Моя работа»: заголовок «Должность · зарплата/год · Формат», строкой ниже — дорога. У гибрида это среднее
+// на день (часть дней дома), как в окне вакансии, поэтому «в среднем».
 workOverview58=function(){
  const html=jobs270Base.workOverview58(),j=s.job;
  if(!j)return html;
@@ -109,7 +118,7 @@ workOverview58=function(){
  const line='<br>'+money(j.salary)+'/год · '+esc(formats16[j.format]||'Очная работа')+'</p>';
  const minutes=j.format==='remote'?0:Math.round(commuteMinutes()||0);
  return html.replace(head,()=>'<h2 class="job-head270">'+jobHeadHTML270(j.title,j.salary,jobFormatNow270(j))+'</h2>')
-  .replace(line,()=>(minutes>0?'<br>Дорога до работы: '+minutes+' мин. в одну сторону':'')+'</p>');
+  .replace(line,()=>(minutes>0?'<br>Дорога до работы: '+(j.format==='hybrid'?'в среднем ':'')+minutes+' мин. в одну сторону':'')+'</p>');
 };
 
 // Внутренние вакансии в разговоре о карьере: зарплата и формат — в названии варианта, в подсказке — шансы.
@@ -120,8 +129,9 @@ function internalOptions270(opts){
  return opts.map((o,i)=>{
   const v=list[i];
   if(!v||o.label!==v.title)return o;
-  const prefix=money(v.salary)+'/год · ';
-  return {...o,label:jobHead270(v.title,v.salary,format),hint:typeof o.hint==='string'&&o.hint.startsWith(prefix)?o.hint.slice(prefix.length):o.hint};
+  const prefix=money(v.salary)+'/год · ',rest=typeof o.hint==='string'&&o.hint.startsWith(prefix)?o.hint.slice(prefix.length):null;
+  // Без суммы впереди подсказка начинается с заглавной, как у соседних вариантов («Шанс 59%»).
+  return {...o,label:jobHead270(v.title,v.salary,format),hint:rest===null?o.hint:rest.charAt(0).toUpperCase()+rest.slice(1)};
  });
 }
 show=function(title,text,opts,...rest){

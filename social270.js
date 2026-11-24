@@ -6,7 +6,8 @@
 //    треть свадеб проходила «ни с кем»). Свадьба случается в свой срок, даже если позвать вас не вышло
 //    (вам меньше 15, ждёт ответа другое приглашение, хозяину за границей не на что позвать): брак записывается
 //    обоим, у родственника появляется союз в семье, в древе — «Брак», у супруга в карточке — родство.
-//    Если вас позвали, брак записывается после праздника, а не через месяц после приглашения. Вдовство снимает отметку.
+//    Если вас позвали, брак записывается сразу после праздника, а не через месяц после приглашения. Вдовство снимает отметку,
+//    расставание — запись о браке; если свадьбы не будет, приглашение и поездка на неё отменяются.
 // б) Приглашение на событие в другом городе больше не приходит «мёртвым»: своя проверка доступности вместо
 //    hostEligible53 (тот пускал только друга, партнёра и родителей с близостью от 50). Хозяин — принимающая сторона,
 //    а не попутчик: в свой город он не едет и дорогу себе не оплачивает. Отказ ни на что не влияет.
@@ -112,17 +113,58 @@ function marrySoc270(host,partner,w=null,q=null){
  if(['Мать','Отец'].includes(host.role))notice61('parentWedding132','Новый брак родителя',host.name+' и '+partner.name+' вступили в брак.'+tie+went);
  else if(kin||q||(host.bond||0)>=40)log('Свадьба · '+host.name,host.name+' и '+partner.name+' поженились.'+tie+went,'Жизнь близких',kin);
 }
+function unionTogetherSoc270(a,b){return !!s.family27?.unions?.some(u=>u.status==='together'&&[u.a,u.b].includes(a)&&[u.a,u.b].includes(b));}
+// Брак из 270 действует, пока оба живы, у обоих отметка о браке и супруг — нынешний партнёр или с ним общий союз.
+// Расставание (autonomy55 adultSocial55) снимает npcMarried54 и партнёра, но не marriage270 — поэтому проверяем всякий раз.
+function spouseSoc270(p){
+ const id=p?.alive&&p.marriage270?.spouse,sp=id&&living(id);
+ if(!sp||!p.npcMarried54||!sp.npcMarried54)return null;
+ return p.agency55?.partner===sp.id||sp.agency55?.partner===p.id||unionTogetherSoc270(p.id,sp.id)?sp:null;
+}
+function marriagesSoc270(){
+ for(const p of s.people){
+  if(!p.alive||!p.marriage270||spouseSoc270(p))continue;
+  const sp=s.people.find(x=>x.id===p.marriage270.spouse);
+  if(sp?.alive&&sp.marriage270?.spouse===p.id)sp.marriage270=null;
+  p.marriage270=null;
+ }
+}
+// Свадьбы не будет: приглашение больше не действует, дело в расписании и поездка снимаются, вам — запись.
+function cancelWeddingSoc270(w,q,why=''){
+ w.status='cancelled';w.cancelled=s.clock.ticks;
+ if(!q)return;
+ const known=['offered','active','accepted'].includes(q.status),reason='Свадьбы не будет'+(why?': '+why:'');
+ let tripLogged=false;
+ if(q.travelInvite){
+  const inv=typeof invite53==='function'&&invite53(q.travelInvite),t=inv?.trip&&travel52().trips.find(t=>t.id===inv.trip);
+  if(inv?.status==='offered')inv.status='cancelled';
+  else if(inv?.status==='accepted'&&t&&['planned','requested','approved'].includes(t.status))tripLogged=cancelTravel52(t.id,reason);
+  if(inv)q.status=inv.status;
+ }else if(['offered','active'].includes(q.status)){
+  q.status='cancelled';
+  for(const t of s.clock.tasks)if(t.kind==='occasion54'&&t.occasion54===q.id&&!['completed','cancelled'].includes(t.state))archiveTask05(t,'cancelled');
+ }
+ if(known&&!tripLogged)log(q.title,reason+'.','Жизнь близких');
+}
+function awayWhySoc270(p){const a=awaySoc270(p);return a?p.name+' '+a[0].toLowerCase()+a.slice(1):'';}
 function weddingsDueSoc270(){
  const events=typeof events54==='function'?events54().invitations:[];
  for(const w of socialFix270().weddings){
-  if(w.status!=='planned'||w.due>s.clock.ticks)continue;
-  const host=living(w.host),partner=living(w.partner),q=w.invite&&events.find(q=>q.id===w.invite);
-  if(!host||!partner||npcPartner55(host)?.id!==partner.id||host.npcMarried54||partner.npcMarried54){w.status='cancelled';continue;}
+  if(w.status!=='planned')continue;
+  const host=living(w.host),partner=living(w.partner),q=w.invite&&events.find(q=>q.id===w.invite)||null;
+  const pair=!!(host&&partner&&npcPartner55(host)?.id===partner.id);
+  // generationPairs58 мог раньше свадьбы сделать их семьёй (npcMarried54 у обоих) — свадьба всё равно в свой срок.
+  const each=pair&&host.npcMarried54&&partner.npcMarried54;
+  if(!pair||!each&&(host.npcMarried54||partner.npcMarried54)){
+   cancelWeddingSoc270(w,q,host&&partner&&!pair?host.name+' и '+partner.name+' расстались':'');continue;
+  }
+  // Праздник, на котором вы были, — и есть свадьба: брак пишется сразу, а не в плановый месяц.
+  if(w.due>s.clock.ticks&&q?.status!=='completed')continue;
   // Вы уже идёте на праздник (дело в расписании или поездка впереди) — свадьба дожидается гостя.
   const guestOnWay=q&&(q.status==='active'||q.status==='accepted'&&tripAheadSoc270(q));
   const away=awaySoc270(host)||awaySoc270(partner);
   if((guestOnWay||away)&&w.delays<4){w.delays++;w.due=s.clock.ticks+(away?2:1);continue;}
-  if(away){w.status='cancelled';continue;}
+  if(away){cancelWeddingSoc270(w,q,awayWhySoc270(host)||awayWhySoc270(partner));continue;}
   marrySoc270(host,partner,w,q);
  }
 }
@@ -143,14 +185,20 @@ function unionOtherSoc270(p){
  return u?(u.a===p.id?u.b:u.a):null;
 }
 // Вдовство (и старый баг «женат ни на ком»): нет живого супруга — нет отметки о браке, человек снова может жениться.
+// Супруг — тот, с кем общий союз, или нынешний партнёр; marriage270 мог остаться от прежнего брака и для этого не годится.
+function spouseNowSoc270(p){
+ const u=s.family27?.unions?.find(u=>u.status==='together'&&[u.a,u.b].includes(p.id)),other=u&&(u.a===p.id?u.b:u.a);
+ if(other&&living(other))return other;
+ const cur=p.agency55?.partner;
+ return cur&&living(cur)?cur:null;
+}
 function widowsSoc270(){
  for(const p of s.people){
-  if(!p.alive||!p.npcMarried54)continue;
-  const id=p.marriage270?.spouse||unionOtherSoc270(p)||p.agency55?.partner||null;
-  if(id&&living(id))continue;
+  if(!p.alive||!p.npcMarried54||spouseNowSoc270(p))continue;
+  const dead=[p.marriage270?.spouse,unionOtherSoc270(p),p.agency55?.partner].find(id=>id&&s.people.some(x=>x.id===id&&!x.alive));
   p.npcMarried54=false;
-  p.unavailable18=!!(p.agency55?.partner&&living(p.agency55.partner));
-  if(id&&s.people.some(x=>x.id===id))p.widowed270={spouse:id,tick:s.clock.ticks};
+  p.unavailable18=false;
+  if(dead)p.widowed270={spouse:dead,tick:s.clock.ticks};
   p.marriage270=null;
  }
 }
@@ -288,11 +336,17 @@ timeBase.talk=function(id){
  const opts=(options||[]).map(o=>{
   if(!talkLimitedSoc270(o))return o;
   if(done)return {...o,disabled:true,hint:'Такой разговор в этом месяце уже был'};
-  const weaker=k<.99||km<.99;
-  return {...o,hint:weaker?scaleHintSoc270(o.hint,k,km)+' · недавно уже говорили, подействует слабее':o.hint,fn:()=>talkRunSoc270(p.id,o.fn)};
+  return {...o,hint:talkHintSoc270(o.hint,k,km),fn:()=>talkRunSoc270(p.id,o.fn)};
  });
  return show(title,text,opts,...rest);
 };
+// С этим человеком недавно говорили — слабее всё. Говорили с другими — слабее только настроение, и только там, где оно есть.
+function talkHintSoc270(h,k,km){
+ const base=String(h||'');
+ if(k<.99)return scaleHintSoc270(base,k,km)+' · недавно уже говорили, подействует слабее';
+ if(km<.99){const x=scaleHintSoc270(base,1,km);if(x!==base)return x+' · такие разговоры недавно уже поднимали настроение';}
+ return h;
+}
 function talkRunSoc270(pid,fn){
  const p=living(pid);if(!p||!s.clock)return;
  if(p.talk270?.tick===s.clock.ticks)return toast('Такой разговор в этом месяце уже был.');
@@ -395,13 +449,14 @@ taskList05=function(...args){
 treeGraph90=function(...args){
  const g=socialFix270Base.treeGraph90(...args),key=(a,b)=>[a,b].sort().join('|');
  const married=new Set((s.family27?.unions||[]).filter(u=>u.married270&&u.status==='together').map(u=>key(u.a,u.b)));
- for(const p of s.people)if(p.alive&&p.marriage270?.spouse)married.add(key(p.id,p.marriage270.spouse));
+ for(const p of s.people)if(spouseSoc270(p))married.add(key(p.id,p.marriage270.spouse));
  for(const e of g.edges)if(e.kind==='partner'&&e.a!=='player'&&e.b!=='player'&&married.has(key(e.a,e.b)))e.kind='married';
  return g;
 };
 personSections42=function(p,...args){
  const sections=socialFix270Base.personSections42(p,...args),m=p?.marriage270;
- const spouse=m?.spouse&&s.people.find(x=>x.id===m.spouse);
+ // Только нынешний брак: после расставания или вдовства карточка показывает то, что записала сама игра.
+ const spouse=spouseSoc270(p);
  if(!spouse)return sections;
  const row=sections.find(x=>x.title==='Собственная жизнь')?.rows?.find(r=>r.label==='Пара');
  if(row)row.value=spouse.name+' · в браке';
@@ -424,6 +479,7 @@ function afterMonthSoc270(){
  claimWeddingsSoc270();
  weddingsDueSoc270();
  widowsSoc270();
+ marriagesSoc270();
  weddingsPlanSoc270();
  occasionMemoriesSoc270();
  overworkSoc270();
