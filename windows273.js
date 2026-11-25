@@ -18,6 +18,13 @@
 //   jobEligibility16 (резюме × собеседование, как в finishTask), шанс поступления — admission16, часы учёбы —
 //   schedule23, цена — tuition16, деньги поездки — таблица самой поездки и quoteJourney57, даты — dateLabel86.
 // • В сохранении ничего нового. «Подробнее» запоминается по виду окна в localStorage этого браузера.
+// • Второй проход (вид и тексты): card.table(row, section, detail) — что из старой таблицы не показывать и в «Все условия»
+//   (макеты «Убрано»: повтор заголовка, очевидное, нули, оговорки про «игровое»); card.opts(list) — поправить подсказку
+//   или сделать вариант серым с причиной (подписи не меняются); card.drop — дописанные кнопки, которые заменил вариант
+//   карточки; card.side — вторая главная кнопка в один ряд с первой («Принять оффер» · «Отказаться»);
+//   card.mainSecondary — единственная главная кнопка не главного вида (отмена поездки); need[].short — короткая причина
+//   под серой главной кнопкой. Главные кнопки прилипают к низу экрана телефона, только если среди них есть доступная и
+//   «Не хватает» пусто. Всё, что нажимают, на телефоне не ниже 44 px.
 // Окна без карточки рисуются как раньше, с двумя общими исправлениями: у серой кнопки видна причина (поле why или
 // reason варианта), а текст окна с таблицей nextDetail20 больше не пропадает — он стоит над таблицей.
 // Новая постоянная обёртка show(), подключённая после этого файла, увидит уже переложенное окно; новые кнопки окна
@@ -25,7 +32,7 @@
 
 const windows273Base={show,jobDetails16,programDetails16,travelDraftMenu52,travelInviteMenu53,travelTripMenu52,
  journeyDraftMenu57,tripInsertReady272,educationPlanMenu231};
-let nextCard273=null,card273=null,seq273=0;
+let nextCard273=null,card273=null,ctx273=null,seq273=0;
 
 // ---------- мелочи ----------
 
@@ -64,6 +71,44 @@ function freeNeed273(hours,what){
 }
 function liveTask273(kind,test){return (s.clock.tasks||[]).find(t=>t.kind===kind&&!['completed','cancelled'].includes(t.state)&&test(t));}
 const foot273=/^(Назад|Закрыть|Вернуться|К предложениям|Все решения|Карточка поездки)/;
+function cap273(t){t=String(t||'');return t.charAt(0).toUpperCase()+t.slice(1);}
+function days273(n){return n+' '+plural273(n,'день','дня','дней');}
+function zero273(t){return /^0(\D|$)/.test(String(t??'').replace(/\s/g,''));}
+// Оговорки про «игровую модель» (правило «Текст» в ROADMAP) из старых таблиц и причин — обычными словами. Только то,
+// что попадает в окна 273: правила стран (rights31), таблица программы (readability20), визы (visas86).
+const ungame273List=[
+ [/Игровой лимит работы на учебном основании: /g,'Лимит работы на учебном основании: '],
+ [/Учебное основание в игре не даёт права на работу/g,'Учебное основание не даёт права на работу'],
+ [/Консервативный игровой маршрут с проверкой документов на подработку/g,'Подработка — после проверки документов'],
+ [/Очная программа в условно аккредитованном игровом вузе; /g,'Очная программа; '],
+ [/; (\d+) ч — игровой лимит нагрузки, не национальный закон/g,'; до $1 ч/нед.'],
+ [/; (\d+) ч — игровой лимит/g,'; до $1 ч/нед.'],
+ [/Этот игровой студенческий маршрут не поддерживает самозанятость/g,'На студенческом статусе самозанятость недоступна'],
+ [/ в игровой модели/g,''],
+ [/Игровые программы и параметры; суммы/g,'Суммы'],
+ [/ игровых мес\./g,' мес.']
+];
+function ungame273(t){t=String(t??'');if(!/игров/i.test(t))return t;for(const [re,to] of ungame273List)t=t.replace(re,to);return t;}
+// «52 лет», «24 месяцев» из старых строк — с правильным окончанием.
+function plurals273(t){return String(t??'').replace(/(\d+) лет(?![а-яё])/g,(m,n)=>n+' '+plural273(+n,'год','года','лет')).replace(/(\d+) месяцев(?![а-яё])/g,(m,n)=>n+' '+plural273(+n,'месяц','месяца','месяцев'));}
+// Таблица окна для «Все условия» — копия без того, что макеты убрали (повтор заголовка, очевидное для этого персонажа,
+// нули, оговорки про игру). keep(row, section) → false (убрать), true (оставить) или новая строка. Карточка считает свои
+// числа по полной таблице. Раздел готовности поездки не трогается: его читает trips272.
+function tableCopy273(detail,keep){
+ const sections=[];
+ for(const g of detail.sections||[]){
+  const rows=[],ready=/^(Готовность|Перед согласием)$/.test(g.title);
+  for(const r of g.rows||[]){
+   let k=true;if(!ready)try{k=keep(r,g,detail);}catch(e){console.error(e);}
+   if(k===false)continue;
+   const row=k&&typeof k==='object'?k:r;
+   rows.push({...row,value:plurals273(ungame273(row.value)),...(row.help?{help:ungame273(row.help)}:{})});
+  }
+  if(!rows.length&&!ready)continue;
+  sections.push({...g,rows,note:g.note?ungame273(g.note):g.note});
+ }
+ return {...detail,sections};
+}
 
 // ---------- show(): карточка, причины у серых кнопок, текст окна ----------
 
@@ -71,8 +116,13 @@ show=function(title,text,opts=[],...rest){
  const card=nextCard273,detail=nextDetail20;
  nextCard273=null;
  const seq=++seq273;
+ // Убранное по макетам (повтор заголовка, очевидное, нули, оговорки про игру) не попадает и в «Все условия»: таблица
+ // рисуется из копии без этих строк. Карточка считает свои числа по полной таблице (ctx.detail). Подписи вариантов
+ // не меняются (их ловят по точной подписи), card.opts может поправить только подсказки и доступность.
+ if(card&&detail?.sections&&typeof card.table==='function')try{nextDetail20=tableCopy273(detail,card.table);}catch(e){console.error(e);}
+ if(card&&typeof card.opts==='function'&&Array.isArray(opts))try{opts=card.opts(opts);}catch(e){console.error(e);}
  const r=windows273Base.show.call(this,title,text,opts,...rest);
- card273=null;
+ card273=null;ctx273=null;
  const ctx={title:String(title??''),text:String(text??''),opts:Array.isArray(opts)?opts:[],detail,seq};
  let c=null;
  if(card)try{c=typeof card.build==='function'?{...card,...card.build(ctx)}:card;}catch(e){console.error(e);c=null;}
@@ -80,7 +130,7 @@ show=function(title,text,opts=[],...rest){
  if(c&&!mainFound273(c,ctx.opts)&&!c.status?.text)c=null;
  try{
   if(c){
-   card273=c;
+   card273=c;ctx273=ctx;
    layout273(c,ctx);yo273();
    queueMicrotask(()=>{if(seq===seq273&&card273===c)try{layout273(c,ctx);yo273();}catch(e){console.error(e);}});
   }else if(detail&&ctx.text.trim())textBack273(ctx.text);
@@ -230,7 +280,8 @@ function adopt273(card,ctx,d,h2){
  for(const b of [...d.querySelectorAll('button')]){
   if(b.closest('.options,.modal-closebar38,.need273,.chips273,.others273')||b.classList.contains('fix273'))continue;
   const l=b.textContent.replace(/\s+/g,' ').trim();
-  if(labels.has(l)){b.remove();continue;}
+  // card.drop — дописанные кнопки, которые карточка заменила своим вариантом (отказ из «Ожидают ответа», navigation24).
+  if(labels.has(l)||card.drop&&is273(l,card.drop)){b.remove();continue;}
   if(chips&&card.pay&&is273(l,card.pay.chips)){chips.append(b);continue;}
   others.append(b);
  }
@@ -238,6 +289,12 @@ function adopt273(card,ctx,d,h2){
  // Порядок главных — как в карточке.
  const order=b=>{const l=optLabel273(b);const i=(card.main||[]).findIndex(x=>x instanceof RegExp?x.test(l):x===l);return i<0?99:i;};
  [...main.children].sort((a,b)=>order(a)-order(b)).forEach(b=>main.append(b));
+ // «Принять оффер» и «Отказаться» — в один ряд, как в макете; отказ — по своей ширине.
+ const kids=[...main.children].filter(b=>!b.hidden);
+ main.classList.toggle('pair273',kids.length===2&&!!card.side&&is273(optLabel273(kids[1]),card.side));
+ main.classList.toggle('second273',!!card.mainSecondary);
+ // Вариант, который стоит кнопкой в «Не хватает», не повторяется в «Других действиях».
+ for(const b of orig?orig.querySelectorAll(':scope > button'):[])b.hidden=!!card.hideOpts?.includes(optLabel273(b));
  mainWhy273(card);
  d.querySelector('.set273').hidden=!setBox.children.length;
  d.querySelector('.others-h273').hidden=!(orig?.children.length||others.children.length);
@@ -245,15 +302,19 @@ function adopt273(card,ctx,d,h2){
  foot.hidden=!foot.children.length;
  d.querySelector('.need273').hidden=!d.querySelector('.need273').children.length;
 }
-// Серая главная кнопка: причина под подписью — первая строка «Не хватает».
+// Серая главная кнопка: причина под подписью — первая строка «Не хватает», коротко («сначала нужен профиль …»).
+// На телефоне главные кнопки прилипают к низу экрана, только если среди них есть доступная и «Не хватает» пусто:
+// серая кнопка не должна закрывать кнопку, которая её исправляет.
 function mainWhy273(card){
- const why=card.mainWhy||(card.need||[]).find(n=>n&&n.text)?.text||'';
- for(const b of document.querySelectorAll('#modal .main273 button')){
+ const first=(card.need||[]).find(n=>n&&n.text),why=card.mainWhy||first?.short||first?.text||'';
+ const main=document.querySelector('#modal .main273'),need=document.querySelector('#modal .need273');
+ for(const b of main?main.querySelectorAll('button'):[]){
   let sm=b.querySelector('.why273');
   if(!b.disabled||!why){if(sm&&sm.dataset.card273)sm.remove();continue;}
   if(!sm){sm=document.createElement('small');sm.className='why273';b.append(sm);}
   sm.dataset.card273='1';sm.textContent=why;
  }
+ if(main)main.classList.toggle('stick273',!card.mainSecondary&&[...main.querySelectorAll('button')].some(b=>!b.disabled&&!b.hidden)&&!(need&&!need.hidden&&need.children.length));
 }
 
 // ---------- вакансия, отклик, собеседование, оффер ----------
@@ -261,11 +322,58 @@ function mainWhy273(card){
 // Этапы отклика — те же, что ставят applyJob16 (резюме: task16 на 1 мес. по 2 ч/нед.) и interview16 (1 мес. по 3 ч/нед.).
 const jobSteps273={resume:{months:1,hours:2},interview:{months:1,hours:3}};
 function interviewChance273(p){return Math.min(.95,p+.15);} // как в finishTask: interviewRoll < min(.95, probability+.15)
+// Нужен ли переезд к выходу на работу. Тогда о нём говорит отдельная строка «Переезд», а не вторая строка заголовка.
+function jobMove273(v){return v.format!=='remote'&&(['city','abroad'].includes(v.format)&&v.city!==residenceCity()||v.country!==s.country);}
 function workPlace273(v){
  if(v.format==='remote')return 'удалённо';
- if(['city','abroad'].includes(v.format)&&(v.city!==residenceCity()||v.country!==s.country))return 'офис · нужен переезд';
+ if(jobMove273(v))return v.format==='hybrid'?'гибрид':'офис';
  let m=0;try{m=Math.round(commuteFor16(v)||0);}catch(e){}
  return (v.format==='hybrid'?'гибрид':'офис')+(m>0?', '+m+' мин дороги':'');
+}
+function jobCitizen273(v){try{return !!rights31(v.country,v).citizen;}catch(e){return v.country===s.country;}}
+// Договор словами: «срочный договор на 2 года», «бессрочный договор».
+function contract273(value){const m=/^(.+?) · (\d+) мес\.$/.exec(value||'');return m?lower273(m[1])+' на '+span273(+m[2]):lower273(value);}
+// «Все условия» вакансии без того, что макет убрал: источник, повтор города и статуса, ставка 100%, очевидное для
+// гражданина (правила страны, право работать, разрешение), «Переезд не требуется», проживание в том же городе.
+function vacancyTable273(v){
+ const citizen=jobCitizen273(v),here=v.country===s.country&&v.city===residenceCity();
+ return (r,g)=>{
+  const l=r.label,val=String(r.value??'');
+  if(g.title==='Условия'&&['Источник','Где','Статус заявки'].includes(l))return false;
+  if(l==='Ставка'&&val==='100%')return false;
+  if(l==='Оформление'&&/не требуется/.test(val))return false;
+  if(l==='Базовое проживание'&&here)return false;
+  if(g.title==='Правила страны'&&citizen)return false;
+  if(citizen&&['Совместимость со статусом','Право работать в стране вакансии'].includes(l))return false;
+  if(l==='Повторная подача'&&r.ok===true)return false;
+  if(l==='Местоположение для выхода'&&/не требуется/.test(val))return false;
+  return true;
+ };
+}
+// Текст окна вакансии (он в «Все условия»): без источника и без проживания в том же городе.
+function vacancyText273(v,text){
+ let t=String(text??'').replace(/ ?Источник: [^.\n]*\./,'');
+ if(v.country===s.country&&v.city===residenceCity())t=t.replace(/ ?Проживание около [^\n]*?пересчитается\./,'');
+ return plurals273(ungame273(t));
+}
+// Выполненные требования одной строкой, как в макете: только настоящие, строчными, без очевидного для этого персонажа.
+// levels — с уровнями («английский C1 (нужно B1)»); skip(row) — что ещё не писать.
+function metList273(detail,{section=null,levels=true,skip=()=>false}={}){
+ const out=[],last=[];
+ for(const r of rows273(detail)){
+  if(r.ok!==true||section&&r.section!==section||skip(r))continue;
+  const l=r.label,v=String(r.value||''),need=/^(.+?) \/ нужно (.+)$/.exec(v),lv=need&&levels?' '+need[1]+' (нужно '+need[2]+')':'';
+  let m;
+  if(/^(Повторная подача|Срок повторной подачи)$/.test(l)||(l==='Опыт'||l==='Местоположение для выхода')&&/не требуется/.test(v))continue;
+  if(l==='Возраст')out.push('возраст');
+  else if((m=/^Язык · (.+)$/.exec(l)))out.push(lower273(m[1])+lv);
+  else if(l==='Профессиональные навыки')out.push('навыки'+lv);
+  else if(l==='Совместимость со статусом')out.push('часы по вашему статусу');
+  else if(l==='Право работать в стране вакансии')out.push('право работать');
+  else if(l==='Профиль'){const name=v.split(' · ')[0].trim();last.push(name?'профиль «'+name+'»':'профиль');}
+  else out.push(lower273(l));
+ }
+ return [...out,...last];
 }
 function jobStatus273(a){
  const t=s.clock.ticks;
@@ -274,7 +382,7 @@ function jobStatus273(a){
  if(a.status==='interviewing'){const k=liveTask273('pathInterview',k=>k.application===a.id);return {text:'Собеседование идёт'+(k?' · '+answerIn273(taskLeft273(k)):''),tone:'wait'};}
  if(a.status==='offered')return {text:'Оффер'+(Number.isFinite(a.expires)?' · ответить '+untilMonth273(a.expires):''),tone:'wait'};
  if(a.status==='accepted')return {text:'Оффер принят · осталось выйти на работу',tone:'ok'};
- if(a.status==='employed')return {text:'Вы здесь работали или работаете',tone:'ok'};
+ if(a.status==='employed'){const v=a.vacancy,now=s.job&&s.job.employer===v.employer&&s.job.professionId===v.profession;return {text:now?'Вы работаете здесь':'Вы здесь работали',tone:'ok'};}
  return {text:lower273(status16[a.status]||'Отклик закрыт').replace(/^./,c=>c.toUpperCase()),tone:'bad'};
 }
 function jobStepsText273(a){
@@ -286,17 +394,17 @@ function jobStepsText273(a){
 }
 // Язык: курс именно этого языка, с ценой, часами и приростом (languageLesson16 — то, что спишет languageTask16).
 function langNeed273(lang,need,back){
- const name=lang16[lang],have=cefr16[level16(lang)]||cefr16[0],text=name+' '+cefr16[need]+' — у вас '+have;
+ const name=lang16[lang],have=cefr16[level16(lang)]||cefr16[0],text=name+' '+cefr16[need]+' — у вас '+have,short='сначала '+lower273(name)+' '+cefr16[need];
  const t=liveTask273('pathLanguage',t=>t.language===lang);
- if(t)return {text,when:'занятия '+answerIn273(taskLeft273(t),'идут, закончатся','стоят — в неделе нет свободных часов')};
+ if(t)return {text,short,when:'занятия '+answerIn273(taskLeft273(t),'идут, закончатся','стоят — в неделе нет свободных часов')};
  const L=languageLesson16('course');
- return {text,fix:{label:'Курс · '+name,hint:L.months+' мес. · '+L.hours+' ч/нед. · '+money(L.cost)+' сразу · +'+String(L.gain).replace('.',',')+' уровня',fn:()=>{languageTask16(lang,'course');back();}}};
+ return {text,short,fix:{label:'Курс · '+name,hint:L.months+' мес. · '+L.hours+' ч/нед. · '+money(L.cost)+' сразу · +'+String(L.gain).replace('.',',')+' уровня',fn:()=>{languageTask16(lang,'course');back();}}};
 }
 function skillNeed273(field,need,back){
- const have=Math.round(path16().experience.skills[field]||s.skill),text='Подготовка '+need+' — у вас '+have;
+ const have=Math.round(path16().experience.skills[field]||s.skill),text='Подготовка '+need+' — у вас '+have,short='сначала подготовка '+need;
  const t=liveTask273('pathSkill',t=>t.field===field);
- if(t)return {text,when:'практика '+answerIn273(taskLeft273(t),'идёт, закончится','стоит — в неделе нет свободных часов')};
- return {text,fix:{label:'Практика · '+fields16[field].name,hint:'3 мес. · 4 ч/нед.',fn:()=>{skillTask16(field);back();}}}; // как в skillTask16
+ if(t)return {text,short,when:'практика '+answerIn273(taskLeft273(t),'идёт, закончится','стоит — в неделе нет свободных часов')};
+ return {text,short,fix:{label:'Практика · '+fields16[field].name,hint:'3 мес. · 4 ч/нед.',fn:()=>{skillTask16(field);back();}}}; // как в skillTask16
 }
 // Каждая причина из jobEligibility16 (trajectory16 и обёртки careers45, specializations46, teaching26, employment28,
 // rights31, court94) — строкой с кнопкой, которая её исправляет, или с объяснением, когда исправить действием нельзя.
@@ -335,9 +443,9 @@ function jobNeed273(w,v,p){
  if(m){const limit=+(m[1]||m[2]),full=v.fullHours28??40,f=[.75,.5,.25].find(f=>full*f<=limit);
   return {text:w.replace(/;.*/,'')+(m[1]?', вакансия — '+(v.hours28??40)+' ч/нед.':''),...(f?{fix:{label:'Вакансии на меньшую ставку',hint:'до '+limit+' ч/нед.',fn:jobs({fte28:String(f)})}}:{when:'нужна вакансия до '+limit+' ч/нед.'})};}
  if(/^Нет права на эту работу/.test(w))return {text:w,fix:{label:'Документы',hint:'разрешение на работу',fn:()=>openPath16('mobility')}};
- if(/самозанятость/.test(w))return {text:w,when:'пока вы на студенческом статусе'};
+ if(/самозанятость/.test(w))return {text:'На студенческом статусе самозанятость недоступна',when:'пока вы на студенческом статусе'};
  if(/заключения/.test(w))return {text:w,when:'до конца заключения'};
- return {text:w};
+ return {text:ungame273(w)};
 }
 function vacancyBuild273(v,a,ctx){
  const x=path16(),p=profession16(v.profession),r=jobEligibility16(v),pay=localAmount16(v.salary,v.country),month=pay/12,stage=a?.status||null;
@@ -347,9 +455,8 @@ function vacancyBuild273(v,a,ctx){
  const cur=s.job&&stage!=='employed'?s.job.salary/12:null,diff=cur==null?0:month-cur;
  card.rows.push({label:'Получите',value:money(month)+'/мес. на руки',note:cur==null?'':Math.abs(diff)<1?'столько же, сколько сейчас':'на '+money(Math.abs(diff))+(diff<0?' меньше':' больше')+' нынешней'});
  const contract=rowValue273(ctx.detail,'Тип','Трудовой договор');
- card.rows.push({label:'Цена',value:[(v.hours28??40)+' ч/нед.',contract?lower273(contract):''].filter(Boolean).join(' · '),note:['interview','submitted'].includes(stage)||!a?jobStepsText273(a):''});
- if(v.format!=='remote'&&(['city','abroad'].includes(v.format)&&v.city!==residenceCity()||v.country!==s.country))
-  card.rows.push({label:'Переезд',value:v.country!==s.country?'к выходу на работу нужны переезд и разрешение на работу':'к выходу на работу нужен переезд'});
+ card.rows.push({label:'Цена',value:[(v.hours28??40)+' ч/нед.',contract?contract273(contract):''].filter(Boolean).join(' · '),note:['interview','submitted'].includes(stage)||!a?jobStepsText273(a):''});
+ if(jobMove273(v))card.rows.push({label:'Переезд',value:v.country!==s.country?'к выходу на работу нужны переезд и разрешение на работу':'к выходу на работу нужен переезд'});
  const resume=a?a.probability:r.probability,iv=interviewChance273(resume);
  if(!a&&!r.why.length||stage==='submitted')card.chance={label:'Шанс оффера',p:resume*iv};
  else if(stage==='interview'||stage==='interviewing')card.chance={label:'Шанс оффера',p:iv};
@@ -360,11 +467,27 @@ function vacancyBuild273(v,a,ctx){
   if(s.clock.ticks<retry)card.need.push({text:'Повторный отклик на эту профессию в этой стране',when:sinceMonth273(retry)});
   const free=freeNeed273(jobSteps273.resume.hours,'резюме');if(free)card.need.push(free);
   card.main=['Отправить резюме'];
- }else card.main=['Пройти собеседование','Принять оффер','Выйти на работу','Документы и переезд','Отказаться от предложения / собеседования'];
+  // Как поднять шанс: законченные работы своего профиля (портфолио, career45) — пока резюме не отправлено.
+  const port=rowValue273(ctx.detail,'Подходящие работы','Портфолио'),gain=/до (\d+) процентн/.exec(rowValue273(ctx.detail,'Влияние','Портфолио'));
+  if(card.chance&&port&&gain){const parts=port.split(' · ').map(t=>/^(.+): (\d+)$/.exec(t.trim())).filter(Boolean),have=parts.reduce((n,m)=>n+ +m[2],0);
+   if(parts.length)card.more.push({title:'Как поднять шанс',text:'Законченные работы своего профиля ('+parts.map(m=>lower273(m[1])).join(', ')+') — до +'+gain[1]+' п. п. '+(have?'Сейчас их '+have+'.':'Сейчас таких работ нет.')});}
+ }else{
+  // Отказ — свой вариант карточки «Отказаться» (с подтверждением); кнопку navigation24 с той же целью карточка убирает.
+  card.main=['Пройти собеседование','Принять оффер','Выйти на работу','Документы и переезд','Отказаться'];
+  card.side=['Отказаться'];card.drop=['Отказаться от предложения / собеседования'];
+ }
  card.more.push({title:'В год',text:money(pay)+' на руки'+(s.job&&stage!=='employed'?'; сейчас '+money(s.job.salary):'')+'.'});
- const met=rows273(ctx.detail).filter(r=>r.ok===true).map(r=>/нужно/.test(r.value)?r.label+' ('+String(r.value).replace(' / ',', ')+')':r.label);
- if(met.length)card.more.push({title:'Выполнено',text:met.join(', ')+'.'});
- card.moreHint=card.chance?'почему '+pct273(card.chance.p)+', требования, договор':'требования, договор';
+ const citizen=jobCitizen273(v);
+ const met=metList273(ctx.detail,{skip:r=>citizen&&['Совместимость со статусом','Право работать в стране вакансии'].includes(r.label)});
+ if(met.length)card.more.push({title:card.need.length?'Остальное выполнено':'Требования выполнены',text:cap273(met.join(', '))+'.'});
+ // Договор и дорога: срок договора, дорога от нынешнего дома (если переезд не нужен), рост ставки.
+ const deal=[],term=rowValue273(ctx.detail,'Срок','Трудовой договор'),road=rowValue273(ctx.detail,'Дорога в одну сторону'),fare=rowValue273(ctx.detail,'Транспорт'),grow=/^([\d.]+)×/.exec(rowValue273(ctx.detail,'Потенциал роста'));
+ if(contract)deal.push(cap273(contract273(contract))+(term&&/выхода на работу/.test(term)?' — срок считается с выхода на работу':'')+'.');
+ const withRoad=road&&v.format!=='remote'&&!jobMove273(v);
+ if(withRoad)deal.push('Дорога '+road+' в одну сторону'+(fare&&!zero273(fare)?', транспорт '+fare.replace(/\.$/,''):'')+'.');
+ if(grow)deal.push('Рост — до '+grow[1].replace('.',',')+' базовой ставки.');
+ if(deal.length)card.more.push({title:withRoad?'Договор и дорога':'Договор',text:deal.join(' ')});
+ card.moreHint=(card.chance?'почему '+pct273(card.chance.p)+', ':'')+'требования, договор';
  return card;
 }
 // Отказ от отклика: на первом экране рядом с «Принять», поэтому с коротким подтверждением.
@@ -380,8 +503,8 @@ function jobDeclineAsk273(id){
 }
 function vacancyOpts273(v,a,id,opts){
  let list=opts;
- if(a&&decisionActive24({kind:'job',id})&&!list.some(o=>o?.label==='Отказаться от предложения / собеседования')){
-  const i=list.findIndex(o=>o?.label==='Закрыть'),decline={label:'Отказаться от предложения / собеседования',fn:()=>jobDeclineAsk273(id)};
+ if(a&&decisionActive24({kind:'job',id})&&!list.some(o=>o?.label==='Отказаться')){
+  const i=list.findIndex(o=>o?.label==='Закрыть'),decline={label:'Отказаться',fn:()=>jobDeclineAsk273(id)};
   list=i<0?[...list,decline]:[...list.slice(0,i),decline,...list.slice(i)];
  }
  return list;
@@ -390,12 +513,12 @@ jobDetails16=function(id,application=false,...rest){
  const x=path16(),a=application&&x.jobApplications.find(a=>a.id===id),v=a?a.vacancy:x.vacancies.find(v=>v.id===id);
  if(!v||nextCard273)return windows273Base.jobDetails16(id,application,...rest);
  const old=show;let done=false;
- nextCard273={kind:'vacancy',area:'Работа',title:jobTitle270(v.title),h2:'hide',build:ctx=>vacancyBuild273(v,a||null,ctx)};
+ nextCard273={kind:'vacancy',area:'Работа',title:jobTitle270(v.title),h2:'hide',table:vacancyTable273(v),build:ctx=>vacancyBuild273(v,a||null,ctx)};
  show=function(title,text,opts=[],...more){
   if(done)return old(title,text,opts,...more);
   done=true;
-  let list=opts;try{list=vacancyOpts273(v,a||null,id,opts);}catch(e){console.error(e);}
-  return old(title,text,list,...more);
+  let list=opts,body=text;try{list=vacancyOpts273(v,a||null,id,opts);body=vacancyText273(v,text);}catch(e){console.error(e);}
+  return old(title,body,list,...more);
  };
  try{return windows273Base.jobDetails16(id,application,...rest);}finally{show=old;nextCard273=null;}
 };
@@ -429,18 +552,42 @@ function certFor273(p){
  const list=(typeof programs16!=='undefined'?programs16:[]).filter(q=>q.level==='certificate'&&q.field===p.field&&(q.track45||null)===(p.track45||null));
  return list.find(q=>q.city===p.city)||list.find(q=>q.country===p.country)||null;
 }
+// «Все условия» программы без того, что макет убрал: «Где», «Ступень», «Направление», «Длительность» (есть в заголовке
+// и в «Получите»), выполненные проверки по одной (они — строкой «Остальное выполнено»), шанс и ответ комиссии (наверху,
+// датой), проживание в том же городе.
+function programTable273(p){
+ const here=p.country===s.country&&p.city===residenceCity();
+ return (r,g)=>{
+  if(g.title==='Программа'&&['Где','Ступень','Направление','Длительность'].includes(r.label))return false;
+  if(g.title==='Что нужно для заявки'&&r.ok===true)return false;
+  if(['Шанс поступления','Ответ комиссии'].includes(r.label))return false;
+  if(r.label==='Проживание'&&here)return false;
+  return true;
+ };
+}
+// Текст окна программы (в «Все условия»): «24 месяца», без проживания в том же городе.
+function programText273(p,text){
+ let t=plurals273(String(text??''));
+ if(p.country===s.country&&p.city===residenceCity())t=t.replace(/ ?Базовое проживание [^\n]*?бюджет\./,'');
+ // Срок ответа — датой наверху; «через 2 месяца доступного времени» не пишем.
+ t=t.replace(/, ответ через \d+ месяц[а-я]* доступного времени;/,';');
+ return ungame273(t);
+}
 function programNeed273(w,p){
  const back=()=>programDetails16(p.id);
  if(w===lang16[p.language]+' '+cefr16[p.minLanguage])return langNeed273(p.language,p.minLanguage,back);
  if(w==='Не достигнут возраст начала программы'){const min=programMinAge16(p),n=Math.max(1,Math.ceil(min-s.age));return {text:'Возраст — с '+min+' лет',when:'через '+n+' '+plural273(n,'год','года','лет')};}
- if(w==='Нужен диплом бакалавра')return {text:w,fix:{label:'Бакалавриат',hint:fields16[p.field].name,fn:()=>educationRoute20(p.field,'bachelor')}};
- if(w==='Нужна профильная магистратура')return {text:w,fix:{label:'Магистратура',hint:fields16[p.field].name,fn:()=>educationRoute20(p.field,'master')}};
+ if(w==='Нужен диплом бакалавра')return {text:w,short:'сначала нужен диплом бакалавра',fix:{label:'Бакалавриат',hint:fields16[p.field].name,fn:()=>educationRoute20(p.field,'bachelor')}};
+ if(w==='Нужна профильная магистратура')return {text:w,short:'сначала нужна профильная магистратура',fix:{label:'Магистратура',hint:fields16[p.field].name,fn:()=>educationRoute20(p.field,'master')}};
  if(/сертификат/.test(w)){
+  // «Для магистратуры нужен профиль «X» или подготовительный сертификат» — как в макете: профиль и что есть у вас.
+  const track=/«([^»]+)»/.exec(w)?.[1],general=track&&hasDiploma16(p.field,'bachelor');
+  const text=track?'Профиль «'+track+'» — '+(general?'у вас общий бакалавриат':'его у вас нет'):w,short=track?'сначала нужен профиль «'+track+'»':'сначала подготовительный сертификат';
   const cp=certFor273(p);
-  if(cp){let hint=span273(cp.months)+' · '+money(tuition16(cp,null))+'/мес. · '+hours273(studyHours273(cp));try{hint+=' · шанс '+pct273(admission16(cp).probability);}catch(e){}return {text:w,fix:{label:'Подготовительный сертификат',hint,fn:()=>programDetails16(cp.id)}};}
-  return {text:w,fix:{label:'Подготовительные программы',fn:()=>educationRoute20(p.field,'certificate')}};
+  if(cp){let hint=span273(cp.months)+' · '+money(tuition16(cp,null))+'/мес. · '+hours273(studyHours273(cp));try{hint+=' · шанс '+pct273(admission16(cp).probability);}catch(e){}return {text,short,fix:{label:'Подготовительный сертификат',hint,fn:()=>programDetails16(cp.id)}};}
+  return {text,short,fix:{label:'Подготовительные программы',fn:()=>educationRoute20(p.field,'certificate')}};
  }
- return {text:w};
+ return {text:ungame273(w)};
 }
 function parentOdds273(p){
  const list=(typeof parents17==='function'?parents17():[]).map(q=>{try{return {q,o:educationPlanOdds231(p,q)};}catch(e){return null;}}).filter(Boolean);
@@ -487,24 +634,45 @@ function programBuild273(p,ctx){
   card.mainNote='Стипендия — отдельной заявкой после подачи, шанс '+pct273(scholarship16(p));
  }
  if(slow||load.falls){
-  const times=num273(1/load.pace);
-  card.need.push({text:'Свободного времени вместе с учёбой — '+Math.max(0,Math.round(load.cap))+' ч/нед.',
-   fix:typeof loadMenu29==='function'?{label:'Нагрузка и время',hint:(slow?'учёба пойдёт в '+times+' раза медленнее':'')+(load.falls?(slow?', ':'')+'оценки будут падать':''),fn:()=>loadMenu29()}:null,
-   when:(slow?'учёба пойдёт в '+times+' раза медленнее':'')+(load.falls?(slow?', ':'')+'оценки будут падать':'')});
+  // Насколько дольше — уже в «Получите» («≈ 8 лет … по программе 2 года»), здесь — коротко, чтобы кнопка «Подать заявку»
+  // оставалась на первом экране телефона.
+  const k=1/load.pace,times=num273(k),word=Number.isInteger(+times)?plural273(+times,'раз','раза','раз'):'раза';
+  const effect=load.falls?'оценки будут падать':'учёба пойдёт в '+times+' '+word+' медленнее';
+  card.need.push({text:'Свободного времени — '+Math.max(0,Math.round(load.cap))+' ч/нед.',short:'сначала нужно свободное время',
+   fix:typeof loadMenu29==='function'?{label:'Нагрузка и время',hint:effect,fn:()=>loadMenu29()}:null,when:effect});
  }
  const sel=p.selectivity;
- card.more.push({title:'Почему '+pct273(a?a.probability:r.probability),text:r.factors+'. Программа отбирает '+(sel>=80?'строго':sel>=60?'средне':'мягко')+' — '+sel+' из 100.'+(a?' Шанс посчитан, когда вы подали заявку.':'')});
- const met=rows273(ctx.detail).filter(r=>r.ok===true&&r.section==='Что нужно для заявки').map(r=>/нужно/.test(r.value)?r.label+' ('+String(r.value).replace(' / ',', ')+')':r.label);
- if(met.length)card.more.push({title:r.why.length?'Выполнено':'Остальное выполнено',text:met.join(', ')+'.'});
+ // Почему: оценки, подготовка, язык при нужном уровне; селективность — один раз, словом и числом.
+ const factors=String(r.factors||'').replace(/,\s*конкурс \d+\/100/,'').replace(/язык ([A-C][0-2]|—)/,(m,l)=>lower273(lang16[p.language])+' '+l+(cefr16[p.minLanguage]?' при нужном '+cefr16[p.minLanguage]:''));
+ card.more.push({title:'Почему '+pct273(a?a.probability:r.probability),text:factors+'. Программа отбирает '+(sel>=80?'строго':sel>=60?'средне':'мягко')+' — '+sel+' из 100.'+(a?' Шанс посчитан, когда вы подали заявку.':'')});
+ // Выполненное одной строкой. Подготовка по направлению не пишется, если «Не хватает» говорит о профиле: галочка
+ // «Профиль подтверждён» спорила с красной строкой.
+ const aboutProfile=card.need.some(n=>/профил|сертификат/i.test(n.text));
+ const met=metList273(ctx.detail,{section:'Что нужно для заявки',levels:false,skip:r=>aboutProfile&&r.label==='Подготовка по направлению'});
+ if(met.length)card.more.push({title:card.need.length?'Остальное выполнено':'Требования выполнены',text:cap273(met.join(', '))+'.'});
+ // Кто платит: вы помесячно, компания и родители — с тем же шансом, что на кнопках строки «Платить».
+ const monthly=money(fee)+' за каждый месяц учёбы';
+ const who=[planParent?planParent.name+' платит '+pct273(plan.share)+' учёбы, остальное — вы.':payer==='вы'?'Вы — '+monthly+'.':grant?'Компания оплачивает часть, остальное — вы.':cap273(payer)+' — '+monthly+'.'];
+ if(hints['Попросить компанию оплатить эту программу'])who.push('Компания может оплатить программу: '+hints['Попросить компанию оплатить эту программу']+'.');
+ const ph=hints['Договориться с родителями об оплате'];
+ if(ph&&s.age>=18)who.push('Родители могут оплатить часть: '+(/^шанс (\d+%) · (.+)$/.test(ph)?ph.replace(/^шанс (\d+%) · (.+)$/,'$2 — шанс $1'):ph)+'.');
+ card.more.push({title:'Кто платит',text:who.join(' ')});
+ // Что даёт: навык, профессии, оговорка про допуск — из раздела «Что даёт программа».
+ const skill=/^(.+?) · растёт/.exec(rowValue273(ctx.detail,'Навык','Что даёт программа'))?.[1],jobsList=rowValue273(ctx.detail,'Профессии','Что даёт программа').split(',').map(t=>t.trim()).filter(Boolean);
+ const gives=[];
+ if(skill)gives.push('Навык «'+skill+'» растёт с каждым оплаченным периодом.');
+ if(jobsList.length)gives.push('Профессии: '+jobsList.slice(0,4).map(lower273).join(', ')+(jobsList.length>4?' и ещё '+(jobsList.length-4):'')+'.');
+ if(rowValue273(ctx.detail,'Допуск к работе','Что даёт программа'))gives.push('Диплом не заменяет опыт, язык и документы, которых требует работа.');
+ if(gives.length)card.more.push({title:'Что даёт',text:gives.join(' ')});
  card.more.push({title:'О вузе',text:'Качество '+p.quality+', сложность '+p.difficulty+', престиж '+p.prestige+', связи с работодателями '+p.employment+'.'});
- card.moreHint='почему '+pct273(a?a.probability:r.probability)+', вуз';
+ card.moreHint='почему '+pct273(a?a.probability:r.probability)+', кто платит'+(gives.length?', что даёт':'');
  return card;
 }
 programDetails16=function(id,...rest){
  const p=prog16(id);
  if(!p||nextCard273)return windows273Base.programDetails16(id,...rest);
  const old=show;let done=false;
- nextCard273={kind:'program',area:'Учёба',title:levels16[p.level]+' · '+programName26(p),h2:'sub',build:ctx=>programBuild273(p,ctx)};
+ nextCard273={kind:'program',area:'Учёба',title:levels16[p.level]+' · '+programName26(p),h2:'sub',table:programTable273(p),build:ctx=>programBuild273(p,ctx)};
  show=function(title,text,opts=[],...more){
   if(done)return old(title,text,opts,...more);
   done=true;
@@ -513,7 +681,7 @@ programDetails16=function(id,...rest){
    const hours=studyHours273(p),r=admission16(p),fee=c().cost*.003,plan=ensureFamily17().educationPlans231?.[p.id],payer=plan&&living(plan.parentId);
    // Часы — те, что посчитает расписание, а не надбавка из каталога; «Подать заявку» не прячется, а сереет с причиной.
    for(const row of rows273(nextDetail20))if(row.label==='Нагрузка'&&row.section==='Программа'){const real=(nextDetail20.sections.find(g=>g.title===row.section)?.rows||[]).find(q=>q.label==='Нагрузка');if(real)real.value=hours273(hours);}
-   body=String(text??'').replace(/\d+(?:[.,]\d+)? ч\/нед\. дополнительной нагрузки/,hours273(hours)+' по расписанию');
+   body=programText273(p,String(text??'').replace(/\d+(?:[.,]\d+)? ч\/нед\. дополнительной нагрузки/,hours273(hours)+' по расписанию'));
    list=opts.map(o=>o?.label!=='Подать заявку'?o:{...o,hidden:false,disabled:!!(o.disabled||o.hidden),hint:'заявка '+money(fee)+(payer?' · платит '+payer.name:''),why:r.why[0]||''});
   }catch(e){console.error(e);}
   return old(title,body,list,...more);
@@ -543,45 +711,122 @@ function partyText273(d){
  const names=[...((d.party53||[]).map(id=>living(id)?.name).filter(Boolean)),...(d.companion&&!(d.party53||[]).includes(d.companion)?[living(d.companion)?.name].filter(Boolean):[])];
  return names.length?'вы и '+names.join(', '):s.gender==='f'?'вы одна':'вы один';
 }
+// Где питомец на время поездки — как в плане ухода (journeys57): «у папы · Арьян Сандху», «с вами», «в зоогостинице».
+function careWhere273(q){
+ const h=q.helper&&living(q.helper);
+ return q.mode==='bring'?'с вами':q.mode==='hotel'?'в зоогостинице':q.mode==='sitter'?'с ситтером':q.mode==='home'?'дома':
+  q.mode==='relative'?(h?'у '+(typeof roleGenitive268==='function'?roleGenitive268(h):h.name)+' · '+h.name:'у близкого'):q.mode==='household'?'дома'+(h?' · '+h.name:''):'уход не выбран';
+}
 function careGroups273(d){
  const pets=livePets57(),plans=d?.journey57?.pets||[],groups=[];
- const where=q=>{const h=q.helper&&living(q.helper);
-  return q.mode==='bring'?'с вами':q.mode==='hotel'?'в зоогостинице':q.mode==='sitter'?'с ситтером':q.mode==='home'?'дома':
-   q.mode==='relative'?(h?'у '+(typeof roleGenitive268==='function'?roleGenitive268(h):h.name)+' · '+h.name:'у близкого'):q.mode==='household'?'дома'+(h?' · '+h.name:''):'уход не выбран';};
- for(const p of pets){const q=plans.find(q=>q.pet===p.id);const w=q?where(q):'уход не выбран';const g=groups.find(g=>g.w===w);if(g)g.names.push(p.name);else groups.push({w,names:[p.name]});}
+ for(const p of pets){const q=plans.find(q=>q.pet===p.id);const w=q?careWhere273(q):'уход не выбран';const g=groups.find(g=>g.w===w);if(g)g.names.push(p.name);else groups.push({w,names:[p.name]});}
  return groups.map(g=>g.names.join(', ')+' — '+g.w).join('\n');
+}
+// «Собаки», если все питомцы — собаки (как в макете), иначе «Питомцы».
+function petsLabel273(){const k=[...new Set(livePets57().map(p=>p.kind))];return k.length===1?{dog:'Собаки',cat:'Кошки'}[k[0]]||'Питомцы':'Питомцы';}
+function num273of(t){return +String(t??'').split(' · ')[0].replace(/[^\d,.-]/g,'').replace(',','.');}
+// «Все условия» поездки без того, что макет убрал: нули («· 0 A$» у питомцев у близких, «Дополнительно за ваш счёт 0»),
+// «Дополнительно за ваш счёт» (это та же сумма за питомцев — она в «Кто где»), «Полная цена», равная вашей части,
+// «Состояние» карточки (оно наверху).
+function tripTable273(kind){
+ return (r,g,detail)=>{
+  const v=String(r.value??''),l=r.label;
+  if(l==='Дополнительно за ваш счёт')return false;
+  if(l==='Состояние'&&kind==='trip')return false;
+  if(l==='Полная цена'){const mine=rows273(detail).find(q=>/^Ваша часть/.test(q.label));if(mine&&num273of(mine.value)===num273of(v))return false;}
+  if(zero273(v)&&!['Длительность','На сколько'].includes(l))return false;
+  if(/ · 0[\s ][^·\d]*$/.test(v))return {...r,value:v.replace(/ · 0[\s ][^·\d]*$/,'')};
+  return true;
+ };
+}
+// «Подробнее» поездки: кто где (с ценой ухода), дорога, кто платит; у «Дороги и ухода» — из чего цена.
+function tripMore273(ctx,kind,d,q){
+ const more=[],rows=rows273(ctx.detail),pets=livePets57(),plans=d?.journey57?.pets||[];
+ const care=rows.filter(r=>r.section==='Дорога и уход'&&pets.some(p=>p.name===r.label));
+ if(care.length){
+  const groups=[];
+  for(const r of care){
+   const parts=String(r.value).split(' · '),fee=parts.length>1&&/\d/.test(parts.at(-1))?parts.pop():'',pet=pets.find(p=>p.name===r.label),plan=pet&&plans.find(q=>q.pet===pet.id);
+   const where=plan?careWhere273(plan):lower273(parts.join(' · ')).replace(/^взять с собой$/,'с вами').replace(/^зоогостиница$/,'в зоогостинице').replace(/^оставить близкому/,'у близкого');
+   let g=groups.find(g=>g.where===where);if(!g)groups.push(g={where,names:[],fees:[]});g.names.push(r.label);g.fees.push(fee);
+  }
+  more.push({title:'Кто где',text:groups.map(g=>g.names.join(', ')+' — '+g.where+' · '+(g.fees.every(f=>!f||zero273(f))?'бесплатно':g.fees.every(f=>f===g.fees[0])?(g.names.length>1?'по ':'')+g.fees[0]:g.fees.join(', '))).join('\n')});
+ }
+ const way=rows.find(r=>r.section==='Дорога и уход'&&r.label==='Способ')?.value,legs=rows.filter(r=>r.section==='Дорога и уход'&&r.label==='Пересадка').map(r=>r.value);
+ if(way)more.push({title:'Дорога',text:cap273(lower273(way))+(legs.length?', пересадка '+legs.join(', '):'')+'.'});
+ if(kind==='trip-road'&&q){
+  const pay=q.player,petsFee=(q.care57||[]).reduce((n,x)=>n+(x.fee||0),0),car=q.car57?.total||0,trip=pay-petsFee-car;
+  const parts=['Сама поездка '+money(trip)];if(petsFee>0)parts.push((petsLabel273()==='Собаки'?'собаки ':'питомцы ')+money(petsFee));if(car>0)parts.push('машина '+money(car));
+  const who=(q.total>pay+.5?'Ваша часть — '+money(pay)+' из '+money(q.total)+'.':'Платите вы.')+' До отъезда поездку можно отменить без расходов.';
+  // Без питомцев и машины цена — сама поездка: число уже наверху, второй раз не пишем.
+  more.push(petsFee>0||car>0?{title:'Из чего цена',text:parts.join(', ')+'. '+who}:{title:'Оплата',text:who});
+ }else{
+  const payRows=rows.filter(r=>r.section==='Кто оплачивает'&&!zero273(r.value));
+  const extra=rows.find(r=>r.label==='Дополнительно за ваш счёт'&&!zero273(r.value));
+  // Платите только вы — сумма уже наверху, здесь без неё.
+  const onlyYou=payRows.length===1&&payRows[0].label==='Вы';
+  if(payRows.length)more.push({title:'Кто платит',text:onlyYou?'Платите вы'+(extra?', из них '+extra.value+' — уход и дорога':'')+'.':payRows.map(r=>r.label+' — '+r.value).join(', ')+(extra?'; уход и дорога — за ваш счёт, '+extra.value:'')+'.'});
+ }
+ return more;
+}
+// Документы поездки в подсказке: «ESTA, оформление 1 мес.», а не «esta, 1 мес.».
+function docsHint273(h){const names={visa:'виза',eta:'ETA',esta:'ESTA',keta:'K-ETA',evisa:'электронная виза'};return String(h??'').replace(/: (visa|eta|esta|keta|evisa), (\d+) мес\./g,(m,k,n)=>': '+names[k]+', оформление '+n+' мес.');}
+// «Перенести дату поездки» ничего не делает, если rescheduleJourney57 откажет (journeys57) — кнопка серая с причиной.
+function rescheduleWhy273(t){
+ try{
+  if(typeof pendingJourney57==='function'&&!pendingJourney57(t))return '';
+  if(s.country!==t.home||residenceCity()!==t.homeCity)return 'вы переехали — поездку нужно спланировать заново';
+  const co=company18();
+  if(t.leaveNeed&&(co?.id!==t.employer||(s.workHours??40)!==t.hours))return 'часы работы изменились — так отпуск не согласовать';
+  const d=tripDraft57(t);if(journeyWhy57(d,quoteJourney57(d)).length)return 'сначала поправьте дорогу и уход';
+ }catch(e){console.error(e);}
+ return '';
+}
+// Строка «Цена»: деньги и зарплата за свой счёт; если денег нет — дни отпуска; если нет ничего — строки нет.
+function priceRow273(price,leave){
+ let v=price?price+leave.extra:leave.extra.replace(/^ \+ /,''),n=leave.note;
+ if(!v&&n){v=n;n='';}
+ return v?{label:'Цена',value:v,note:n}:null;
 }
 function tripBuild273(kind,ctx,d,t){
  const val=l=>rowValue273(ctx.detail,l);
  const card={rows:[],need:[],more:[],main:[tripConfirm2722],foot:[foot273],settings:[]};
- const mine=val('Ваша часть')||val('Ваша часть по приглашению'),full=val('Полная цена');
+ const mine=val('Ваша часть')||val('Ваша часть по приглашению'),full=val('Полная цена')||val('Всего');
  if(kind==='trip-road'){
   const q=quoteJourney57(d),old=t.journey57?.quote?.player;
-  card.sub=t.days+' дн. · '+(Number.isFinite(t.departure)?dateLabel86(t.departure)+' · ':'')+partyText273(t);
+  card.sub=days273(t.days)+' · '+(Number.isFinite(t.departure)?lower273(dateLabel86(t.departure))+' · ':'')+partyText273(t);
   const pets=careGroups273(d);
-  if(pets)card.rows.push({label:'Питомцы',value:pets});
+  if(pets)card.rows.push({label:petsLabel273(),value:pets});
   const diff=Number.isFinite(old)?q.player-old:0;
   card.rows.push({label:'Цена',value:money(q.player)+(Math.abs(diff)>=1?' вместо '+money(old):''),note:Math.abs(diff)>=1?'на '+money(Math.abs(diff))+(diff<0?' меньше':' больше')+' спишут при отъезде':''});
   card.main=['Подтвердить новый план и бюджет'];card.settings=['Выбрать дорогу','Питомцы и присмотр'];card.foot=['Карточка поездки',foot273];
-  card.moreHint='кто где, из чего цена';
+  card.more=tripMore273(ctx,kind,d,q);
+  card.moreHint=card.more.map(m=>lower273(m.title)).join(', ');
   return card;
  }
  if(kind==='trip'){
-  card.sub=(Number.isFinite(t.departure)?dateLabel86(t.departure)+' · ':'')+t.days+' дн. · '+partyText273(t);
+  card.sub=(Number.isFinite(t.departure)?dateLabel86(t.departure)+' · ':'')+partyText273(t);
   card.status={text:travelStatuses52[t.status]||'',tone:['cancelled','declined'].includes(t.status)?'bad':'wait'};
-  card.rows.push({label:'Получите',value:t.days+' дн. · '+t.city+' · '+travelName103(t.country)});
-  const price=mine||val('Цена при отъезде')||val('Оплачено'),leave=tripLeave273(t,t.leaveUsed?'used':'trip');
-  if(price)card.rows.push({label:'Цена',value:price+(full&&full!==mine&&!price.startsWith(full)?' · всего '+full:'')+leave.extra,note:leave.note});
-  card.main=[];card.settings=['Дорога и уход за питомцами','Перенести дату поездки','Выбрать месяц и год'];card.foot=[foot273,'Отменить без расходов'];
-  card.moreHint='дорога, кто платит';
+  card.rows.push({label:'Получите',value:days273(t.days)+' · '+t.city+' · '+travelName103(t.country)});
+  let price=mine||val('Цена при отъезде')||val('Оплачено');
+  if(zero273(price)){const who=rows273(ctx.detail).find(r=>r.section==='Кто оплачивает'&&!zero273(r.value)&&r.label!=='Вы');price=who?'платит '+who.label:'';}
+  const row=priceRow273(price&&price+(full&&full!==mine&&!price.startsWith(full)&&!zero273(full)?' · всего '+full:''),tripLeave273(t,t.leaveUsed?'used':'trip'));
+  if(row)card.rows.push(row);
+  // Отмена — обычной (не главной) кнопкой под верхом, а не ссылкой в подвале; к низу экрана не прилипает.
+  card.main=['Отменить без расходов'];card.mainSecondary=true;
+  card.settings=['Дорога и уход за питомцами','Перенести дату поездки','Выбрать месяц и год'];card.foot=[foot273];
+  card.more=tripMore273(ctx,kind,tripDraft57(t),null);
+  card.moreHint=card.more.map(m=>lower273(m.title)).join(', ');
   return card;
  }
  // Черновик и приглашение.
- const when=val('Отъезд'),inv=d.invite53?invite53(d.invite53):null,dd=inv?{...d,...['departure86','childcare86','unpaid86'].reduce((o,k)=>(inv.draft[k]!==undefined&&(o[k]=inv.draft[k]),o),{})}:d;
+ const when=val('Отъезд')||val('Начало'),inv=d.invite53?invite53(d.invite53):null,dd=inv?{...d,...['departure86','childcare86','unpaid86'].reduce((o,k)=>(inv.draft[k]!==undefined&&(o[k]=inv.draft[k]),o),{})}:d;
  card.sub=[when,partyText273(d)].filter(Boolean).join(' · ');
- card.rows.push({label:'Получите',value:d.stayHome86?'отпуск дома · '+d.days+' дн.':d.days+' дн. · '+d.city+' · '+travelName103(d.country)});
- const leave=tripLeave273(dd,'draft');
- card.rows.push({label:'Цена',value:tripPrice273(mine,full,inv)+leave.extra,note:leave.note});
+ card.rows.push({label:'Получите',value:d.stayHome86?'отпуск дома · '+days273(d.days):days273(d.days)+' · '+d.city+' · '+travelName103(d.country)});
+ const row=priceRow273(tripPrice273(mine,full,inv),tripLeave273(dd,'draft'));
+ if(row)card.rows.push(row);
+ card.more=tripMore273(ctx,kind,d,null);
+ card.moreHint=card.more.map(m=>lower273(m.title)).join(', ');
  if(kind==='trip-invite'){
   const q=invite53(d.invite53);
   if(q&&!invitationAvailable53(q)){
@@ -591,13 +836,11 @@ function tripBuild273(kind,ctx,d,t){
    if(price){price.note='';if(q.status!=='accepted'){const h=living(q.host);price.value=price.value.replace(/^платит /,h?.gender==='f'?'платила ':'платил ');}}
    card.status={text:st,tone:q.status==='accepted'||q.status==='completed'?'ok':'bad'};
    card.main=['Открыть поездку'];card.settings=[];card.disabledWhy=st;
-   card.moreHint='кто платил, дорога';
    return card;
   }
   card.main=[tripConfirm2722,'Отказаться без расходов'];card.settings=['Выбрать дорогу','Питомцы и присмотр',/^Дата · /];
  }
  else card.settings=[/^Дата · /,/^Оплачиваемый отпуск$/,/^Отпуск за свой сч/,/^Дорога · /,/^Питомцы и присмотр/,/^Длительность · /,/^Бюджет · /,/^Состав поездки · /,/^Кто платит/,/^Попутчик · /];
- card.moreHint='кто платит, дорога, условия';
  return card;
 }
 // Отпуск и зарплата: оплачиваемый отпуск списывается при отъезде (travel52), за свой счёт отпуск не тратится, но в месяц
@@ -615,17 +858,28 @@ function tripLeave273(d,mode){
  const bal=typeof travelLeave52==='function'?travelLeave52():null,left=bal&&Number.isFinite(bal.balance)?bal.balance-need:null;
  return {note:'отпуск '+num273(need)+' дн.'+(left==null?'':left>=0?' · останется '+num273(left):' · не хватает '+num273(-left)),extra:''};
 }
-// Цена приглашения: если ваша часть — ноль, платит приглашающий; нули не пишем.
+// Цена черновика и приглашения: нули не пишем. Ваша часть — ноль: платит приглашающий (или не вы); всего ноль — строки нет.
 function tripPrice273(mine,full,q){
- const zero=/^0(\D|$)/.test(String(mine).replace(/\s/g,''));
- if(zero&&q){const h=living(q.host);return 'платит '+(h?h.name:'приглашающий')+(full?' · всего '+full:'');}
- return (mine||full||'')+(full&&mine&&full!==mine?' · всего '+full:'');
+ const total=full&&!zero273(full)?full:'';
+ if(mine&&zero273(mine)){const h=q&&living(q.host);return total?(q?'платит '+(h?h.name:'приглашающий'):'вы не платите')+' · всего '+total:'';}
+ const price=mine||total;
+ return price+(price&&total&&mine&&total!==mine?' · всего '+total:'');
 }
 function inviteState273(q){
  return q.status==='accepted'?'Поездка запланирована':q.status==='completed'||q.status==='family270'?'Поездка завершена':q.status==='declined'?'Вы отказались от приглашения':'Приглашение закрыто';
 }
 function tripCard273(kind,d,t){
- return {kind,area:'Поездки',build:ctx=>tripBuild273(kind,ctx,d,t)};
+ return {kind,area:'Поездки',table:tripTable273(kind),opts:list=>tripOpts273(kind,t,list),build:ctx=>tripBuild273(kind,ctx,d,t)};
+}
+// Подсказка «Оформить документы» — названиями документов; «Перенести дату поездки» серая с причиной, когда перенос
+// не сработает (подпись та же — её ловят по точной подписи).
+function tripOpts273(kind,t,list){
+ return list.map(o=>{
+  if(!o||typeof o.label!=='string')return o;
+  if(/^Оформить документы/.test(o.label)&&o.hint)return {...o,hint:docsHint273(o.hint)};
+  if(kind==='trip'&&t&&o.label==='Перенести дату поездки'&&!o.disabled){const why=rescheduleWhy273(t);if(why)return {...o,disabled:true,why,hint:''};}
+  return o;
+ });
 }
 travelDraftMenu52=function(d,...rest){
  if(!d||nextCard273)return windows273Base.travelDraftMenu52(d,...rest);
@@ -652,6 +906,16 @@ journeyDraftMenu57=function(d,...rest){
  try{return windows273Base.journeyDraftMenu57(d,...rest);}finally{nextCard273=null;}
 };
 // Причина готовности без кнопки (у trips272 для неё нет исправления): что будет и что можно сделать.
+// Согласованный отпуск больше не действует (сменились работодатель, часы или право на работу): перенос даты этого
+// не исправит (rescheduleJourney57 откажет), при отъезде поездка отменится сама, без расходов.
+function tripReapprove273(text,ctx){
+ if(!/нужно новое согласование|заново проверить оплачиваемый отпуск/.test(text)||ctx?.kind==='draft'||!ctx?.t)return null;
+ // Причина — словами игры (её же ищут проверки 272), под ней — что именно изменилось и что будет.
+ const t=ctx.t,co=company18(),hours=s.workHours??40;
+ const what=/^Право на работу/.test(text)?'':co&&co.id===t.employer&&Number.isFinite(t.hours)&&t.hours!==hours?'отпуск согласовали на '+num273(t.hours)+' ч/нед., сейчас '+num273(hours)+' — ':'';
+ return {text:ungame273(text),short:'отпуск нужно согласовать заново',when:what+'при отъезде поездка отменится сама, без расходов',reapprove:true};
+}
+const tripShort273={'Сначала завершите или отмените текущую поездку':'сначала текущая поездка'};
 function tripWhen273(text,ctx){
  const planned=ctx?.kind!=='draft';
  if(/нужно новое согласование|заново проверить оплачиваемый отпуск/.test(text))return planned?'поездку можно отменить без расходов и запланировать заново':'отпуск согласуют, когда вы запланируете поездку';
@@ -664,9 +928,20 @@ tripInsertReady272=function(why,ctx,...rest){
  try{
   const items=tripReadyItems272(why,ctx),home=ctx.kind==='draft'&&ctx.d?.stayHome86;
   if(items.length){
-   c.need=items.map(i=>({text:i.text,fix:i.fix?{label:i.fix.label,fn:i.fix.fn}:null,when:i.fix?'':tripWhen273(i.text,ctx)}));
+   // Документы — прямо тем вариантом окна, который их оформляет («Оформить документы · 31 A$»), а не общим меню виз;
+   // в «Других действиях» он тогда не повторяется.
+   const docs=(ctx273?.opts||[]).find(o=>o&&!o.disabled&&!o.hidden&&/^Оформить документы/.test(o.label||'')&&typeof o.fn==='function');
+   c.hideOpts=[];
+   c.need=items.map(i=>{
+    const text=ungame273(i.text),short=tripShort273[i.text];
+    if(docs&&/: нужны .+ на оформление$/.test(i.text)){if(!c.hideOpts.includes(docs.label))c.hideOpts.push(docs.label);return {text,short,fix:{label:docs.label,hint:docs.hint||'',fn:docs.fn}};}
+    return tripReapprove273(i.text,ctx)||{text,short,fix:i.fix?{label:i.fix.label,fn:i.fix.fn}:null,when:i.fix?'':tripWhen273(i.text,ctx)};
+   });
    c.needTitle=home?'Чтобы начать отпуск, не хватает':'Чтобы поехать, не хватает';
    box.innerHTML=needHTML273(c);box.hidden=false;
+   for(const b of document.querySelectorAll('#modal .orig273 > button'))b.hidden=c.hideOpts.includes(optLabel273(b));
+   // Отпуск согласовывали на прежние часы — статус «Отпуск согласован» больше не верен.
+   if(c.kind==='trip'&&c.need.some(n=>n.reapprove))setStatus273({text:'Нужно новое согласование отпуска',tone:'bad'});
   }else{
    const held=ctx.t?.hold57&&ctx.kind!=='draft',st=c.status?.text;
    setStatus273({text:(st?st+' · ':'')+(home?'можно отдыхать':'можно ехать')+(held?' · отъезд в начале следующего месяца':''),tone:'ok'});
@@ -702,7 +977,7 @@ tripInsertReady272=function(why,ctx,...rest){
   '#modal .chance273{align-items:center}#modal .chance273 dd{font-size:14px;color:var(--muted)}',
   '#modal .chance273 b{font-family:"Prata",Georgia,serif;font-weight:400;font-size:27px;line-height:1;color:var(--ink);vertical-align:-3px}',
   '#modal .chips273{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}#modal .chips273:empty{display:none}',
-  '#modal .chips273 button{display:block;width:auto;margin:0;font-size:12.5px;line-height:1.35;border:1px solid var(--line);background:var(--paper);border-radius:7px;padding:6px 10px;text-align:left;color:var(--ink)}',
+  '#modal .chips273 button{display:block;width:auto;margin:0;font-size:12.5px;line-height:1.35;border:1px solid var(--line);background:var(--paper);border-radius:7px;padding:6px 10px;min-height:40px;text-align:left;color:var(--ink)}',
   '#modal .chips273 button small{display:block;font-size:11px;color:var(--muted)}',
   '#modal .need273{margin-top:14px}',
   '#modal .need273 h4{font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.04em;color:#8a4b16;margin:0 0 2px}',
@@ -712,11 +987,15 @@ tripInsertReady272=function(why,ctx,...rest){
   '#modal .nofix273::before{content:"";position:absolute;left:3px;top:14px;width:6px;height:6px;border-radius:50%;background:#b57e3d}',
   '#modal .fix273 span{display:block;font-size:14px;line-height:1.4;font-weight:500}',
   '#modal .fix273 small{display:block;font-size:12px;line-height:1.45;color:var(--muted);margin-top:3px}',
-  '#modal .needmore273 summary{cursor:pointer;font-size:12.5px;color:var(--muted);padding:6px 0 0}',
+  '#modal .needmore273 summary{cursor:pointer;font-size:12.5px;color:var(--muted);padding:11px 0 0;min-height:40px;box-sizing:border-box}',
   '#modal .main273{display:grid;gap:8px;margin-top:16px}#modal .main273:empty{display:none}',
   '#modal .main273 button{text-align:center;font-weight:500;background:var(--ink);color:var(--paper);border:1px solid var(--ink);border-radius:7px;padding:12px 14px;line-height:1.4}',
-  '#modal .main273 button+button{background:transparent;color:var(--ink);border-color:var(--line)}',
+  '#modal .main273 button+button,#modal .main273.second273 button{background:transparent;color:var(--ink);border-color:var(--line)}',
+  '#modal .main273.pair273{grid-template-columns:minmax(0,1fr) auto}#modal .main273.pair273 button+button{padding-left:18px;padding-right:18px}',
   '#modal .main273 button small{color:inherit;opacity:.85;font-size:12px;font-weight:400}',
+  // Подсказка главной кнопки и кнопок «Платить» — в той же строке («Подать заявку · заявка 112 A$»), причина серой — ниже.
+  '#modal .main273 button small:not(.why273),#modal .chips273 button small{display:inline}',
+  '#modal .main273 button small:not(.why273)::before,#modal .chips273 button small::before{content:" · "}',
   '#modal .main273 button[disabled]{background:#d9ccc6;border-color:#cbbcb5;color:#6d5d58;opacity:1}',
   '#modal .options button small.why273{display:block;color:#8a4b16;opacity:1}',
   '#modal .main273 button[disabled] small.why273{color:#6d4a2e}',
@@ -724,7 +1003,7 @@ tripInsertReady272=function(why,ctx,...rest){
   '#modal .set273{margin-top:16px}',
   '#modal .set273 h4,#modal .more-body273 h4{font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--muted);margin:0 0 4px}',
   '#modal .setopts273{display:flex;flex-wrap:wrap;gap:6px;margin:0}',
-  '#modal .setopts273 button{width:auto;margin:0;font-size:12.5px;line-height:1.35;padding:6px 10px;border:1px solid var(--line);background:var(--paper);border-radius:7px;text-align:left}',
+  '#modal .setopts273 button{width:auto;margin:0;font-size:12.5px;line-height:1.35;padding:6px 10px;min-height:40px;border:1px solid var(--line);background:var(--paper);border-radius:7px;text-align:left}',
   '#modal .setopts273 button small{display:block;font-size:11px}',
   '#modal details.more273{margin-top:16px;border-top:1px solid var(--line)}',
   '#modal details.more273>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:12px 2px;font-size:14px;font-weight:500}',
@@ -736,21 +1015,27 @@ tripInsertReady272=function(why,ctx,...rest){
   '#modal .info273{margin:10px 0 0}#modal .info273 p{font-size:13px;line-height:1.55;color:var(--muted);margin:0}',
   '#modal .others-h273{margin-top:14px!important}',
   '#modal .more-body273 .orig273{display:grid;gap:6px;margin-top:6px;grid-template-columns:minmax(0,1fr)}',
-  '#modal .more-body273 .orig273>button,#modal .others273>button{display:block;width:100%;margin:0;font-size:13px;line-height:1.45;text-align:left;border:1px solid var(--line);border-radius:7px;background:transparent;padding:8px 11px;color:var(--ink)}',
+  '#modal .more-body273 .orig273>button,#modal .others273>button{display:block;width:100%;min-height:40px;margin:0;font-size:13px;line-height:1.45;text-align:left;border:1px solid var(--line);border-radius:7px;background:transparent;padding:8px 11px;color:var(--ink)}',
+  '#modal .more-body273 .orig273>button[hidden]{display:none}',
   '#modal .others273{display:grid;gap:6px;margin-top:6px}#modal .others273:empty{display:none}',
   '#modal details.all273{margin-top:14px}',
-  '#modal details.all273>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:6px 0}',
+  '#modal details.all273>summary{cursor:pointer;font-size:13px;color:var(--muted);padding:10px 0;min-height:40px;box-sizing:border-box}',
   '#modal .all-body273 .detail20{margin:6px 0 10px}',
   '#modal .foot273{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px;padding-top:10px;border-top:1px solid var(--line)}',
-  '#modal .foot273 button{width:auto;margin:0;font-size:13px;border:0;background:none;padding:4px 0;color:var(--muted);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}',
+  '#modal .foot273 button{width:auto;min-height:40px;margin:0;font-size:13px;border:0;background:none;padding:4px 0;color:var(--muted);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}',
+  '#modal .info273 p{white-space:pre-line}',
   '@media(max-width:600px){#modal:has(> .top273){padding-left:18px;padding-right:18px}',
   ' #modal:has(> .top273) .modal-closebar38{margin-left:-18px;margin-right:-18px}',
   ' #modal .title273{font-size:24px}',
-  ' #modal .main273{position:sticky;bottom:-32px;z-index:6;background:var(--surface);padding:10px 0 12px;margin-bottom:-12px}}',
+  ' #modal .main273.stick273{position:sticky;bottom:-32px;z-index:6;background:var(--surface);padding:10px 0 12px;margin-bottom:-12px}',
+  // Телефон: всё, что нажимают пальцем, не ниже 44 px.
+  ' #modal .setopts273 button,#modal .chips273 button,#modal .foot273 button,#modal .more-body273 .orig273>button,#modal .others273>button{min-height:44px}',
+  ' #modal details.all273>summary,#modal .needmore273 summary{min-height:44px;padding-top:12px}',
+  ' #modal details.more273>summary{min-height:44px}}',
   '@media(min-width:700px){#modal dl.top273{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;border:0}',
   ' #modal .row273{display:block;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:var(--paper)}',
   ' #modal .row273 dt{padding:0 0 4px}#modal .pay273{grid-column:1/-1}',
-  ' #modal .main273{display:flex;flex-wrap:wrap}#modal .main273 button{flex:1 1 200px}',
+  ' #modal .main273{display:flex;flex-wrap:wrap}#modal .main273 button{flex:1 1 200px}#modal .main273.pair273 button+button{flex:0 0 auto}',
   ' #modal .infos273{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 24px}',
   ' #modal .more-body273 .orig273,#modal .others273{grid-template-columns:repeat(2,minmax(0,1fr))}}'
  ].join('\n');

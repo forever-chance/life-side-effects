@@ -20,7 +20,10 @@ const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp', '.png': 'image/png' };
 const INDEX = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const BASE = process.env.BASE === '1', SAVE = process.env.SAVE || '', SHOTS = process.env.SHOTS || '';
+const BASE = process.env.BASE === '1', SAVE = process.env.SAVE || process.env.OWNER_SAVE || '', SHOTS = process.env.SHOTS || '';
+// WINDOWS273=файл — раздать вместо windows273.js другой файл (например, прежнюю версию): видно, какие проверки ловят
+// старое поведение этого файла, когда остальная сборка та же.
+const ALT273 = process.env.WINDOWS273 || '';
 const PHONE = { width: 390, height: 844 }, WIDE = { width: 1280, height: 800 };
 let pass = 0, fail = 0;
 const check = (label, ok, extra = '') => { ok ? pass++ : fail++; console.log((ok ? 'ok   ' : 'FAIL ') + label + (extra !== '' && !ok ? ' — ' + (typeof extra === 'string' ? extra : JSON.stringify(extra)).slice(0, 900) : '')); };
@@ -35,7 +38,7 @@ async function page(browser, { viewport = PHONE, base = BASE, raw = null, countr
     const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '') || 'index.html';
     const f = path.join(ROOT, rel);
     if (!f.startsWith(ROOT) || !fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
-    const body = rel === 'offline-game.js' ? '' : rel === 'index.html' && base ? INDEX.replace(/<script src="(windows|fixes)273\.js[^"]*"><\/script>/g, '') : fs.readFileSync(f);
+    const body = rel === 'offline-game.js' ? '' : rel === 'index.html' && base ? INDEX.replace(/<script src="(windows|fixes)273\.js[^"]*"><\/script>/g, '') : rel === 'windows273.js' && ALT273 ? fs.readFileSync(ALT273) : fs.readFileSync(f);
     r.fulfill({ status: 200, body, headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } });
   });
   const pg = await ctx.newPage();
@@ -112,6 +115,30 @@ function helpers() {
   window.__snap = () => { window.__saved = JSON.stringify(s); };
   window.__restore = () => { __close(); s = JSON.parse(window.__saved); s.pending = []; s.clock.running = false; Math.random = seeded269(2731); };
   window.save = function () {}; if (typeof flushSave264 === 'function') window.flushSave264 = function () {};
+  window.DECLINE = 'Отказаться'; window.DECLINE_OLD = 'Отказаться от предложения / собеседования';
+  // Замечания по виду и текстам (второй проход 273). Всё — по открытому окну-карточке.
+  window.__design = () => {
+    const m = $('#modal'); if (!m.open || !m.querySelector('.top273')) return null;
+    m.scrollTop = 0;
+    const more = m.querySelector('details.more273'), all = m.querySelector('details.all273'), was = more?.open, wasAll = all?.open;
+    if (more) more.open = true; if (all) all.open = false;
+    // Всё, что нажимают: кнопки и раскрывашки окна, видимые при открытом «Подробнее» (без «×» и без старой таблицы).
+    const shown = e => e.getClientRects().length > 0 && !e.closest('details:not([open]) > :not(summary)') && !e.closest('.all-body273') && !e.closest('.modal-closebar38');
+    const taps = [...m.querySelectorAll('button, summary')].filter(shown).map(b => ({ label: (b.tagName === 'SUMMARY' ? b.textContent : __label(b) || b.textContent).replace(/\s+/g, ' ').trim().slice(0, 50), h: Math.round(b.getBoundingClientRect().height * 10) / 10 }));
+    const hint = more?.querySelector('summary small')?.textContent || '';
+    const infos = [...m.querySelectorAll('.infos273 .info273')].map(s => ({ title: s.querySelector('h4').textContent, text: s.querySelector('p').textContent }));
+    if (more) more.open = was; if (all) all.open = wasAll;
+    const game = [...m.textContent.matchAll(/[Ии]гров\S*(\s+\S+)?/g)].map(x => x[0]).filter(t => !/студи/.test(t));
+    const main = m.querySelector('.main273'), btns = main ? [...main.querySelectorAll('button')].filter(b => !b.hidden) : [];
+    const need = [...m.querySelectorAll('.need273 .fix273')];
+    const vb = Math.min(innerHeight, m.getBoundingClientRect().bottom);
+    const covered = need.filter(b => b.tagName === 'BUTTON').flatMap(b => { const r = b.getBoundingClientRect(), x = r.left + r.width / 2; return [r.top + 4, r.top + r.height / 2, r.bottom - 4].filter(y => y > 0 && y < vb).map(y => document.elementFromPoint(x, y)).filter(e => e && e.closest('.main273')).map(() => b.querySelector('span')?.textContent || ''); });
+    return { taps, hint, infos, game, all: all ? all.querySelector('.all-body273').textContent.replace(/\s+/g, ' ') : '', allLabels: [...m.querySelectorAll('.all-body273 dt')].map(d => d.textContent.replace(/^(✓ Выполнено|! Не хватает)/, '').trim()),
+      sub: m.querySelector('.sub273')?.textContent || '', status: (s => s && !s.hidden ? s.textContent : '')(m.querySelector('.status273')), price: __top()['Цена'] ?? null, top: __top(),
+      main: btns.map(b => ({ label: __label(b), disabled: b.disabled, top: Math.round(b.getBoundingClientRect().top), why: b.querySelector('.why273')?.textContent || '' })), sticky: main ? getComputedStyle(main).position : '', needCount: need.length, covered: [...new Set(covered)],
+      others: [...m.querySelectorAll('.orig273 > button, .others273 > button')].filter(b => b.getClientRects().length || b.closest('details:not([open])')).filter(b => !b.hidden).map(__label), needFix: need.map(b => ({ text: b.querySelector('span')?.textContent || '', fix: b.tagName === 'BUTTON' ? (b.querySelector('small')?.textContent || '') : '', when: b.tagName !== 'BUTTON' ? (b.querySelector('small')?.textContent || '') : '' })),
+      text: m.textContent.replace(/\s+/g, ' ') };
+  };
 }
 
 // Окна сценария открываются одной функцией-строкой: одинаково в обоих режимах.
@@ -126,7 +153,8 @@ const OPEN = {
 const MAIN = { vacancy: 'Отправить резюме', program: 'Подать заявку', draft: /^(Запланировать поездку|Запросить отпуск и запланировать поездку|Запросить отпуск и запланировать|Запланировать отдых)$/, invite: 'Согласиться и запланировать', road: 'Подтвердить новый план и бюджет', card: /^(Дорога и уход за питомцами|Перенести дату поездки|Отменить без расходов)$/ };
 // Новые кнопки, которых нет без карточки: отказ от отклика (из «Заявок» его не было), «Подать заявку» до нужного
 // возраста (раньше пряталась, теперь серая с причиной).
-const EXTRA = /^(Отказаться от предложения \/ собеседования|Подать заявку)$/;
+const EXTRA = /^(Отказаться|Подать заявку)$/;
+const DECLINE = 'Отказаться', DECLINE_OLD = 'Отказаться от предложения / собеседования';
 
 async function openWin(pg, kind) {
   return pg.evaluate(src => { __close(); (0, eval)('(' + src + ')')(); return __title(); }, OPEN[kind]);
@@ -180,7 +208,7 @@ async function look(pg, kind) {
     const re = main.startsWith('/') ? new RegExp(main.slice(1, -1)) : null;
     const lbls = __labels();
     const m = lbls.find(x => re ? re.test(x.label) : x.label === main);
-    return { kind, title: __title(), labels: lbls, main: m ? __where(m.label) : null, top: __top(), notes: __topNotes(), need: __need(), chance: __chance(), card: !!document.querySelector('#modal .top273'), more: document.querySelector('#modal details.more273')?.open ?? null, area: document.querySelector('#modal .eyebrow')?.textContent || '', ...__deadEnd() };
+    return { kind, title: __title(), labels: lbls, main: m ? __where(m.label) : null, top: __top(), notes: __topNotes(), need: __need(), chance: __chance(), card: !!document.querySelector('#modal .top273'), more: document.querySelector('#modal details.more273')?.open ?? null, area: document.querySelector('#modal .eyebrow')?.textContent || '', design: __design(), ...__deadEnd() };
   }, [kind, String(MAIN[kind])]);
 }
 
@@ -218,6 +246,13 @@ async function scenario(browser, name, opts) {
       }
     }
     if (!mode.startsWith('wide')) r.extra = await extraChecks(P.pg, name);
+    // Маленький телефон (360×740): главная кнопка не закрывает строки «Не хватает».
+    if (mode === 'new') {
+      await P.pg.setViewportSize({ width: 360, height: 740 });
+      r.small = {};
+      for (const k of kinds) r.small[k] = await P.pg.evaluate(src => { __restore(); __close(); (0, eval)('(' + src + ')')(); const d = __design(); return d && { covered: d.covered, sticky: d.sticky, main: d.main.map(b => b.label + (b.disabled ? ' (серая)' : '')), need: d.needCount }; }, OPEN[k]);
+      await P.pg.setViewportSize(PHONE);
+    }
     r.errors = P.errors.slice();
     out[mode] = r;
     await P.ctx.close();
@@ -260,15 +295,15 @@ async function extraChecks(pg, name) {
       __restore(); applyJob16(__v.apply); const a = path16().jobApplications.at(-1); a.roll = 0; a.interviewRoll = 0;
       jobDetails16(a.id, true); x.submitted = { status: document.querySelector('#modal .status273')?.textContent || '', chance: __chance(), want: pc(a.probability * iv(a.probability)) };
       for (let i = 0; i < 4 && a.status === 'submitted'; i++) __month(1);
-      jobDetails16(a.id, true); x.interview = { status: a.status, main: __where('Пройти собеседование'), decline: !!__labels().find(l => l.label === 'Отказаться от предложения / собеседования'), chance: __chance(), want: pc(iv(a.probability)) };
+      jobDetails16(a.id, true); x.interview = { status: a.status, main: __where('Пройти собеседование'), decline: !!__labels().find(l => l.label === DECLINE), chance: __chance(), want: pc(iv(a.probability)) };
       __press('Пройти собеседование');
       for (let i = 0; i < 4 && a.status === 'interviewing'; i++) __month(1);
-      jobDetails16(a.id, true); x.offer = { status: a.status, statusLine: document.querySelector('#modal .status273')?.textContent || '', accept: __where('Принять оффер'), decline: __where('Отказаться от предложения / собеседования') }; __close();
+      jobDetails16(a.id, true); x.offer = { status: a.status, statusLine: document.querySelector('#modal .status273')?.textContent || '', accept: __where('Принять оффер'), decline: __where(DECLINE) }; __close();
       openDecision24('job', a.id); await new Promise(r => setTimeout(r, 0));
-      x.offerDecision = { accept: __where('Принять оффер'), decline: __where('Отказаться от предложения / собеседования'), count: __labels().filter(l => l.label === 'Отказаться от предложения / собеседования').length };
+      x.offerDecision = { accept: __where('Принять оффер'), decline: __where(DECLINE), count: __labels().filter(l => l.label === DECLINE).length, old: __labels().filter(l => l.label === DECLINE_OLD).length, pair: [...document.querySelectorAll('#modal .main273 button')].map(b => Math.round(b.getBoundingClientRect().top)) };
       __snap2 = JSON.stringify(s);
-      __press('Отказаться от предложения / собеседования'); x.declineAsk = __title(); __press('Вернуться к отклику'); x.declineBack = __title();
-      __press('Отказаться от предложения / собеседования'); __press('Да, отказаться'); x.declined = a.status;
+      __press(DECLINE); x.declineAsk = __title(); __press('Вернуться к отклику'); x.declineBack = __title();
+      __press(DECLINE); __press('Да, отказаться'); x.declined = a.status;
       s = JSON.parse(__snap2); const a2 = path16().jobApplications.find(q => q.id === a.id); jobDetails16(a2.id, true); __press('Принять оффер'); x.accepted = a2.status; __close();
     }
     // Настоящая учёба на сохранении: срок в окне до подачи — тот, что выйдет по темпу monthPath16 после зачисления.
@@ -334,12 +369,27 @@ async function extraChecks(pg, name) {
     // Отказ из «Ожидают ответа» не двигает очередь событий: событие в s.pending остаётся, окно показывает закрытый отклик.
     if (__v.apply) { __restore(); applyJob16(__v.apply); const a = path16().jobApplications.at(-1); s.clock.tasks = s.clock.tasks.filter(t => t.application !== a.id); a.status = 'offered'; a.expires = s.clock.ticks + 3;
       s.pending = [{ type: 'offer', job: { title: 'Проверочная должность', salary: Math.round(c().wage), tenure: 0 } }]; const apps = path16().jobApplications.length;
-      openDecision24('job', a.id); await new Promise(r => setTimeout(r, 0)); __press('Отказаться от предложения / собеседования'); __press('Да, отказаться');
+      openDecision24('job', a.id); await new Promise(r => setTimeout(r, 0)); __press(DECLINE); __press('Да, отказаться');
       x.declineQueue = { pending: s.pending.map(q => q.type), status: a.status, apps: path16().jobApplications.length - apps, open: $('#modal').open, line: document.querySelector('#modal .status273')?.textContent || '' };
       closeModal(); x.declineQueue.afterClose = s.pending.map(q => q.type); s.pending = []; __close(); }
     // Серые кнопки старых окон — с причиной (fixes273.js).
     { __restore(); x.grey = {}; for (const [k, f] of [['load', () => loadMenu29()], ['travel', () => travelMenu52()], ['money', () => paymentMenu40()], ['household', () => householdMenu54()], ['living', () => livingMenu68()], ['housing', () => housingMenu()], ['contract', () => contractMenu45()]]) {
         try { __close(); f(); } catch (e) { continue; } if ($('#modal').open) x.grey[k] = __greyWhy(); } __close(); }
+    // Второй проход 273 (вид и тексты). Отпуск дома: без работы и денег строки «Цена» с нулём нет.
+    { __restore(); travelDraftMenu52({ ...JSON.parse(JSON.stringify(__v.draft)), country: s.country, city: residenceCity(), stayHome86: true }); x.home = __design(); __close(); }
+    // Приглашение, где ваша часть — ноль (питомцев нет): «платит …», а не «0 A$».
+    if (name === 'ru') { __restore(); const q = __invite(); if (q) { travelInviteMenu53(q.id); x.zeroInvite = __design(); } __close(); }
+    // Вакансия за границей: о переезде — строка «Переезд», а не ещё и вторая строка заголовка.
+    { __restore(); Object.assign(path16().view, { fit68: 'all', page: 0, format: 'abroad' }); path16().marketKey = null; makeVacancies16(); const v = path16().vacancies.find(v => v.country !== s.country && v.format !== 'remote');
+      if (v) { jobDetails16(v.id); x.abroad = __design(); } __close(); }
+    // Статус отклика, по которому вышли на работу: «работаете» или «работали», а не «работали или работаете».
+    if (__v.apply) { __restore(); applyJob16(__v.apply); const a = path16().jobApplications.at(-1); a.status = 'employed'; s.clock.tasks = s.clock.tasks.filter(t => t.application !== a.id);
+      if (!s.job) s.job = { title: 'Проверка', salary: 1, tenure: 0 }; s.job.employer = a.vacancy.employer; s.job.professionId = a.vacancy.profession; jobDetails16(a.id, true); x.employedNow = __design()?.status; __close();
+      s.job.employer = 'Другая компания'; jobDetails16(a.id, true); x.employedPast = __design()?.status; __close(); }
+    // Карточка поездки на сохранении: отпуск согласовывали на прежние часы — статус не «Отпуск согласован», перенос
+    // даты серый с причиной (rescheduleJourney57 в этом состоянии ничего не делает).
+    if (name === 'owner' && __v.trip) { __restore(); travelTripMenu52(__v.trip); await new Promise(r => setTimeout(r, 0)); x.tripCard = __design(); x.tripCardMove = __greyWhy().find(g => g.label === 'Перенести дату поездки') || null; __close();
+      __restore(); const t = travel52().trips.find(t => t.id === __v.trip), dep = t.departure, st = t.status; x.tripCardReschedule = { result: rescheduleJourney57(t.id), changed: t.departure !== dep || t.status !== st }; __close(); }
     // Общие исправления: текст окна с таблицей, причина у серой кнопки; перехват «Сходить в кино».
     __restore();
     nextDetail20 = { sections: [section20('Проверка', [fact20('Строка', 'значение')])] }; show('Окно с таблицей', 'Текст этого окна.', [{ label: 'Понятно', fn: () => {} }]);
@@ -353,18 +403,76 @@ async function extraChecks(pg, name) {
   }, name);
 }
 
+// Второй проход 273: замечания по виду и текстам (касание ≥ 44 px на телефоне, «Подробнее» по подсказке, без «игрового»,
+// без нулей и убранных макетом строк, серая кнопка не закрывает «Не хватает», тексты).
+const WRONG_PLURAL = /(?<!\d)(?:\d*[02-9][1-4]|[1-4]) (?:лет|месяцев)(?![а-яё])/;
+function design(name, out) {
+  const N = out.new, W = out.wide, e = N.extra;
+  for (const k of N.kinds) {
+    const n = N.wins[k]?.design, w = W?.wins[k]?.design;
+    if (!n) continue;
+    const small = n.taps.filter(t => t.h < 44), smallW = (w?.taps || []).filter(t => t.h < 40);
+    check(`${name} · ${k}: всё, что нажимают, не ниже 44 px на 390 и 40 px на 1280`, !small.length && !smallW.length, { phone: small, wide: smallW });
+    check(`${name} · ${k}: в окне нет оговорок про «игровое»`, !n.game.length, n.game);
+    const titles = n.infos.map(i => i.title.toLowerCase());
+    const missing = n.hint.split(',').map(t => t.trim().toLowerCase()).filter(Boolean).map(t => t.replace(/^почему \d+%$/, 'почему')).filter(t => !titles.some(x => x.startsWith(t) || t === 'требования' && /выполнен/.test(x)));
+    check(`${name} · ${k}: «Подробнее» содержит то, что обещает подсказка («${n.hint}»)`, !missing.length, { missing, titles });
+    check(`${name} · ${k}: нулей в цене нет`, n.price === null || !/(^|· )0[\s ]/.test(n.price), n.price);
+    if (n.main.length && n.main.every(b => b.disabled) && n.needCount) check(`${name} · ${k}: серая главная кнопка не прилипает к низу экрана`, n.sticky !== 'sticky', { sticky: n.sticky, main: n.main });
+    const sm = N.small?.[k];
+    check(`${name} · ${k}: главная кнопка не закрывает «Не хватает» (390×844 и 360×740)`, !n.covered.length && !(sm?.covered.length), { phone: n.covered, small: sm });
+    check(`${name} · ${k}: окончания у чисел верные (нет «52 лет», «24 месяцев»)`, !WRONG_PLURAL.test(n.text), (n.text.match(WRONG_PLURAL) || [''])[0]);
+    const met = n.infos.find(i => /выполнен/i.test(i.title));
+    if (met) check(`${name} · ${k}: «${met.title}» — одной строкой, без очевидного («повторная подача», «местоположение», сырые подписи)`, !/Повторная подача|повторной подачи|Местоположение|Совместимость со статусом|Право работать в стране/.test(met.text) && /^[А-ЯЁ][^А-ЯЁ]*(«[^»]*»[^А-ЯЁ]*)*$/.test(met.text.replace(/[A-C][12]|[А-ЯЁ][а-яё]+ [А-ЯЁ][а-яё]+(?= —)/g, '')), met.text);
+    if (k === 'vacancy') {
+      const gone = ['Источник', 'Ставка100%', 'Переезд не требуется', 'Новое рабочее разрешение не требуется', 'Повторная подачаДоступна'].filter(t => n.all.includes(t));
+      check(`${name} · vacancy: «Все условия» без того, что макет убрал`, !gone.length, gone);
+      check(`${name} · vacancy: договор словами («срочный договор на 2 года»), не «· 24 мес.»`, !/договор · \d+ мес\./.test(n.price || ''), n.price);
+    }
+    if (k === 'program') {
+      const gone = ['Где', 'Ступень', 'Направление', 'Длительность', 'Срок повторной подачи', 'Ответ комиссии'].filter(t => n.allLabels.includes(t));
+      check(`${name} · program: «Все условия» без «Где», «Ступень», «Направление», «Длительность» и выполненных проверок`, !gone.length, gone);
+      const why = n.infos.find(i => /^Почему/.test(i.title))?.text || '';
+      check(`${name} · program: «Почему» — без «конкурс N/100», селективность одним числом`, !/конкурс \d+\/100/.test(why), why);
+      const prof = n.needFix.some(f => /профил|сертификат/i.test(f.text));
+      check(`${name} · program: «Выполнено» не спорит с «Не хватает» и называется «Остальное выполнено», когда чего-то не хватает`, !met || (!prof || !/подготовка по направлению/i.test(met.text)) && met.title === (n.needCount ? 'Остальное выполнено' : 'Требования выполнены'), { met, need: n.needFix });
+      check(`${name} · program: в «Подробнее» — «Кто платит» и «Что даёт»`, titles.includes('кто платит') && (titles.includes('что даёт') || !/Профессии/.test(n.all)), titles);
+    }
+    if (k === 'road') {
+      check(`${name} · road: подзаголовок «7 дней · месяц год · …», месяц строчными`, /^\d+ (день|дня|дней) · [а-яё]+ \d{4} · /.test(n.sub), n.sub);
+      const where = n.infos.find(i => i.title === 'Кто где');
+      if (/Питомцы|Собаки|Кошки/.test(Object.keys(n.top).join())) check(`${name} · road: «Кто где» с ценой ухода и «Из чего цена»`, !!where && /по |бесплатно|\d/.test(where.text) && titles.some(t => t === 'из чего цена' || t === 'оплата'), n.infos);
+    }
+    if (k === 'card') check(`${name} · card: подзаголовок «Месяц год · …», дни — только в «Получите»`, /^[А-ЯЁ][а-яё]+ \d{4} · /.test(n.sub) && !/\d+ (дн|день|дня|дней)/.test(n.sub), n.sub);
+  }
+  if (e.home) check(`${name}: отпуск дома — строки «Цена» с нулём нет`, e.home.price === null || !/(^|· )0[\s ]/.test(e.home.price), e.home.price);
+  if (e.zeroInvite) check(`${name}: приглашение без вашей доли — «платит …», а не «0»`, !/(^|· )0[\s ]/.test(e.zeroInvite.price || ''), e.zeroInvite.price);
+  if (e.abroad) check(`${name}: вакансия за границей — переезд одной строкой «Переезд», не в заголовке`, !/переезд/.test(e.abroad.sub) && 'Переезд' in e.abroad.top, { sub: e.abroad.sub, top: e.abroad.top });
+  if (e.employedNow !== undefined) check(`${name}: статус отклика с работой — «Вы работаете здесь» / «Вы здесь работали»`, e.employedNow === 'Вы работаете здесь' && e.employedPast === 'Вы здесь работали', { now: e.employedNow, past: e.employedPast });
+  if (e.offerDecision) check(`${name}: оффер — «Принять оффер» и «Отказаться» в один ряд, без второй кнопки отказа`, e.offerDecision.count === 1 && e.offerDecision.old === 0 && e.offerDecision.pair.length === 2 && e.offerDecision.pair[0] === e.offerDecision.pair[1], e.offerDecision);
+  if (e.tripCard) check(`${name}: карточка поездки — не «Отпуск согласован», когда нужно новое согласование; перенос даты серый с причиной`, e.tripCard.status !== 'Отпуск согласован' && e.tripCard.needFix.every(f => !/нужно новое согласование/.test(f.text) || f.fix || f.when) && (!e.tripCard.needFix.some(f => /нужно новое согласование/.test(f.text)) || e.tripCardReschedule.result === false && !!e.tripCardMove?.why && e.tripCard.needFix.some(f => /при отъезде поездка отменится/.test(f.when))), { status: e.tripCard.status, need: e.tripCard.needFix, move: e.tripCardMove, reschedule: e.tripCardReschedule });
+  const draft = N.wins.draft?.design;
+  if (draft && draft.needFix.some(f => /: нужны .+ на оформление$/.test(f.text))) check(`${name}: черновик — документы кнопкой «Оформить документы · …», без повтора в «Других действиях»`, draft.needFix.filter(f => /: нужны .+ на оформление$/.test(f.text)).every(f => /^Оформить документы · /.test(f.fix) && !/: (visa|eta|esta|keta|evisa),/.test(f.fix)) && !draft.others.some(l => /^Оформить документы/.test(l)), { need: draft.needFix, others: draft.others });
+}
+
 function compare(name, out) {
   const B = out.base, N = out.new, W = out.wide;
   for (const k of B.kinds) {
     const b = B.wins[k], n = N.wins[k], w = W?.wins[k];
     if (!n) { check(`${name}: окно «${k}» открылось с карточкой`, false, 'нет окна'); continue; }
     check(`${name} · ${k}: окно с карточкой («${n.area}»)`, n.card && n.title === b.title, { base: b.title, new: n.title, area: n.area });
-    const lost = b.labels.filter(l => !n.labels.some(m => m.label === l.label)).map(l => l.label);
+    // «Визы и документы» (кнопка готовности trips272) открывала то же окно, что «Визы и условия въезда»; теперь строка
+    // документов ведёт прямо к «Оформить документы · …».
+    const sameAs = (l, other) => n.labels.some(m => m.label === other) && N.press[k + ' / ' + other]?.title === B.press[k + ' / ' + l]?.title;
+    const replaced = l => l === 'Визы и документы' && n.labels.some(m => m.fix && /^Оформить документы · /.test(m.label)) && sameAs(l, 'Визы и условия въезда');
+    const lost = b.labels.filter(l => !n.labels.some(m => m.label === l.label) && !replaced(l.label)).map(l => l.label);
     const extra = n.labels.filter(m => !m.fix && !b.labels.some(l => l.label === m.label)).map(m => m.label).filter(l => !EXTRA.test(l));
     check(`${name} · ${k}: ни одна кнопка не потерялась, новых нет`, !lost.length && !extra.length, { lost, extra });
-    const state = b.labels.filter(l => { const m = n.labels.find(m => m.label === l.label && m.option === l.option) || n.labels.find(m => m.label === l.label); return m && (m.disabled !== l.disabled || m.handler !== l.handler || m.option !== l.option); }).map(l => l.label);
+    // «Перенести дату поездки» серая с причиной там, где без карточки она ничего не делала (rescheduleJourney57 отказывает).
+    const allowed = l => l === 'Перенести дату поездки' && k === 'card' && N.extra.tripCardReschedule?.result === false && !N.extra.tripCardReschedule.changed && !!N.extra.tripCardMove?.why;
+    const state = b.labels.filter(l => { const m = n.labels.find(m => m.label === l.label && m.option === l.option) || n.labels.find(m => m.label === l.label); return m && (m.disabled !== l.disabled || m.handler !== l.handler || m.option !== l.option) && !(allowed(l.label) && m.disabled && !l.disabled); }).map(l => l.label);
     check(`${name} · ${k}: у каждой кнопки та же доступность, обработчик и место среди вариантов`, !state.length, state);
-    const diff = Object.keys(B.press).filter(key => key.startsWith(k + ' / ') && JSON.stringify(B.press[key]) !== JSON.stringify(N.press[key])).map(key => ({ key, base: B.press[key], new: N.press[key] }));
+    const diff = Object.keys(B.press).filter(key => key.startsWith(k + ' / ') && JSON.stringify(B.press[key]) !== JSON.stringify(N.press[key]) && !(allowed(key.slice(k.length + 3)) && N.press[key]?.disabled && !B.press[key]?.changed) && !replaced(key.slice(k.length + 3))).map(key => ({ key, base: B.press[key], new: N.press[key] }));
     check(`${name} · ${k}: каждая старая кнопка нажимается и ведёт туда же`, !diff.length, diff);
     if (n.main) {
       check(`${name} · ${k}: главная кнопка «${n.main.label}» видна без прокрутки на 390×844` + (b.main ? ` (без карточки — ${b.main.screen}-й экран, ${b.main.y} px)` : ''), n.main.fold, n.main);
@@ -412,7 +520,7 @@ function compare(name, out) {
   else note(`${name}: вакансий с нехваткой профильной подготовки нет`);
   check(`${name}: нет свободных часов — окно вакансии не обещает дату ответа и ведёт к нагрузке`, /ответа не будет/.test(e.busy.note) && e.busy.need.some(n => /Свободного времени/.test(n.text) && n.fix), e.busy);
   if (e.busy.status !== undefined) check(`${name}: нет свободных часов — отклик без даты, и резюме правда не двигается`, /ответа не будет/.test(e.busy.status) && e.busy.progress === 0 && e.busy.after === 'submitted', e.busy);
-  check(`${name}: перегруженная неделя — срок и «всего» программы по темпу учёбы, строка про время`, e.slow.get.includes(spanOf(e.slow.months)) && e.slow.cost.includes(e.slow.want) && e.slow.need.some(t => /Свободного времени вместе с учёбой/.test(t)), e.slow);
+  check(`${name}: перегруженная неделя — срок и «всего» программы по темпу учёбы, строка про время`, e.slow.get.includes(spanOf(e.slow.months)) && e.slow.cost.includes(e.slow.want) && e.slow.need.some(t => /^Свободного времени — \d+ ч\/нед\.$/.test(t)), e.slow);
   if (e.realPace) check(`${name}: учёба после настоящего зачисления идёт так, как обещало окно (срок и «всего»)`, e.realPace.started && e.realPace.card.get.includes(spanOf(e.realPace.months)) && e.realPace.card.cost.includes(e.realPace.wantTotal), e.realPace);
   if (e.closedInvite) check(`${name}: закрытое приглашение — статус наверху, нет нулевой цены, у серых кнопок причина`, e.closedInvite.mainOk && /закрыто|завершена|запланирована|отказались/.test(e.closedInvite.status) && !/^0\s/.test(e.closedInvite.price) && e.closedInvite.grey.every(g => g.why || g.hint), e.closedInvite);
   if (e.kidInvite) check(`${name}: семейная поездка ребёнка — окно без карточки, «Поехать с …» и «Остаться дома» на виду`, !e.kidInvite.card && e.kidInvite.buttons.some(b => /^Поехать с /.test(b.label) && !b.hidden && !b.disabled) && e.kidInvite.buttons.some(b => b.label === 'Остаться дома' && !b.hidden) && e.kidInviteDecision.every(b => !b.hidden), e.kidInvite);
@@ -424,6 +532,7 @@ function compare(name, out) {
   check(`${name}: старые окна — у каждой серой кнопки причина (${Object.entries(e.grey || {}).map(([k, l]) => k + ' ' + l.length).join(', ')})`, !grey.length, grey);
   check(`${name}: у серой кнопки видна причина`, e.why === 'Причина видна', e.why);
   if (e.cinema) check(`${name}: «Сходить в кино» по-прежнему открывает афишу`, e.cinema === B.extra?.cinema || (!B.extra && /кино|Афиша|фильм/i.test(e.cinema)), { base: B.extra?.cinema, new: e.cinema });
+  design(name, out);
   check(`${name}: ошибок на странице нет`, !B.errors.length && !N.errors.length && !(W?.errors.length), { base: B.errors, new: N.errors, wide: W?.errors });
 }
 
