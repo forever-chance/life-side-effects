@@ -78,12 +78,17 @@ function helpers() {
     const P = await page(browser, { viewport: vp });
     const r = await P.pg.evaluate(() => {
       const out = {};
-      const layout = () => { const m = document.querySelector('#modal'), box = m.querySelector('.ready272'); if (!box) return null; const panel = box.querySelector('.ready2722-panel'), acts = box.querySelector('.ready2722-acts'); return { panel: !!panel, actsAfterPanel: !!(panel && acts && panel.nextElementSibling === acts), go: [...m.querySelectorAll('.ready2722-go')].map(b => b.textContent), acts: [...m.querySelectorAll('.ready2722-act')].map(b => b.textContent), why: [...m.querySelectorAll('.ready2722-why')].map(li => li.textContent), afterH2: m.querySelector('h2')?.nextElementSibling === box, bottom: __opts().filter(o => /Запланировать поездку/.test(o)) }; };
+      // 273: с windows273.js плашка готовности — поле «Не хватает» карточки, «Можно ехать» — статус, кнопка согласия — главная.
+      const lbl = b => [...b.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
+      const layout273 = m => { const need = m.querySelector('.need273'), rows = need && !need.hidden ? [...need.querySelectorAll('.fix273')] : [], st = m.querySelector('.status273'), ok = !rows.length && /можно (ехать|отдыхать)/i.test(st?.textContent || ''), main = m.querySelector('.main273');
+        if (!rows.length && !ok) return null; const top = rows.length ? need : st;
+        return { panel: true, actsAfterPanel: true, go: ok ? [...main.querySelectorAll('button')].filter(b => !b.disabled).map(lbl) : [], acts: rows.filter(e => e.tagName === 'BUTTON').map(e => e.querySelector('small').textContent), why: rows.map(e => e.querySelector('span').textContent), afterH2: !!(top.compareDocumentPosition(main) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(m.querySelector('h2').compareDocumentPosition(top) & Node.DOCUMENT_POSITION_FOLLOWING), bottom: __opts().filter(o => /Запланировать поездку/.test(o)) }; };
+      const layout = () => { const m = document.querySelector('#modal'); if (m.querySelector('.top273')) return layout273(m); const box = m.querySelector('.ready272'); if (!box) return null; const panel = box.querySelector('.ready2722-panel'), acts = box.querySelector('.ready2722-acts'); return { panel: !!panel, actsAfterPanel: !!(panel && acts && panel.nextElementSibling === acts), go: [...m.querySelectorAll('.ready2722-go')].map(b => b.textContent), acts: [...m.querySelectorAll('.ready2722-act')].map(b => b.textContent), why: [...m.querySelectorAll('.ready2722-why')].map(li => li.textContent), afterH2: m.querySelector('h2')?.nextElementSibling === box, bottom: __opts().filter(o => /Запланировать поездку/.test(o)) }; };
       __base();
       travelDraftMenu52(__trip());
       out.ok = layout();
       const before = travel52().trips.length;
-      const go = document.querySelector('#modal .ready2722-go');
+      const go = document.querySelector('#modal .ready2722-go') || [...document.querySelectorAll('#modal .main273 button')].find(b => !b.disabled); // 273
       if (go) go.click();
       out.planned = travel52().trips.length - before;
       out.plannedTitle = __title();
@@ -93,12 +98,13 @@ function helpers() {
       const kid = person('Ребенок', 6, 'f', s.country); kid.city18 = residenceCity(); s.people.push(kid); out.kid = kid.name;
       travelDraftMenu52(__trip(1));
       out.miss = layout();
-      const money = [...document.querySelectorAll('#modal .ready2722-act')].find(b => b.textContent === 'Деньги');
+      const act = name => [...document.querySelectorAll('#modal .ready2722-act')].find(b => b.textContent === name) || [...document.querySelectorAll('#modal .need273 button.fix273')].find(b => b.querySelector('small')?.textContent === name); // 273
+      const money = act('Деньги');
       if (money) money.click();
       out.moneyTitle = __title();
       closeModal();
       travelDraftMenu52(__trip(1));
-      const care = [...document.querySelectorAll('#modal .ready2722-act')].find(b => b.textContent === 'Присмотр за детьми');
+      const care = act('Присмотр за детьми');
       if (care) care.click();
       out.careTitle = __title();
       closeModal();
@@ -125,7 +131,7 @@ function helpers() {
     check(tag + ': «Присмотр за детьми» под плашкой открывает присмотр', /С кем останутся дети|присмотр/i.test(r.careTitle), r.careTitle);
     check(tag + ': работающий — под плашкой «Запросить отпуск и запланировать»', r.job && r.job.go.length === 1 && /^Запросить отпуск и запланировать/.test(r.job.go[0]), r.job);
     check(tag + ': отпуск дома — «Запланировать отдых» под плашкой', r.home && r.home.go[0] === 'Запланировать отдых', r.home);
-    const fit = await P.pg.evaluate(() => { __base(); travelDraftMenu52(__trip()); const m = document.querySelector('#modal'), mr = m.getBoundingClientRect(); const els = [...m.querySelectorAll('.ready2722-go,.ready2722-act')]; const res = { n: els.length, inside: els.every(e => { const r = e.getBoundingClientRect(); return r.left >= mr.left - 1 && r.right <= mr.right + 1; }), noScroll: m.scrollWidth <= m.clientWidth + 1, visible: els.every(e => e.getBoundingClientRect().bottom < window.innerHeight) }; closeModal(); return res; });
+    const fit = await P.pg.evaluate(() => { __base(); travelDraftMenu52(__trip()); const m = document.querySelector('#modal'), mr = m.getBoundingClientRect(); const els = m.querySelector('.top273') ? [...m.querySelectorAll('.main273 button:not([disabled]),.need273 .fix273')] : [...m.querySelectorAll('.ready2722-go,.ready2722-act')]; /* 273 */ const res = { n: els.length, inside: els.every(e => { const r = e.getBoundingClientRect(); return r.left >= mr.left - 1 && r.right <= mr.right + 1; }), noScroll: m.scrollWidth <= m.clientWidth + 1, visible: els.every(e => e.getBoundingClientRect().bottom < window.innerHeight) }; closeModal(); return res; });
     check(tag + ': кнопка видна без прокрутки и не вылезает за окно', fit.n === 1 && fit.inside && fit.noScroll && fit.visible, fit);
     check(tag + ': без ошибок страницы', P.errors.length === 0, P.errors);
     await P.ctx.close();

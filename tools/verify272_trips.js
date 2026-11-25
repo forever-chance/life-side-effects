@@ -54,8 +54,14 @@ async function birth(p, raw = null) {
 function helpers() {
   window.__opts = () => [...document.querySelectorAll('#modal .options button')].map(b => (b.disabled ? '[x] ' : '') + b.textContent.replace(/\s+/g, ' ').trim());
   window.__click = src => { const re = new RegExp(src); const b = [...document.querySelectorAll('#modal .options button:not([disabled])')].find(b => re.test(b.textContent)); if (!b) return false; b.click(); return true; };
-  window.__ready = () => { const box = document.querySelector('#modal .ready272'); if (!box) return null; if (box.dataset.v2722) return { ok: box.classList.contains('ready272-ok'), head: box.querySelector('h3')?.textContent || '', items: [...box.querySelectorAll('li.ready2722-why')].map(li => ({ text: li.textContent, fix: li.dataset.fix || null, button: !!li.dataset.fix })) }; return { ok: box.classList.contains('ready272-ok'), head: box.querySelector('h3')?.textContent || '', items: [...box.querySelectorAll('.ready272-item')].map(e => ({ text: e.childNodes[0]?.textContent || e.textContent, fix: e.querySelector('small')?.textContent || null, button: e.tagName === 'BUTTON' })) }; };
-  window.__readyClick = src => { const re = new RegExp(src); const b = [...document.querySelectorAll('#modal .ready272 button')].find(b => re.test(b.textContent)); if (!b) return false; b.click(); return true; };
+  // 273: с windows273.js блок готовности — поле «Не хватает» окна-карточки (.need273), «Можно ехать» — строка статуса.
+  window.__ready273 = () => { const m = document.querySelector('#modal'); if (!m?.querySelector('.top273')) return undefined; const need = m.querySelector('.need273'), st = m.querySelector('.status273');
+    const items = need && !need.hidden ? [...need.querySelectorAll('.fix273')].map(e => ({ text: e.querySelector('span')?.textContent || '', fix: e.tagName === 'BUTTON' ? e.querySelector('small')?.textContent || null : null, button: e.tagName === 'BUTTON' })) : [];
+    if (items.length) return { ok: false, head: need.querySelector('h4')?.textContent || '', items };
+    const okText = st && !st.hidden ? /можно (ехать|отдыхать)/i.exec(st.textContent) : null;
+    return okText ? { ok: true, head: okText[0].charAt(0).toUpperCase() + okText[0].slice(1), items: [] } : null; };
+  window.__ready = () => { const r273 = __ready273(); if (r273 !== undefined) return r273; const box = document.querySelector('#modal .ready272'); if (!box) return null; if (box.dataset.v2722) return { ok: box.classList.contains('ready272-ok'), head: box.querySelector('h3')?.textContent || '', items: [...box.querySelectorAll('li.ready2722-why')].map(li => ({ text: li.textContent, fix: li.dataset.fix || null, button: !!li.dataset.fix })) }; return { ok: box.classList.contains('ready272-ok'), head: box.querySelector('h3')?.textContent || '', items: [...box.querySelectorAll('.ready272-item')].map(e => ({ text: e.childNodes[0]?.textContent || e.textContent, fix: e.querySelector('small')?.textContent || null, button: e.tagName === 'BUTTON' })) }; };
+  window.__readyClick = src => { const re = new RegExp(src); const b = [...document.querySelectorAll('#modal .ready272 button, #modal .need273 button.fix273')].find(b => re.test(b.textContent)); if (!b) return false; b.click(); return true; };
   window.__sections = () => [...document.querySelectorAll('#modal .detail-section20 h3')].map(h => h.textContent);
   window.__title = () => document.querySelector('#modal h2')?.textContent || '';
   window.__month = (n = 1) => { for (let i = 0; i < n; i++) { s.pending = []; if ($('#modal').open) closeModal(); if (s.clock.yearDue && typeof rollYear === 'function') { try { transact('year', rollYear); } catch (e) {} } s.pending = []; if ($('#modal').open) closeModal(); advanceMonth(); } s.pending = []; if ($('#modal').open) closeModal(); };
@@ -283,15 +289,15 @@ async function buildTrip(pg, how) {
       });
       // Настоящий клик по причине про детей.
       let clicked = false;
-      try { await P.pg.locator('#modal .ready272 button', { hasText: INDEX.includes('src="trips2722.js') ? 'Присмотр за детьми' : r.kid }).first().click({ timeout: 3000 }); clicked = true; } catch (e) {}
+      try { await P.pg.locator('#modal .ready272 button, #modal .need273 button.fix273', { hasText: INDEX.includes('src="trips2722.js') ? 'Присмотр за детьми' : r.kid }).first().click({ timeout: 3000 }); clicked = true; } catch (e) {}
       const kidWin = await P.pg.evaluate(() => __title());
       check(tag + ': ребёнок младше 12 — причина наверху, клик открывает присмотр за детьми', r.draft?.items?.some(i => i.text.includes(r.kid) && i.fix === 'Присмотр за детьми') && clicked && kidWin === 'С кем останутся дети', { ready: r.draft, title: kidWin });
       const layout = await P.pg.evaluate(() => {
         travelDraftMenu52(__trip(0));
-        const m = document.querySelector('#modal'), box = m.querySelector('.ready272'), first = m.querySelector('.detail20');
+        const m = document.querySelector('#modal'), card = !!m.querySelector('.top273'), box = card ? m.querySelector('.need273:not([hidden])') : m.querySelector('.ready272'), first = card ? m.querySelector('.more273') : m.querySelector('.detail20'); // 273: в карточке таблица свёрнута в «Подробнее»
         const mr = m.getBoundingClientRect();
         return { box: !!box, aboveDetails: !!box && !!first && box.getBoundingClientRect().top < first.getBoundingClientRect().top, belowTitle: !!box && box.getBoundingClientRect().top > m.querySelector('h2').getBoundingClientRect().top,
-          noScroll: m.scrollWidth <= m.clientWidth + 1, inside: [...m.querySelectorAll('.ready272 .ready272-item')].every(e => { const r = e.getBoundingClientRect(); return r.left >= mr.left - 1 && r.right <= mr.right + 1; }), visible: !!box && box.getBoundingClientRect().top < window.innerHeight };
+          noScroll: m.scrollWidth <= m.clientWidth + 1, inside: [...m.querySelectorAll('.ready272 .ready272-item, .need273 .fix273')].every(e => { const r = e.getBoundingClientRect(); return r.left >= mr.left - 1 && r.right <= mr.right + 1; }), visible: !!box && box.getBoundingClientRect().top < window.innerHeight };
       });
       check(tag + ': блок сразу под заголовком, над таблицей, виден без прокрутки, не шире окна', layout.box && layout.aboveDetails && layout.belowTitle && layout.noScroll && layout.inside && layout.visible, layout);
       await P.pg.screenshot({ path: path.join(process.env.SHOTS || require('os').tmpdir(), 'verify272-trips-' + (tag === 'телефон' ? 'phone' : 'desktop') + '.png') });
@@ -328,7 +334,7 @@ async function buildTrip(pg, how) {
         t.hold57 = { created: s.clock.ticks, reason: kidName + ': нужен присмотр на время поездки' };
         travelTripMenu52(t.id);
         out.held = __ready();
-        out.heldNote = document.querySelector('#modal .ready272-note')?.textContent || '';
+        out.heldNote = (document.querySelector('#modal .ready272-note') || document.querySelector('#modal .top273') && document.querySelector('#modal .status273'))?.textContent || ''; // 273: в карточке — строка статуса
         out.holdKept = !!t.hold57;
         // Причина отъезда с «;» внутри — одной строкой, а не двумя.
         t.hold57 = null; t.leaveNeed = 1; t.employer = 'другой работодатель'; t.hours = 40;

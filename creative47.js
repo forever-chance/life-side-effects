@@ -133,7 +133,7 @@ function offerMenu47(id,application=false){
   fact20('Статус',a?statusNames47[a.status]:'Приём заявок: ещё '+Math.max(0,o.expires-s.clock.ticks)+' мес.'),
   ...(task?[fact20('Прогресс',task.progress.toFixed(1)+' / '+task.duration),fact20('Ограничения',task.blocked47||'Нет')]:[]),...(a?.paid?[fact20('Выплачено',money(a.paid))]:[])
  ]),section20('Допуск',q.why.length?q.why.map(w=>fact20('Требование',w)):[fact20('Условия выполнены',o.network50||o.sourceWork191?'Заказчик уже прислал предложение; нужно отдельно принять условия':'Ответ после месяца рассмотрения; результат не гарантирован')])]};
- show(o.title,'Гонорар закреплён в валюте игрового кошелька. Смена страны или потеря права на работу приостанавливает оплачиваемый проект; накопленный прогресс сохраняется.',a?[
+ /* 273: текст окна снова виден (windows273), без «игрового кошелька» */show(o.title,'Гонорар назначен в валюте ваших денег. Смена страны или потеря права на работу приостанавливает оплачиваемый проект; накопленный прогресс сохраняется.',a?[
   ...(o.clientId50?[{label:'Заказчик и история',fn:()=>openClientFromOffer50(o,id,application)}]:[]),
   ...(a.status==='offered'?[{label:'Принять предложение',disabled:s.clock.ticks>=a.until||(o.network50||o.bridge193?creativeCheck47(o).why.length>0:creativeRights47(o).length>0)||creativeTasks47().length>=3,fn:()=>acceptCreative47(a.id)},{label:'Отклонить',fn:()=>{a.status='declined';save();}}]:[]),
   ...(task?[{label:'Отменить работу',fn:()=>cancelTask(task.id)}]:[])
