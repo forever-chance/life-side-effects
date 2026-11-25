@@ -433,6 +433,9 @@ async function main() {
         __month(1);
         out.released = { status: t?.status, hold: t?.hold57?.reason || null, logs: __logs(12).filter(l => /Поездка снова по плану/.test(l)) };
         // Лагерь с проживанием в месяц поездки закрывает присмотр.
+        // Ребёнок мог случайно заболеть за два месяца выше: болезнь до отъезда требует своего присмотра, лагерь
+        // её не закрывает (journeys57) — здесь проверяется только присмотр на время поездки, болезнь снимаем.
+        for (const k of kids) if (k.child55?.illness?.status === 'active') k.child55.illness = null;
         p.cohabit = false; s.housing.occupant = null; p.city18 = list[2]; ensureHome();
         const dep = departureMin86(__trip(1));
         for (const k of kids) family54().camps.push({ id: 'camp-' + k.id, child: k.id, kind: 'domestic', country: s.country, home: s.country, city: residenceCity(), fee: 0, status: 'planned', departure: dep, roll: .5 });

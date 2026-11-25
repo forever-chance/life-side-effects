@@ -476,7 +476,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       show(hobbies.film[0], 'x', hobbies.film.slice(1).map(label => ({ label, fn: () => {} }))); out.hobbyCinema = texts().some(b => /^Сходить в кино/.test(b)); closeModal();
       // Названия премьер не повторяются в пределах 20 лет; сюжеты идут без повторов, пока не кончатся.
       const titles = [], stories = []; for (let ym = 2028 * 12; ym < 2048 * 12; ym++) for (const f of futureMonth269(ym)) { titles.push(f.title); stories.push(f.story); }
-      out.titles = new Set(titles.slice(0, 200)).size === Math.min(200, titles.length) && new Set(stories.slice(0, filmStories269.length)).size === Math.min(filmStories269.length, stories.length);
+      const L = typeof premierePool271 !== 'undefined' ? premierePool271.length : filmStories269.length; out.titles = new Set(titles.slice(0, 200)).size === Math.min(200, titles.length) && new Set(stories.slice(0, L)).size === Math.min(L, stories.length);
       // Приглашение в кинопроект — конкретный проект с сюжетом.
       const x = creative47(), spec = Object.keys(specialties184.cinema)[0];
       x.works.push({ id: 'v1', track: 'cinema', specialty184: spec, quality: 90, level184: 2, title: 'Проба 1' }, { id: 'v2', track: 'cinema', specialty184: spec, quality: 90, level184: 2, title: 'Проба 2' }); x.nextCinema191 = 0;
