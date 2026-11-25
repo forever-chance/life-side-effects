@@ -493,6 +493,9 @@ function npcNames271(){
   }
   const sp=npcSpouse271(p);
   if(!sp||p.marriageDecided271===sp.id||sp.marriageDecided271===p.id)continue;
+  // Свадьба из social270 ещё впереди (generationPairs58 раньше срока отметил пару браком): фамилию решают после неё,
+  // иначе невеста приходит на свою свадьбу уже с фамилией мужа, а приглашение — со старой.
+  if(typeof weddingOpenSoc270==='function'&&(weddingOpenSoc270(p.id)||weddingOpenSoc270(sp.id)))continue;
   const before=[p.name,sp.name],who=coupleName271(p,sp,p.country||s.country);
   if(who){
    remember(who,(who.gender==='f'?'сменила':'сменил')+' фамилию после свадьбы: '+who.surname);

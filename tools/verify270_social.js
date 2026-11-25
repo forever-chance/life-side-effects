@@ -95,6 +95,8 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         // Сестра с партнёром 13 месяцев; вам 14 — позвать вас нельзя, свадьба всё равно будет.
         s.age = 14;
         const sis = T.mk('Сестра', 27, { gender: 'f', bond: 70 }), sp = T.pair(sis, 13);
+        // С 271 после свадьбы невеста может взять фамилию мужа (names271): запись о свадьбе — под именем, которое было на свадьбе.
+        const sisAt = 'Свадьба · ' + sis.name;
         out.sisEligible = weddingEligible132(sis);
         const w = planWeddingSoc270(sis); out.planned = !!w; out.invite = w && w.invite;
         s.age = 30;
@@ -104,7 +106,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         out.married = sis.npcMarried54 && sp.npcMarried54 && sis.marriage270?.spouse === sp.id && sp.marriage270?.via === sis.id;
         out.union = !!s.family27.unions.find(u => u.married270 && [u.a, u.b].includes(sis.id) && [u.a, u.b].includes(sp.id));
         out.edge = treeGraph90().edges.find(e => [e.a, e.b].includes(sis.id) && [e.a, e.b].includes(sp.id))?.kind;
-        const e = s.log.find(e => e.title === 'Свадьба · ' + sis.name); out.logText = e?.text || null;
+        const e = s.log.find(e => e.title === sisAt); out.logText = e?.text || null;
         const card = personSections42(sp); out.cardTie = card.find(x => x.title === 'О человеке')?.rows.find(r => r.label === 'Родство')?.value || null;
         // Вдовство: супруг умер — отметка снимается, можно снова жениться.
         sp.alive = false; T.month(1);
@@ -112,7 +114,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         const sp2 = T.pair(sis, 13); out.widowAgain = weddingEligible132(sis);
         // Приглашение на свадьбу друга: брак не пишется через месяц после рассылки, а после праздника.
         z.invitations = []; z.lastOffer = -100;
-        const fr = T.mk('Друг', 31, { bond: 75, trust: 70, strain: 5 }), fp = T.pair(fr, 14);
+        const fr = T.mk('Друг', 31, { bond: 75, trust: 70, strain: 5 }), fp = T.pair(fr, 14), frAt = 'Свадьба · ' + fr.name;
         const w2 = planWeddingSoc270(fr), q = w2 && z.invitations.find(q => q.id === w2.invite);
         out.inviteLinked = !!q && q.local && q.wedding270 === w2.id;
         out.accepted = q ? respondOccasion54(q.id, true) : false;
@@ -123,7 +125,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         out.sameMonth = out.months.findIndex(m => m.q === 'completed') === out.months.findIndex(m => m.married);
         out.dueAhead = w2.due > w2.held;
         out.friendMarried = fr.npcMarried54 && fp.npcMarried54 && fr.marriage270?.spouse === fp.id;
-        out.guest = s.log.find(e => e.title === 'Свадьба · ' + fr.name)?.text || null;
+        out.guest = s.log.find(e => e.title === frAt)?.text || null;
         out.qStatus = q?.status;
         // Планировщик: пара друга — в план; бабушка с новым партнёром — нет.
         const gm = T.mk('Бабушка', 70, { gender: 'f', bond: 70 }); T.pair(gm, 30);
@@ -187,6 +189,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         // 4. Свадьба брата назначена позже двух лет вместе; вы отказались. generationPairs58 успевает раньше — свадьба всё равно в свой срок.
         z.invitations = []; z.lastOffer = -100;
         const bro = solo(T.mk('Брат', 30, { gender: 'm', bond: 80, trust: 70, strain: 5 })), bp = T.pair(bro, 22); bp.age = 30;
+        const broAt = 'Свадьба · ' + bro.name; out.bpBefore = bp.name;
         const w = planWeddingSoc270(bro), q = w && z.invitations.find(q => q.id === w.invite);
         if (w) w.due = s.clock.ticks + 4;
         out.declined = q ? respondOccasion54(q.id, false) : 'нет приглашения';
@@ -195,17 +198,18 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         for (let i = 0; i < 4 && w?.status === 'planned'; i++) T.month(1);
         out.broHeld = { w: w?.status, m: bro.marriage270?.spouse === bp.id && bp.marriage270?.spouse === bro.id,
           unions: s.family27.unions.filter(u => u.status === 'together' && [u.a, u.b].includes(bro.id)).map(u => !!u.married270) };
-        out.broLog = s.log.find(e => e.title === 'Свадьба · ' + bro.name)?.text || null;
+        out.broLog = s.log.find(e => e.title === broAt)?.text || null;
         out.broEdge = treeGraph90().edges.find(e => [e.a, e.b].includes(bro.id) && [e.a, e.b].includes(bp.id))?.kind || null;
         // 5. Приглашение принято, вы идёте на праздник — свадьба на месте, generationPairs58 не мешает.
         z.invitations = []; z.lastOffer = -100;
         const sis2 = solo(T.mk('Сестра', 30, { gender: 'f', bond: 80, trust: 70, strain: 5 })), sp2 = T.pair(sis2, 22); sp2.age = 30;
+        const sis2At = 'Свадьба · ' + sis2.name;
         const w2 = planWeddingSoc270(sis2), q2 = w2 && z.invitations.find(q => q.id === w2.invite);
         out.acc2 = q2 ? respondOccasion54(q2.id, true) : 'нет приглашения';
         for (let i = 0; i < 6 && w2?.status === 'planned'; i++) T.month(1);
         out.sis2 = { w: w2?.status, q: q2?.status, m: sis2.marriage270?.spouse === sp2.id,
           unions: s.family27.unions.filter(u => [u.a, u.b].includes(sis2.id) && u.status === 'together').length };
-        out.sis2Log = s.log.find(e => e.title === 'Свадьба · ' + sis2.name && /поженились/.test(e.text))?.text || null;
+        out.sis2Log = s.log.find(e => e.title === sis2At && /поженились/.test(e.text))?.text || null;
         // 6. Пара рассталась до свадьбы: приглашение, дело в расписании и поездка отменяются.
         z.invitations = []; z.lastOffer = -100;
         const f3 = T.mk('Друг', 31, { bond: 75, trust: 70, strain: 5 }), p3 = T.pair(f3, 14);
@@ -238,6 +242,8 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       check('свадьба брата: generationPairs58 раньше свадьбы — свадьба не отменена', r.declined === true && r.family.married && !r.family.m270 && r.family.w === 'planned', r.family);
       check('свадьба брата: в срок — брак записан, союз один, в древе «Брак»', r.broHeld.w === 'held' && r.broHeld.m && r.broHeld.unions.length === 1 && r.broHeld.unions[0] && r.broEdge === 'married', r.broHeld);
       check('свадьба брата: запись «поженились», вас не было', /поженились/.test(r.broLog || '') && /не было/.test(r.broLog || ''), r.broLog);
+      // generationPairs58 отметил их браком раньше свадьбы — фамилию невеста меняет не раньше самой свадьбы (names271).
+      check('свадьба брата: невеста до свадьбы со своей фамилией', (r.broLog || '').includes(' и ' + r.bpBefore + ' поженились'), { log: r.broLog, before: r.bpBefore });
       check('свадьба сестры: гость на празднике — брак сразу, союз один', r.acc2 === true && r.sis2.w === 'held' && r.sis2.q === 'completed' && r.sis2.m && r.sis2.unions === 1 && /среди гостей/.test(r.sis2Log || ''), r);
       check('отмена: расстались до свадьбы — приглашение отменено, запись с причиной', r.offered.w === 'cancelled' && r.offered.q === 'cancelled' && /Свадьбы не будет: .+ расстались\.$/.test(r.offered.log || ''), r.offered);
       check('отмена: принятое приглашение — дело в расписании снято', r.acc4 === true && r.active.w === 'cancelled' && r.active.q === 'cancelled' && r.active.task === 'cancelled', r);
