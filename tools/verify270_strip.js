@@ -10,6 +10,10 @@ const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp' };
 const ORDER = ['films269.js', 'display269.js', 'notices270.js', 'family270.js', 'social270.js', 'jobs270.js', 'strip270.js', 'texts270.js', 'names270.js', 'onboarding270.js'];
 const PHONE = { width: 390, height: 844 }, WIDE = { width: 1280, height: 900 };
+// 272 (layout272.js): на телефоне «Люди», «Траектория», «Личное дело» — одна строка последнего события, на широком
+// экране вместо полосы — сводка над вкладками центра (подробно — tools/verify272_layout.js). Здесь те же места
+// проверяются по-новому, когда layout272.js подключён.
+const L272 = process.env.L272 === '1' || fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').includes('layout272.js');
 
 async function page(browser, cfg, viewport) {
   const ctx = await browser.newContext({ viewport });
@@ -239,7 +243,8 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     for (const [t, label] of [['people', 'Люди'], ['trajectory', 'Траектория']]) {
       await pg.evaluate(t => { s.clock.running = false; s.ui05.panel = 'center'; tab = t; render(); }, t);
       st = await pg.evaluate(strip);
-      check('телефон «' + label + '»: и последнее событие, и ответы', st.shown && st.latest && st.waiting, st);
+      if (L272) check('телефон «' + label + '» (272): только последнее событие', st.shown && st.latest && !st.waiting, st);
+      else check('телефон «' + label + '»: и последнее событие, и ответы', st.shown && st.latest && st.waiting, st);
       lay = await pg.evaluate(layout);
       check('телефон «' + label + '»: две строки не съедают экран, без горизонтальной прокрутки', lay.stripHeight < 110 && Math.abs(lay.stripBottom - lay.shellTop) < 1.5 && !lay.pageScrollX && !lay.stripOverflow && !lay.wide, lay);
     }
@@ -252,10 +257,12 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     check('телефон «Персонаж»: раскладка как раньше (4 строки, колонки до низа)', lay.rows.split(' ').length === 4 && Math.abs(lay.shellBottom - lay.innerHeight) < 1.5, lay);
     await pg.evaluate(() => { s.ui05.panel = 'center'; setTab('world'); });
     st = await pg.evaluate(strip);
-    check('телефон «Личное дело»: полосы нет', !st.shown, st);
+    if (L272) check('телефон «Личное дело» (272): последнее событие', st.shown && st.latest && !st.waiting, st);
+    else check('телефон «Личное дело»: полосы нет', !st.shown, st);
     await pg.evaluate(() => { tab = 'plans'; render(); });
     st = await pg.evaluate(strip);
-    check('телефон: старая вкладка «plans» (рисуется как «Личное дело») — полосы нет', !st.shown, st);
+    if (L272) check('телефон: старая вкладка «plans» (рисуется как «Личное дело», 272) — последнее событие', st.shown && st.latest, st);
+    else check('телефон: старая вкладка «plans» (рисуется как «Личное дело») — полосы нет', !st.shown, st);
 
     // Время стоит на «Персонаже» и «Личном деле» и идёт дальше, когда игрок уходит.
     const run = () => pg.evaluate(() => { s.pending = []; if ($('#modal').open) closeModal(); s.clock.choiceActive = false; s.clock.resumeAfterChoice = false; s.dead = false; s.clock.speed = 8; s.clock.running = true; clockStamp = Date.now(); clockCarry = 0; render(); return s.clock.ticks; });
@@ -339,7 +346,7 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     const before = await pg.evaluate(() => ({ st: !!document.querySelector('#app>.top-strip270'), hold: clockHold270() }));
     await pg.setViewportSize(WIDE);
     await wait(300);
-    const wide = await pg.evaluate(() => ({ st: !!document.querySelector('#app>.top-strip270 .strip-latest270'), waiting: !!document.querySelector('#app>.top-strip270 .strip-waiting270'), hold: clockHold270(), mobile: mobile270() }));
+    const wide = await pg.evaluate(() => ({ st: !!document.querySelector(typeof summary272 === 'function' ? '.summary272 .sum-event272' : '#app>.top-strip270 .strip-latest270'), waiting: !!document.querySelector('#app>.top-strip270 .strip-waiting270'), hold: clockHold270(), mobile: mobile270() }));
     await pg.setViewportSize(PHONE);
     await wait(300);
     const back = await pg.evaluate(() => ({ st: !!document.querySelector('#app>.top-strip270'), hold: clockHold270() }));
@@ -365,6 +372,11 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     for (const [t, label] of [['people', 'Люди'], ['world', 'Личное дело'], ['trajectory', 'Траектория']]) {
       await pg.evaluate(t => { s.clock.running = false; tab = t; render(); }, t);
       st = await pg.evaluate(strip);
+      if (L272) {
+        const sum = await pg.evaluate(() => ({ strip: !!document.querySelector('#app>.top-strip270'), title: document.querySelector('.summary272 .sum-title272')?.textContent || '', rows: getComputedStyle(document.getElementById('app')).gridTemplateRows.split(' ').length }));
+        check('широкий «' + label + '» (272): полосы нет, сверху сводка с последним событием', !sum.strip && sum.rows === 3 && sum.title === 'Событие для широкого экрана', sum);
+        continue;
+      }
       check('широкий «' + label + '»: сверху последнее событие, без ответов', st.shown && st.latest && !st.waiting && st.latestTitle === 'Событие для широкого экрана', { st, pend });
       lay = await pg.evaluate(layout);
       check('широкий «' + label + '»: полоса над колонками, колонки до низа, без горизонтальной прокрутки', lay.stripHeight > 20 && lay.stripHeight < 80 && Math.abs(lay.stripBottom - lay.shellTop) < 1.5 && Math.abs(lay.shellBottom - lay.innerHeight) < 1.5 && !lay.pageScrollX && !lay.stripOverflow && !lay.wide, lay);
@@ -379,9 +391,9 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     await pg.evaluate(() => { if ($('#modal').open) closeModal(); s.pending = []; s.clock.running = false; s.ui05.panel = 'center'; tab = 'people'; render(); });
 
     // Нажатие — «История», полоса уходит.
-    await pg.click('#app>.top-strip270 .strip-latest270 .strip-open270');
+    await pg.click(L272 ? '.summary272 .sum-event272' : '#app>.top-strip270 .strip-latest270 .strip-open270');
     const r = await pg.evaluate(() => ({ tab, st: !!document.querySelector('#app>.top-strip270'), active: document.querySelector('.center .tabs .active')?.textContent }));
-    check('широкий: нажатие открывает «Историю», полоса исчезает', r.tab === 'story' && !r.st && r.active === 'История', r);
+    check(L272 ? 'широкий (272): нажатие на сводку открывает «Историю»' : 'широкий: нажатие открывает «Историю», полоса исчезает', r.tab === 'story' && !r.st && r.active === 'История', r);
 
     check('широкий: без ошибок страницы', !errors.length, errors);
     await ctx.close();
@@ -467,7 +479,7 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     for (const label of ['Люди', 'Траектория']) {
       await pg.click('.center .tabs button:has-text("' + label + '")');
       const st = await pg.evaluate(strip), lay = await pg.evaluate(layout), inl = await pg.evaluate(kickerInline);
-      check('телефон боком 844×390, «' + label + '»: обе строки, полоса до 80px, колонке больше 100px', st.latest && st.waiting && lay.stripHeight <= 80 && lay.shellBottom - lay.shellTop > 100 && inl.inline && !lay.pageScrollX && !lay.stripOverflow && !lay.wide, { st: { ...st, text: '' }, lay, inl });
+      check('телефон боком 844×390, «' + label + '»: ' + (L272 ? 'последнее событие (272)' : 'обе строки') + ', полоса до 80px, колонке больше 100px', st.latest && st.waiting !== L272 && lay.stripHeight <= 80 && lay.shellBottom - lay.shellTop > 100 && inl.inline && !lay.pageScrollX && !lay.stripOverflow && !lay.wide, { st: { ...st, text: '' }, lay, inl });
     }
     await pg.setViewportSize(PHONE);
     await wait(300);
