@@ -377,7 +377,8 @@ print(json.dumps({'out':[m.fix_text(x)[0] for x in t],'skip':sorted(m.SKIP)},ens
 
     // Настоящий месяц: студия показывает премьеру, подруга на ней — всё уже без лишней ё.
     const premiere = await pg.evaluate(id => {
-      const count = () => s.log.filter(e => e.title === 'Премьера · Три сестры').length, before = count(), out = { months: 0 };
+      // 272.2: с feed2722.js название премьеры в «ёлочках» — «Премьера · «Три сестры»».
+      const count = () => s.log.filter(e => e.title === 'Премьера · Три сестры' || e.title === 'Премьера · «Три сестры»').length, before = count(), out = { months: 0 };
       while (out.months < 3 && count() === before) { T.calm(); advanceMonth(); out.months++; }
       T.calm();
       const f = s.people.find(p => p.id === id.friend), m = clubState19().memberships.find(m => m.id === id.club);
