@@ -11,9 +11,14 @@
 //    чередовании плохих и хороших месяцев, сезонный провал — не тревога, закрытие ровно в названный срок и со ссылкой,
 //    первый год, замена сотрудника через 254, своё помещение без повышения аренды, окно «Кто где работает» для старых
 //    сохранений;
-// 6) книги: прежний / новый издатель, своё издательство без оплаты, самиздат сразу после отказа, 2 месяца вместо 6.
+// 6) книги: прежний / новый издатель, своё издательство без оплаты, самиздат сразу после отказа, 2 месяца вместо 6;
+//    название с двоеточием («Город: хроники») в записях об отказе и о выходе;
+// 8) рецензия 272.1: панель «Моё дело» на вкладке действий (кнопки открывают дела), дело в долг — бесплатные ответы
+//    событий 254 доступны, прибавка уходящего сотрудника доходит до него, сезонный провал словами квартала, один пункт
+//    «Дело может закрыться», конкурент у вида со своим словом, второе дело без резерва на две зарплаты — «Вложить деньги»,
+//    тексты о людях на точке без рабочих мест.
 // Игра раздаётся с диска, сервер не нужен:  node tools/verify272_business.js
-// BASE=1 — без business272*.js: видно, какие проверки ловят старое поведение.
+// BASE=1 — без business272*.js (теги снимаются и из index.html): видно, какие проверки ловят старое поведение.
 // OWNER_SAVE=путь — сохранение владелицы (по умолчанию scratchpad/owner-save.json рядом с рабочей копией, если есть).
 // FIT=1 — напечатать таблицу соответствия событий и видов.
 const fs = require('fs'), path = require('path');
@@ -35,7 +40,9 @@ async function open(browser, { plain = false } = {}) {
     const rel = decodeURIComponent(u.pathname).replace(/^\/+/, '') || 'index.html';
     const f = path.join(ROOT, rel);
     if (!f.startsWith(ROOT) || !fs.existsSync(f)) return r.fulfill({ status: 404, body: '' });
-    r.fulfill({ status: 200, body: rel === 'offline-game.js' ? '' : fs.readFileSync(f), headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } });
+    // BASE: index.html без тегов business272*.js (с 272.1 они в index.html, иначе BASE ничего не снимал).
+    const body = rel === 'offline-game.js' ? '' : rel === 'index.html' && (BASE || plain) ? INDEX.replace(/<script src="business272(-data)?\.js[^"]*"><\/script>/g, '') : fs.readFileSync(f);
+    r.fulfill({ status: 200, body, headers: { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' } });
   });
   const pg = await ctx.newPage();
   const errors = [];
@@ -294,7 +301,7 @@ const ev = async (pg, fn, arg) => { try { return await pg.evaluate(fn, arg); } c
     if (!has(r, 'one')) check(false, '3. нет данных');
     else {
       check(r.one.cover === 1 && r.one.cap >= 2, '3. кинотеатр, владелец сам и сотрудник: точка укомплектована, мощность как раньше', r.one);
-      check(r.solo.cover === 1 && r.solo.cap === 1 && r.solo.mods === 0 && !/людей не хватает|Людей не хватает/.test(r.soloCard), '3. кинотеатр, владелец сам и один: точка укомплектована, как в 263 (без штрафа одиночке)', { solo: r.solo, card: r.soloCard.slice(0, 300) });
+      check(r.solo.cover === 1 && r.solo.cap === 1 && r.solo.mods === 0 && !/людей не хватает|Людей не хватает|не хватает людей/.test(r.soloCard), '3. кинотеатр, владелец сам и один: точка укомплектована, как в 263 (без штрафа одиночке)', { solo: r.solo, card: r.soloCard.slice(0, 300) });
       check(r.half.cover != null && Math.abs(r.half.cover - .45 / 1.4) < .02 && /работает примерно на 32%/.test(r.halfCard), '3. кинотеатр, владелец частично и без людей: 0,45 места из 1,4 — «работает примерно на 32%»', { half: r.half, card: r.halfCard.slice(0, 400) });
       check(r.three.every(x => x.cap < .4 && x.cover < .3) && r.hours.every(h => h <= 12), '3. три кинотеатра «сам» без людей: у каждого треть вас, часы делятся (35 → ~12 ч)', { three: r.three, hours: r.hours });
       check(r.three.every(x => x.profit < 0), '3. три кинотеатра без людей — в минусе', r.three.map(x => x.profit));
@@ -713,6 +720,16 @@ const ev = async (pg, fn, arg) => { try { return await pg.evaluate(fn, arg); } c
       out.houseIncome = { player: c3.income - cashBook, business: Math.round(house.bookIncome272 || 0), paid: c3.paidMonths };
       T.month([house], 1);
       out.houseBooks = house.history.at(-1).books272 || 0;
+      // 272.1: двоеточие в названии — запись об отказе и о выходе в своём издательстве всё равно про эту книгу.
+      if (typeof bookSubmit272 === 'function') {
+        const colon = mk('Город: хроники');
+        bookSubmit272(colon.id, 'new'); colon.roll = .999; run(3);
+        out.colonRej = s.log.find(e => e.title === 'Отказ издателя' && /^Город: хроники/.test(e.text))?.text || '';
+        const colon2 = mk('Пароль: взаимность');
+        bookMenu27(colon2.id); T.click(/^В своё издательство/); T.clean();
+        run(2);
+        out.colonPub = s.log.find(e => e.title === 'Книга опубликована' && /^Пароль: взаимность/.test(e.text))?.text || '';
+      }
       return out;
     });
     if (r.error) check(false, '7. книги: проверки не выполнены', r.error.split('\n')[0]);
@@ -729,8 +746,159 @@ const ev = async (pg, fn, arg) => { try { return await pg.evaluate(fn, arg); } c
     check(r.third.includes('В своё издательство · Свой знак') && r.houseClick && r.houseFee === 0, '7. своё издательство: в окне книги, без оплаты', { b: r.third, fee: r.houseFee });
     check(r.house.status === 'published' && r.house.cat.includes('Третья'), '7. книга вышла в своём издательстве и стоит в каталоге', r.house);
     check(r.houseIncome.player === 0 && r.houseIncome.business > 0 && r.houseIncome.paid === 1 && r.houseBooks > 0, '7. выручка от своей книги — на счёт издательства, не автору', { ...r.houseIncome, books: r.houseBooks });
+    check(/^Город: хроники · Издательство «.+» отказало: рукопись остаётся вашей/.test(r.colonRej || ''), '7. «Город: хроники»: в записи об отказе название целиком и кто отказал', r.colonRej);
+    check(/Книга вышла в «Свой знак»/.test(r.colonPub || '') && !/Авторские выплаты/.test(r.colonPub || ''), '7. «Пароль: взаимность» в своём издательстве: «Книга вышла в «Свой знак»», без авторских выплат', r.colonPub);
     }
     check(!errors.length, '7. без ошибок страницы', errors.slice(0, 3));
+    await ctx.close();
+  }
+
+  // ---------- 8. Рецензия 272.1: панель, долг и события 254, прибавка уходящего, «Ожидают ответа», найм, тексты ----------
+  {
+    const { pg, errors, ctx } = await open(browser);
+    await life(pg, 'nl');
+    const r = await ev(pg, () => {
+      if (typeof bzKind272 !== 'function') return { base: true };
+      const out = {};
+      const shut = () => { for (const b of ownedEnterprises168().filter(b => b.status === 'active')) { selectEnterprise168(b.id); closeEnterprise152(b.id); } T.clean(); };
+      // Панель «Моё дело» на вкладке действий после настоящего render(): у каждого дела — кнопка, которая открывает его карточку.
+      const panel = () => {
+        T.clean(); render();
+        const boxes = [...document.querySelectorAll('.enterprise-panel152')];
+        const res = { boxes: boxes.length, raw: boxes.some(x => /data-id=|onclick=|home-compact60/.test(x.textContent)), opened: [] };
+        res.buttons = boxes.reduce((n, x) => n + x.querySelectorAll('button[data-id]').length, 0);
+        for (let i = 0; i < res.buttons; i++) {
+          T.clean(); render();
+          const bt = [...document.querySelectorAll('.enterprise-panel152 button[data-id]')][i];
+          bt?.click(); res.opened.push(T.title()); T.clean();
+        }
+        return res;
+      };
+      const a = T.open('studio', 'photo', 'Ракурс', 1); a.fit263 = 1.4;
+      T.month([a], 2);
+      out.panel1 = panel();
+      const a2 = T.open('studio', 'design', 'Линия', 1);
+      T.month([a, a2], 2);
+      out.panel2 = panel();
+      shut();
+
+      // Дело в долг до срока предупреждения: в окне события 254 бесплатный ответ доступен, платный — нет.
+      const d = T.open('studio', 'design', 'Долг', 1); d.fit263 = 1.4;
+      T.quiet(() => { T.seed(11); T.month([d], 13); });
+      out.debtActive = d.status;
+      d.cash = -800; bzWarn272(d); s.pending = [];
+      const st = businessState254(d);
+      const win = id => {
+        for (const c of st.cases) if (['offered', 'proposal', 'saleProposal', 'scheduled'].includes(c.status)) { c.status = 'expired'; c.entity.status = 'expired'; }
+        st.cooldowns = {};
+        const q = businessOffer254(d, id); if (!q) return null;
+        T.clean(); openDecision24('business254', q.id);
+        return { id: q.id, buttons: T.buttons() };
+      };
+      const w398 = win('E0398');
+      out.debt398 = w398?.buttons || null;
+      out.debtClick = w398 ? T.click(/^Ничего/) && T.click(/^Подтвердить/) : false; T.clean();
+      out.debtLeft = w398 ? decisionItems24().some(i => i.ref.kind === 'business254' && i.ref.id === w398.id) : null;
+      out.debt403 = win('E0403')?.buttons || null; T.clean();
+      out.debt399 = win('E0399')?.buttons || null; T.clean();
+      out.debtFinal = !!d.final272 && d.cash < 0;
+      shut();
+
+      // Уходит сотрудник с прибавкой: в месяц ухода прибавку, которую списали с дела, получает он сам.
+      const bo = T.open('studio', 'photo', 'Прибавка', 2); bo.fit263 = 1.3;
+      T.quiet(() => { T.seed(5); T.month([bo], 13); });
+      const [w1, w2] = bo.staff155.map(living);
+      bo.bonus266 = { [w1.id]: 1000, [w2.id]: 500 };
+      bo.leaving266 = { id: w1.id, at: s.clock.ticks + 1 };
+      s.pending = [];
+      const g1 = w1.privateCash || 0, g2 = w2.privateCash || 0;
+      T.quiet(() => { T.seed(6); T.month([bo], 1); });
+      const h = bo.history.at(-1);
+      out.bonus = { left: !bo.staff155.includes(w1.id), wage: enterpriseWage155(bo), got1: w1.privateCash - g1, got2: w2.privateCash - g2, payroll: h.payroll,
+        charged: h.costs - Math.round((h.rent || 0) + (h.branchRent || 0) + (h.overhead || 0) + (h.production || 0)) - (h.incidentCosts || 0) };
+      // Сезонный провал: последний месяц в плюсе, два до него в минусе — не «в минусе 1 месяц подряд».
+      const n = bo.history.length;
+      bo.history.forEach((x, i) => { x.sales = 10000; x.costs = i === n - 3 || i === n - 2 ? 16000 : 8000; });
+      bo.history.at(-1).costs = 9500; bo.cash = 50000; delete bo.final272; delete bo.loss272;
+      out.dip = bzStatuses272(bo).find(x => x.level === 'dip')?.text || '';
+      // «Ожидают ответа»: окно «Дело может закрыться» ждёт в очереди за другим — один пункт, а не два.
+      bo.final272 = { at: s.clock.ticks, until: s.clock.ticks + 2 };
+      const fin = () => decisionItems24().filter(i => i.ref.kind === 'bz272' && i.ref.id === 'final:' + bo.id || i.ref.kind === 'pending' && /Дело может закрыться/.test(i.title)).length;
+      s.pending = [{ type: 'staffLeave266', businessId: bo.id, personId: w2.id }, { type: 'bzFinal272', businessId: bo.id }];
+      out.notices = { queued: fin() };
+      s.pending = [];
+      out.notices.alone = fin();
+      shut();
+
+      // Конкурент рядом (266) у цветочной лавки: и подсказка к «Снизить цены» — про покупателей.
+      const fl = T.open('shop', 'flowers', 'Букет', 1);
+      s.pending = [{ type: 'competitor266', businessId: fl.id }]; resolvePending();
+      out.comp = T.buttons().map(b => b.label + ' · ' + b.hint).join(' | ').replace(/\s+/g, ' '); T.clean();
+      out.compKinds = Object.keys(bzKinds272).filter(k => bzKinds272[k].who).filter(k => {
+        let t = 'Цены ниже рынка · больше клиентов, меньше с каждого'; for (const [from, to] of bzBuild272(k).swaps) t = t.split(from).join(to); return /лиент/.test(t);
+      });
+      shut();
+
+      // Второе дело, когда первое ведёте сами: «наймите сразу» — только если резерва хватает на две зарплаты; иначе — сколько внести.
+      T.open('studio', 'photo', 'Первое', 0);
+      const lack = (type, sp) => { const { reserve } = enterpriseQuote152(type, sp); return enterpriseWage155({ type, specialty: sp, country: s.country, city: residenceCity() }) * 2 - reserve; };
+      const all = Object.keys(enterpriseTypes152).flatMap(type => enterpriseEntries253(type).filter(([sp]) => sp !== 'school196').map(([sp, label]) => ({ type, sp, label, lack: lack(type, sp) })));
+      const poor = all.find(x => x.lack > 0), rich = all.find(x => x.lack <= 0);
+      const esc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const warnFor = x => { if (!x) return null; T.clean(); enterpriseSpecialtyMenu153(x.type, true); T.click(new RegExp('^' + esc(x.label))); const t = T.text(); T.clean(); return t; };
+      out.open = { poor: warnFor(poor), rich: warnFor(rich), poorKind: poor && poor.type + '/' + poor.sp, richKind: rich && rich.type + '/' + rich.sp };
+      if (poor) {
+        s.pending = []; s.cash = 1e9;
+        startEnterprise152(poor.type, 'Без резерва', poor.sp, true);
+        const nb = s.enterprise152;
+        resolvePending();
+        out.hire = { title: T.title(), text: T.text(), buttons: T.buttons() };
+        out.hire.put = T.click(/^Вложить деньги/);
+        out.hire.after = T.buttons();
+        out.hire.hired = T.click(/^Нанять сотрудника/);
+        out.hire.staff = (nb.staff155 || []).length;
+        T.clean();
+      }
+      shut();
+
+      // Тексты: людей на точке не хватает — без «рабочих мест» и двойного двоеточия, одной строкой в карточке.
+      const e = businessCatalog253.find(x => enterpriseAvailable253(x.id) && bzNeed272({ type: x.type, specialty: x.id }) > 1);
+      const half = T.open(e.type, e.id, 'Полдня', 0, 'partial');
+      T.month([half], 1);
+      out.cause = bzCause272(half);
+      selectEnterprise168(half.id); enterpriseMenu152(); out.halfCard = T.text(); T.clean();
+      half.cash = -500; half.final272 = { at: s.clock.ticks, until: s.clock.ticks + 2 };
+      bzDepositMenu272(half); out.deposit = T.buttons().map(b => b.label + ' · ' + b.hint); T.clean();
+      shut();
+      return out;
+    });
+    if (r.base || r.error) check(false, '8. рецензия 272.1: business272 не подключён или проверки не выполнены', r.error?.split('\n')[0]);
+    else {
+      check(r.panel1.buttons === 1 && !r.panel1.raw && r.panel1.opened.join() === 'Ракурс', '8. панель «Моё дело» на вкладке действий, одно дело: кнопка есть и открывает карточку, без обрывков разметки', r.panel1);
+      check(r.panel2.buttons === 2 && !r.panel2.raw && [...r.panel2.opened].sort().join() === 'Линия,Ракурс', '8. панель «Моё дело», два дела: две кнопки, каждая открывает своё дело', r.panel2);
+      const btn = (list, re) => (list || []).find(b => re.test(b.label));
+      check(r.debtFinal && btn(r.debt398, /^Ничего/)?.disabled === false && btn(r.debt398, /^Рекламировать/)?.disabled === true && btn(r.debt398, /^Дифференцироваться/)?.disabled === true,
+        '8. дело в долг: в окне события 254 «Ничего» доступно, платные ответы — нет', r.debt398 || r.debtActive);
+      check(r.debtClick && r.debtLeft === false, '8. дело в долг: «Ничего» и «Подтвердить» нажимаются, событие уходит из «Ожидают ответа»', { click: r.debtClick, left: r.debtLeft });
+      check(['Выкуп доли', 'Кредит', 'Отказ'].every(l => btn(r.debt403, new RegExp('^' + l))?.disabled === false), '8. дело в долг: инвестор — «Выкуп доли», «Кредит», «Отказ» доступны', r.debt403);
+      check(btn(r.debt399, /^Найти/)?.disabled === true && btn(r.debt399, /^Перераспределить/)?.disabled === false, '8. дело в долг: сотрудник увольняется — «Перераспределить» доступно, «Найти» (две зарплаты со счёта) — нет', r.debt399);
+      const bo = r.bonus;
+      check(bo.left && bo.got1 === bo.wage + 1000 && bo.got2 === bo.wage + 500 && Math.abs(bo.charged - (bo.got1 + bo.got2)) <= 1,
+        '8. сотрудник с прибавкой уходит: прибавку за последний месяц получает он; списано с дела = получили люди', bo);
+      check(/^Два месяца из последних трёх — в минусе, но за 12 месяцев дело в плюсе/.test(r.dip) && !/1 месяц подряд/.test(r.dip), '8. сезон: последний месяц в плюсе — «Два месяца из последних трёх — в минусе», а не «1 месяц подряд»', r.dip);
+      check(r.notices.queued === 1 && r.notices.alone === 1, '8. «Ожидают ответа»: «Дело может закрыться» ждёт в очереди — один пункт, без очереди — тоже один', r.notices);
+      check(/Снизить цены · .*покупател/.test(r.comp) && !/лиент/.test(r.comp) && !r.compKinds.length, '8. конкурент у цветочной лавки: «больше покупателей», у всех видов со своим словом — без «клиентов»', { comp: r.comp, kinds: r.compKinds });
+      check(r.open.poor && /внесите в дело ещё/.test(r.open.poor) && !/Наймите людей сразу/.test(r.open.poor), '8. второе дело без резерва на две зарплаты (' + r.open.poorKind + '): не «наймите сразу», а сколько внести', (r.open.poor || '').slice(-300));
+      check(!r.open.rich || /Наймите людей сразу после открытия/.test(r.open.rich), '8. второе дело с резервом (' + r.open.richKind + '): «Наймите людей сразу после открытия»', (r.open.rich || '').slice(-300));
+      const hb = r.hire || {};
+      check(hb.buttons?.[0]?.label === 'Вложить деньги' && hb.buttons[0].disabled === false && btn(hb.buttons, /^Нанять сотрудника/)?.disabled === true && /Внесите ещё/.test(hb.text || ''),
+        '8. окно «Кто будет работать» без резерва: сначала «Вложить деньги», нанять пока нельзя', hb.buttons);
+      check(hb.put && btn(hb.after, /^Нанять сотрудника/)?.disabled === false && hb.hired && hb.staff === 1, '8. после «Вложить деньги» сотрудника можно нанять', { after: hb.after, staff: hb.staff });
+      check(/^На точке не хватает людей — она работает примерно на \d+%, и помещение быстрее приходит в упадок\.$/.test(r.cause), '8. причина в статусе: простыми словами, одно двоеточие не нужно', r.cause);
+      check(!/рабоч\S* мест|\d,\d+ рабоч|::/.test(r.halfCard) && (r.halfCard.match(/не хватает людей — она работает/g) || []).length === 1, '8. карточка: без дробных рабочих мест, строка о людях — один раз', r.halfCard.slice(0, 600));
+      check(r.deposit.length >= 2 && /долг и запас на три месяца/.test(r.deposit[0]) && /долг и запас на полгода/.test(r.deposit[1]), '8. вложить деньги при долге: «долг и запас на полгода»', r.deposit);
+    }
+    check(!errors.length, '8. без ошибок страницы', errors.slice(0, 3));
     await ctx.close();
   }
 

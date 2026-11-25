@@ -4,6 +4,7 @@
 // 272: business272-data.js и business272.js стенд тоже подгружает сам (BASE=1 — без них, модель 263–266). Сценарии branch
 // (владелец сам и два сотрудника, через год — вторая точка или её замена по виду: серия, команда, маршрут, линия) и two
 // (два дела одного вида, в каждом владелец сам и сотрудник) показывают, как делятся люди; SCENARIOS=… — выбрать.
+// Окна 272 в очереди стенд убирает после открытия и каждого месяца (иначе они глушат события 266 этого дела).
 const fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
@@ -50,6 +51,9 @@ async function bench(browser, country) {
           const p = { id: 'bench-' + i + '-' + k + '-' + Math.random(), name: 'Сотрудник', role: 'Знакомый', alive: true, age: 30, gender: 'f', country: b.country, city18: b.city, privateCash: 0, bond: 40, memories: [], trait: ['', ''], inner: { trust: 50, affection: 50, strain: 0, desire: 0 } };
           s.people.push(p); b.staff155.push(p.id);
         } };
+      // 272.1: окна 272 в очереди (кто будет работать, дело может закрыться, кто где работает) стенд не открывает —
+      // а пока у дела есть окно в очереди, 266 не присылает своих событий. Убирать их после открытия и каждого месяца.
+      const drop272 = () => { s.pending = s.pending.filter(q => !['bzHire272', 'bzFinal272', 'bzModel272'].includes(q?.type)); };
       for (const [scName, [mode, staffN, extra]] of Object.entries(window.BENCH_SCENARIOS ? Object.fromEntries(Object.entries(scenarios).filter(([k]) => window.BENCH_SCENARIOS.includes(k))) : scenarios)) for (const type of types) for (let i = 0; i < N; i++) {
         const specs = specsOf(type);
         if (!specs.length) break;
@@ -61,11 +65,13 @@ async function bench(browser, country) {
         if (typeof business263 !== 'undefined') b.mode263 = mode === 'manager' ? 'self' : mode;
         b.staff155 = [];
         addStaff(b, staffN, i);
+        drop272();
         // two: второе дело того же вида рядом, тоже «сам» и с сотрудником; деньги владельца — по обоим.
         const all = [b];
         if (extra === 'two') {
           if (!startEnterprise152(type, 'Стенд ' + i + 'Б', spec, true)) { out.push({ scName, type, failed: true }); continue; }
           const b2 = s.enterprise152; b2.mode263 = mode; b2.staff155 = []; addStaff(b2, staffN, i + 'b'); startCash += b2.cash; all.push(b2);
+          drop272();
         }
         let drawn = 0, months = 0, firstYear = 0, closedAt = null, sales = 0, profit = 0, skip = false;
         for (let m = 0; m < 60; m++) {
@@ -86,6 +92,7 @@ async function bench(browser, country) {
             const h = x.history.at(-1);
             if (h && h.tick === s.clock.ticks) { any = true; const p = h.sales - h.costs; if (m < 12) firstYear += p; if (m >= 12) { sales += h.sales; profit += p; } }
           }
+          drop272();
           if (any) months++;
           if (all.some(x => x.status !== 'active')) { closedAt = m; if (all.every(x => x.status !== 'active')) break; }
           if (m % 3 === 2) for (const x of all) if (x.status === 'active') { selectEnterprise168(x.id); const before = s.cash; drawEnterprise152(x.id); drawn += s.cash - before; }

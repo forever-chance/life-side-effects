@@ -87,7 +87,7 @@ function bzWho272(text,who){
  return String(text).replace(bzClientRe272,(m,pre,k,suf)=>{const w=f[bzCase272[suf||'']];return pre+(k==='К'?bzCap272(w):w);});
 }
 function bzGeneric272(){
- const d=bzDefaults272,out=[d.busy,d.reno[1],d.reno[2],d.tired,d.firstYear[0],d.firstYear[1],d.slip[1],d.competitor.text,d.competitor.price,d.competitor.reno[1],'Клиент · '];
+ const d=bzDefaults272,out=[d.busy,d.reno[1],d.reno[2],d.tired,d.firstYear[0],d.firstYear[1],d.slip[1],d.competitor.text,d.competitor.hint,d.competitor.price,d.competitor.reno[1],'Клиент · '];
  if(typeof businessIndex254!=='undefined')for(const e of Object.values(businessIndex254)){
   if(e.businesses.length)continue;
   out.push(e.title,e.text,...e.choices.map(c=>c.label));
@@ -105,7 +105,7 @@ function bzSwaps272(p){
  add(d.firstYear[0],p.firstYear[0]);add(d.firstYear[1],p.firstYear[1]);
  for(const m of ['self','partial','manager'])add(d.mode[m],p.mode[m]);
  add(d.slip[0],p.slip[0]);add(d.slip[1],p.slip[1]);
- add(d.competitor.text,p.competitor.text);add(d.competitor.price,p.competitor.price);add(d.competitor.ad,p.competitor.ad);add(d.competitor.reno[1],p.competitor.reno[1]);
+ add(d.competitor.text,p.competitor.text);add(d.competitor.hint,p.competitor.hint);add(d.competitor.price,p.competitor.price);add(d.competitor.ad,p.competitor.ad);add(d.competitor.reno[1],p.competitor.reno[1]);
  add(d.landlord,p.landlord);
  if(typeof businessIndex254!=='undefined'){
   const plans=typeof businessPlans254!=='undefined'?businessPlans254:{};
@@ -206,6 +206,16 @@ if(typeof businessEligible254==='function'){
  businessCommit254=function(id,...a){return bzWith272(businessCase254(id)?.b,()=>bz254Base272.commit.call(this,id,...a));};
  businessJournal254=function(id,...a){return bzWith272(businessFind254(id),()=>bz254Base272.journal.call(this,id,...a));};
  businessFunding254=function(id,...a){return bzWith272(businessFind254(id),()=>bz254Base272.funding.call(this,id,...a));};
+}
+// 272.1: дело живёт в долг до срока предупреждения (счёт ниже нуля). Ответ, который ничего не стоит («Ничего», «Отказ»,
+// «Предоставить документы», кредит или выкуп доли у инвестора), остаётся доступен; платные — пока счёт не может заплатить.
+// Найм и оборудование в плане без цены, но платятся со счёта дела (две зарплаты, покупка) — в долг их не открыть.
+if(typeof businessWhy254==='function'){
+ const bzWhyBase272=businessWhy254;
+ businessWhy254=function(b,q,plan,...a){
+  if(b&&plan&&!(plan.cost>0)&&!['hire','equipment'].includes(plan.op)&&b.cash<0)b=Object.create(b,{cash:{value:0,writable:true,enumerable:true,configurable:true}});
+  return bzWhyBase272.call(this,b,q,plan,...a);
+ };
 }
 const bzModeBase272=setBusinessMode263;
 setBusinessMode263=function(id,...a){return bzWith272(bzById272(id),()=>bzModeBase272.call(this,id,...a));};
@@ -321,6 +331,9 @@ function bzRestore272(c){
 const bzTasksBase272=businessTasks263;
 businessTasks263=function(...a){
  const c=bz272.ctx;if(c&&!c.restored)bzRestore272(c);
+ // 272.1: сразу после этого 266 списывает со счёта прибавки тем, кто сейчас в деле, и только потом отпускает
+ // уходящего. Кому списали — тем и выплатить (bzAfterMonth272), даже если человек в этом месяце ушёл.
+ if(c&&c.b)c.bonusDue=c.b.status==='active'?enterpriseStaff155(c.b).filter(p=>(c.b.bonus266?.[p.id]||0)>0).map(p=>[p.id,c.b.bonus266[p.id]]):[];
  const out=bzTasksBase272.apply(this,a);
  bzHours272();
  return out;
@@ -342,7 +355,8 @@ function bzAfterMonth272(b,c){
  if(b.status!=='active'){delete b.final272;delete b.loss272;return;}
  if(c.branch&&b.branch159)bzBranchMonth272(b,c.plan,h,c.modMult);
  if(b.bookIncome272>0){const x=Math.round(b.bookIncome272);b.cash+=x;h.sales+=x;h.books272=x;b.bookIncome272=0;}
- for(const [id,v] of Object.entries(b.bonus266||{})){const w=enterpriseStaff155(b).find(p=>p.id===id);if(w&&v>0)w.privateCash=(w.privateCash||0)+v;}
+ // Прибавки: ровно тем, кому 266 их списал со счёта дела (список — до того, как уходящий освободил место).
+ for(const [id,v] of c.bonusDue||[]){const w=living(id);if(w&&v>0)w.privateCash=(w.privateCash||0)+v;}
  if(c.plan.covMain<1)b.fresh263=(b.fresh263??1)*(1-.02*(1-c.plan.covMain));
  h.cover272=+c.plan.covMain.toFixed(2);
  if(!c.plan.present)h.away272=true;
@@ -595,7 +609,7 @@ function bzHealth272(hist,cash,age=Infinity){
  const level=debt>0||n>=2&&runway<=3&&(sum3<0||streak>0)?'final':
   losing||concern?(age<12&&runway>6?'ramp':'loss'):
   sum3<0||streak>=2?(age<12?'ramp':sumY>=0?'dip':'ok'):'ok';
- return {level,losing,concern,relief,safe,streak,burn,worst,runway,debt,cash,age,sum3,sumY,months:Math.min(12,n)};
+ return {level,losing,concern,relief,safe,streak,burn,worst,runway,debt,cash,age,sum3,sumY,neg3:negs.length,months:Math.min(12,n)};
 }
 // Срок последнего предупреждения: месяц, который счёт уже не оплатит, но не раньше чем через два месяца.
 function bzFinalMonths272(hl){return hl.debt||!(hl.runway>=3)?2:3;}
@@ -604,12 +618,17 @@ function bzCause272(b){
  const sh=bzOwnerShares272();
  if(h.cover272===0)return 'Точка закрыта: некому работать'+(h.away272?' — '+bzAway272():'')+'. Выручки нет, а аренда и расходы идут.';
  if(h.branch272&&h.branch272.units===0)return bzBranchIdle272(b)+(bzUnitMode272(b)?' Расходы идут без выручки.':' Аренда и расходы там идут без выручки.');
- if(h.cover272!=null&&h.cover272<1)return 'Людей не хватает: '+(sh.count>1?'вас делят '+sh.count+' '+bzPlural272(sh.count,'дело','дела','дел')+', а ':'')+'на точке меньше людей, чем ей нужно: она работает примерно на '+bzPct272(h.cover272)+'%, место стареет.';
+ if(h.cover272!=null&&h.cover272<1)return bzShort272(sh,h.cover272);
  if(h.branch272&&h.branchSales<h.branch272.costs)return bzCap272(bzBranchName272(b))+' не окупается: выручка '+bzMoney272(b,h.branchSales)+', расходы '+bzMoney272(b,h.branch272.costs)+' в месяц.';
  if(h.capacity263&&h.demand263<h.capacity263*.7)return 'Работы меньше, чем рук: зарплаты и аренда не окупаются.';
  if(h.sales&&h.rent+h.branchRent>h.sales*.35)return 'Аренда съедает '+Math.round(100*(h.rent+(h.branchRent||0))/h.sales)+'% выручки.';
  if(bzMode272(b)==='manager')return 'Управляющий обходится дороже, чем приносит дело.';
  return '';
+}
+// 272.1: без «рабочих мест» и двойного двоеточия — что видно со стороны.
+function bzShort272(sh,cover){
+ return (sh.count>1?'Вас делят '+sh.count+' '+bzPlural272(sh.count,'дело','дела','дел')+', а других людей на точке не хватает':'На точке не хватает людей')+
+  ' — она работает примерно на '+bzPct272(cover)+'%, и помещение быстрее приходит в упадок.';
 }
 function bzRunwayText272(hl){
  if(hl.debt)return 'Денег на счёте нет: долг поставщикам и арендодателю — ';
@@ -635,10 +654,16 @@ function bzStatuses272(b){
    text:(left>0?'Дело закроется '+bzWhen272(b.final272.until)+', если ничего не изменить.':'Дело закроется в этом месяце, если денег не хватит.')+' '+bzReason272(b,hl)});
  }else if(hl.level==='loss'||hl.level==='final')out.push({level:'loss',label:'Дело в минусе',text:bzReason272(b,hl)});
  else if(hl.level==='ramp')out.push({level:'ramp',label:'Первый год: пока в минусе',text:'Первый год: дело ещё набирает обороты и пока в минусе — в среднем −'+bzMoney272(b,hl.burn)+' в месяц. '+bzRunwayText272(hl)});
- else if(hl.level==='dip')out.push({level:'dip',label:'',text:'В минусе '+bzMonths272(Math.max(1,hl.streak))+' подряд, но за '+bzMonths272(hl.months)+' дело в плюсе: '+bzMoney272(b,hl.sumY)+'. Похоже на сезон.'});
+ else if(hl.level==='dip')out.push({level:'dip',label:'',text:bzDipText272(hl)+', но за '+bzMonths272(hl.months)+' дело в плюсе: '+bzMoney272(b,hl.sumY)+'. Похоже на сезон.'});
  const closed=h?.cover272===0||h?.branch272&&h.branch272.units===0;
  if(h?.cover272!=null&&h.cover272<1||closed)out.push({level:'staff',label:closed?'Точка закрыта: некому работать':'Людей не хватает',text:bzCause272(b)});
  return out.map(x=>({...x,label:bzText272(b,x.label),text:bzText272(b,x.text)}));
+}
+// 272.1: «В минусе 1 месяц подряд» при последнем месяце в плюсе — нет: серия от двух месяцев, иначе — по кварталу.
+function bzDipText272(hl){
+ if(hl.streak>=2)return 'В минусе '+bzMonths272(hl.streak)+' подряд';
+ if(hl.neg3>=2)return 'Два месяца из последних трёх — в минусе';
+ return hl.streak===1?'Прошлый месяц — в минусе':'Один месяц из последних трёх — в минусе';
 }
 const bzRank272={final:5,loss:4,staff:3,ramp:2,dip:1};
 function bzStatus272(b){return bzStatuses272(b).sort((x,y)=>bzRank272[y.level]-bzRank272[x.level])[0]||null;}
@@ -762,7 +787,7 @@ function bzDepositMenu272(b){
  const burn=Math.max(hl.burn,Math.round((h?.costs||0)*.15),1);
  const amounts=[...new Set([hl.debt+burn*3,hl.debt+burn*6].map(x=>Math.max(1,Math.round(x))))];
  show('Вложить деньги','Деньги уйдут на счёт дела. Если для этого взять личный кредит, долг останется вашим даже после закрытия дела.',[
-  ...amounts.map((a,i)=>({label:'Внести '+bzMoney272(b,a),hint:(i===0?(hl.debt?'долг и запас на три месяца':'запас на три месяца'):'запас на полгода')+' · у вас '+money(s.cash),
+  ...amounts.map((a,i)=>({label:'Внести '+bzMoney272(b,a),hint:(hl.debt?'долг и запас на ':'запас на ')+(i===0?'три месяца':'полгода')+' · у вас '+money(s.cash),
    disabled:s.cash<a*rate,fn:()=>{if(bzDeposit272(b.id,a))bzWarnMenu272(b);else toast('Не хватает личных денег.');}})),
   {label:'Рассмотреть личный кредит',fn:financeMenu},
   {label:'Назад',fn:()=>bzWarnMenu272(b)}
@@ -816,7 +841,11 @@ function bzCardText272(b,text){
  if(task&&plan.shares.k<1)t=t.replace(/\((\d+) ч\/нед\.\)\./,'(около '+task.hours+' ч/нед.: вас делят '+plan.shares.count+' '+bzPlural272(plan.shares.count,'дело','дела','дел')+').');
  lines.push(...bzStaffLines272(b));
  if(plan.covMain<=0)lines.push('Точка закрыта: некому работать — '+bzAway272()+(enterpriseStaff155(b).length?', а все сотрудники '+bzBranchWhere272(b):', сотрудников нет')+'. Выручки нет, а аренда и расходы идут.');
- else if(plan.covMain<1)lines.push('На точку людей не хватает: ей нужно около '+String(plan.need).replace('.',',')+' рабочего места, а есть '+String(+plan.main.toFixed(2)).replace('.',',')+'. Она работает примерно на '+bzPct272(plan.covMain)+'%, место стареет быстрее.');
+ else if(plan.covMain<1){
+  // Та же строка уже стоит под заголовком (статус за прошлый месяц) — второй раз не нужна.
+  const line=bzShort272(plan.shares,plan.covMain);
+  if(!bzStatuses272(b).some(x=>x.level==='staff'&&x.text===bzText272(b,line)))lines.push(line);
+ }
  if(b.branch159&&plan.branch===0)lines.push(bzBranchIdle272(b)+(bzUnitMode272(b)?' Расходы идут без выручки.':' Аренда и расходы там идут без выручки.'));
  else if(b.branch159&&plan.covBranch<1)lines.push(bzCap272(bzBranchName272(b))+': людей не хватает — работает примерно на '+bzPct272(plan.covBranch)+'%.');
  const cat=b.catalogue272||[];
@@ -884,8 +913,9 @@ if(typeof enterprisePanel152==='function'){
  enterprisePanel152=function(...a){
   let html=bzPanelBase272.apply(this,a);
   try{
-   const parts=html.split('<button type="button" class="home-portrait59');
-   html=parts[0]+parts.slice(1).map(chunk=>{
+   // 272.1: кусок после разреза начинается без «<button…»: склеиваем тем же разделителем и перед первым делом тоже.
+   const SEP='<button type="button" class="home-portrait59',parts=html.split(SEP);
+   html=[parts[0],...parts.slice(1).map(chunk=>{
     const id=/data-id="([^"]*)"/.exec(chunk)?.[1]||'';
     const net=(s.enterpriseNetworks168||[]).find(n=>n.id===id);
     const list=net?bzOwned272().filter(b=>net.ids.includes(b.id)&&b.status==='active'):[bzOwned272().find(b=>b.id===id&&b.status==='active')].filter(Boolean);
@@ -898,7 +928,7 @@ if(typeof enterprisePanel152==='function'){
     }
     if(st)chunk=chunk.replace(/<\/span><\/button>/,'<span class="'+(bzRed272(st)?'bz-warn272':'bz-note272')+'">'+esc(st.label)+'</span></span></button>');
     return chunk;
-   }).join('<button type="button" class="home-portrait59');
+   })].join(SEP);
   }catch(e){}
   return html;
  };
@@ -912,10 +942,21 @@ if(typeof enterprisePanel152==='function'){
 
 // ---------- 8. Открыть ещё одно дело: вас на всех не хватит ----------
 function bzOthersHere272(){return bzOwned272().filter(b=>b.status==='active'&&businessPresent263(b)&&(business263.modes[bzMode272(b)]?.units||0)>0);}
-function bzOpeningWarn272(others){
- const o=others[0],n=others.length+1;
+// 272.1: «наймите сразу» — только если резерва при открытии хватает на две зарплаты (без этого нанять нельзя);
+// иначе — сколько внести в дело. Резерв и зарплата — по выбранной специализации.
+function bzOpenLack272(type,specialty){
+ try{
+  const {reserve}=enterpriseQuote152(type,specialty),wage=enterpriseWage155({type,specialty,country:s.country,city:residenceCity()});
+  return {reserve,need:wage*2,lack:Math.max(0,Math.ceil(wage*2-reserve))};
+ }catch(e){return null;}
+}
+function bzOpeningWarn272(others,type,specialty){
+ const o=others[0],n=others.length+1,whom=others.length>1?'одно из дел':'«'+o.title+'»',x=type?bzOpenLack272(type,specialty):null;
+ const advice=x&&x.lack>0?'Чтобы сразу нанять человека, на счёте дела нужны две зарплаты — '+money(x.need)+', а резерв при открытии — '+money(x.reserve)+
+  '. После открытия внесите в дело ещё '+money(x.lack)+' или передайте '+whom+' управляющему.':
+  'Наймите людей сразу после открытия или передайте '+whom+' управляющему.';
  return 'Вы уже ведёте '+(others.length>1?others.length+' '+bzPlural272(others.length,'дело','дела','дел'):'«'+o.title+'»')+' сами. На '+n+' '+bzPlural272(n,'дело','дела','дел')+
-  ' вас не хватит: каждое получит часть ваших часов, и без сотрудников новое дело будет работать вполсилы. Наймите людей сразу после открытия или передайте '+(others.length>1?'одно из дел':'«'+o.title+'»')+' управляющему.';
+  ' вас не хватит: каждое получит часть ваших часов, и без сотрудников новое дело будет работать вполсилы. '+advice;
 }
 if(typeof enterpriseSpecialtyMenu153==='function'){
  const bzSpecialtyBase272=enterpriseSpecialtyMenu153;
@@ -925,9 +966,10 @@ if(typeof enterpriseSpecialtyMenu153==='function'){
   const showBase=show;
   show=function(title,text,opts=[],...rest){
    show=showBase;
+   const entries=typeof enterpriseEntries253==='function'?enterpriseEntries253(type):Object.entries(enterpriseSpecialties153[type]||{});
    return showBase.call(this,title,text,(opts||[]).map(o=>o&&typeof o.fn==='function'&&o.label!=='Назад'?{...o,fn:(...x)=>{
-    const inner=show;
-    show=function(t2,x2,o2,...r2){show=inner;return inner.call(this,t2,x2+'\n'+bzOpeningWarn272(others),o2,...r2);};
+    const inner=show,spec=entries.find(e=>e[1]===o.label)?.[0];
+    show=function(t2,x2,o2,...r2){show=inner;return inner.call(this,t2,x2+'\n'+bzOpeningWarn272(others,spec?type:null,spec),o2,...r2);};
     try{return o.fn(...x);}finally{show=inner;}
    }}:o),...rest);
   };
@@ -996,11 +1038,20 @@ function bzHireMenu272(q){
  s.pending.shift();save();
  const b=bzById272(q.businessId),next=()=>{if(s.pending.length)resolvePending();};
  if(!b)return next();
+ return bzHireShow272(b,q.others,next);
+}
+// 272.1: нанять можно, только когда на счёте дела две зарплаты; если резерва не хватает — сначала «Вложить деньги».
+function bzHireShow272(b,others,next){
  return bzWith272(b,()=>{
   const sh=bzOwnerShares272(),task=s.clock.tasks?.find(t=>t.kind==='business263'&&t.business263===b.id),wage=enterpriseWage155(b);
-  const old=(q.others||[]).map(bzById272).filter(Boolean)[0];
-  show('Кто будет работать в «'+b.title+'»','Дело открыто. Здесь пока работаете только вы, а вас делят '+sh.count+' '+bzPlural272(sh.count,'дело','дела','дел')+': на каждое — около '+(task?.hours??Math.round(35*sh.k))+' ч в неделю. Без людей дело будет работать примерно на '+bzPct272(bzPlan272(b).covMain)+'%.',[
-   {label:'Нанять сотрудника',hint:bzMoney272(b,wage)+'/мес. · нужен резерв на две зарплаты',disabled:b.cash<wage*2,fn:()=>{selectEnterprise168(b.id);if(!hireEnterprise155(b.id))toast('Проверьте резерв на две зарплаты.');next();}},
+  const need=wage*2,lack=Math.max(0,Math.ceil(need-b.cash)),rate=fxRate86(b.country);
+  const old=(others||[]).map(bzById272).filter(Boolean)[0];
+  const lines=['Дело открыто. Здесь пока работаете только вы, а вас делят '+sh.count+' '+bzPlural272(sh.count,'дело','дела','дел')+': на каждое — около '+(task?.hours??Math.round(35*sh.k))+' ч в неделю. Без людей дело будет работать примерно на '+bzPct272(bzPlan272(b).covMain)+'%.'];
+  if(lack>0)lines.push('Чтобы нанять человека, на счёте дела нужны две зарплаты — '+bzMoney272(b,need)+', а там '+bzMoney272(b,b.cash)+'. Внесите ещё '+bzMoney272(b,lack)+' из личных денег — у вас '+money(s.cash)+'.');
+  show('Кто будет работать в «'+b.title+'»',lines.join('\n'),[
+   ...(lack>0?[{label:'Вложить деньги',hint:bzMoney272(b,lack)+' из личных средств · тогда можно нанять человека',disabled:s.cash<lack*rate,
+    fn:()=>{if(bzDeposit272(b.id,lack))bzHireShow272(b,others,next);else toast('Не хватает личных денег.');}}]:[]),
+   {label:'Нанять сотрудника',hint:bzMoney272(b,wage)+'/мес.'+(lack>0?' · сначала внесите деньги в дело':''),disabled:lack>0,fn:()=>{selectEnterprise168(b.id);if(!hireEnterprise155(b.id))toast('Проверьте резерв на две зарплаты.');next();}},
    ...(old?[{label:'Передать «'+old.title+'» управляющему',hint:bzMoney272(old,Math.round(businessW263(old)*1.3))+'/мес.',fn:()=>{setBusinessMode263(old.id,'manager');next();}}]:[]),
    {label:'Позже',fn:next}
   ]);
@@ -1042,7 +1093,10 @@ function bzItems272(){
  const out=[];
  for(const b of bzOwned272()){
   if(b.status!=='active')continue;
+  // 272.1: окно «Дело может закрыться» ещё ждёт в очереди — оно и так в «Ожидают ответа», второй пункт не нужен.
+  const queued=(s.pending||[]).some(q=>q?.type==='bzFinal272'&&q.businessId===b.id);
   for(const kind of ['final','loss']){
+   if(kind==='final'&&queued)continue;
    const ref={kind:'bz272',id:kind+':'+b.id},q=bzRecord272(ref.id);if(!q)continue;
    const snoozed=typeof snoozed270==='function'?snoozed270(ref,q):((s.notices59?.snoozed?.[ref.kind+':'+ref.id]??-1)>s.clock.ticks);
    if(snoozed)continue;
@@ -1178,7 +1232,9 @@ creativeMonth27=function(...a){
  const logBase=log;
  log=function(title,text,...rest){
   let tx=String(text??'');
-  const name=tx.split(/:| · /)[0];
+  // 272.1: в названии бывает двоеточие («Город: хроники») — книгу ищем по началу записи, а не по первому «:».
+  const book=reviewing.filter(p=>tx.startsWith(p.title+':')||tx.startsWith(p.title+' · ')).sort((a,b)=>b.title.length-a.title.length)[0];
+  const name=book?book.title:tx.split(/:| · /)[0];
   if(title==='Отказ издателя'){
    const pub=pubOf(name);
    tx=name+(pub?' · '+pub.name+' отказало':'')+': рукопись остаётся вашей. Другому издателю можно отправить через два месяца, этому — через полгода. '+
@@ -1250,7 +1306,7 @@ function bzFitTable272(){
  add('263 первый год',(k,b)=>cell(k,d.firstYear.join(' ')));
  add('263 ошибки управляющего',(k,b)=>cell(k,d.slip.join(' ')));
  add('263 ремонт',(k,b)=>cell(k,d.reno.join(' ')+d.tired));
- add('266 конкурент рядом',(k,b)=>cell(k,d.competitor.text+d.competitor.price+d.competitor.ad+d.competitor.reno[1]));
+ add('266 конкурент рядом',(k,b)=>cell(k,d.competitor.text+d.competitor.hint+d.competitor.price+d.competitor.ad+d.competitor.reno[1]));
  add('266 помещение продают',(k,b)=>cell(k,d.landlord));
  add('266 сотрудник уходит (272: прибавка и ответ)',()=>'text');
  add('156 реклама',(k,b)=>cell(k,d.ad.join(' · ')));
