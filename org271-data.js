@@ -1,6 +1,6 @@
 'use strict';
 // Сборка 271: корни и типы названий организаций (работодатели, своё дело). Сгенерировано tools/org271_build.py
-// из scratchpad/names271/org-roots.json — руками не править, пересобрать скриптом.
+// из docs/names271/org-roots.json — руками не править, пересобрать скриптом.
 // types: [тип, сфера, теги]; countries.cc.types: сфера → номера в types; roots: [корень, теги, kind, пояснение].
 const org271Data={"fixture":false,"source":"org-roots.json","tags":["any","food","cafe-bar","beauty","health-care","kids-education","tech","creative-media","craft-repair","trade-shop","services-home","finance-law","build-industry","pets","sport","travel-hotel"],
 "kindTags":{"studio":["creative-media"],

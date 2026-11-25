@@ -3,7 +3,7 @@
 
    python3 tools/org271_build.py [папка-с-данными] [--check] [--fixture] [--out=путь]
 
-Папка по умолчанию — scratchpad/names271 этой сессии (можно передать свою или ORG271_DIR).
+Папка по умолчанию — docs/names271 (можно передать свою или ORG271_DIR).
 
 Источник:
   org-roots.json — основной. Схема:
@@ -33,7 +33,7 @@
 import json, os, re, sys, hashlib, collections
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_DIR = '/tmp/claude-0/-home-user-life-side-effects/673b65e8-1bde-512a-aa02-ceb3dd19767c/scratchpad/names271'
+DEFAULT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'docs', 'names271')
 OUT = os.path.join(ROOT, 'org271-data.js')
 GROUPS = ['slavic', 'germanic', 'english', 'romance', 'asia', 'south']
 FIRST14 = ['nl', 'rs', 'ru', 'us', 'br', 'jp', 'fr', 'es', 'de', 'uk', 'ca', 'kr', 'cn', 'mx']
@@ -225,7 +225,7 @@ def main():
                'specialtyTags': spec_tags, 'types': type_table, 'countries': out_countries}
     head = ["'use strict';",
             '// Сборка 271: корни и типы названий организаций (работодатели, своё дело). Сгенерировано tools/org271_build.py',
-            '// из scratchpad/names271/' + ('org-roots.json' if not is_fixture else '{' + ','.join(GROUPS) + '}.json') +
+            '// из docs/names271/' + ('org-roots.json' if not is_fixture else '{' + ','.join(GROUPS) + '}.json') +
             ' — руками не править, пересобрать скриптом.',
             '// types: [тип, сфера, теги]; countries.cc.types: сфера → номера в types; roots: [корень, теги, kind, пояснение].']
     if is_fixture:

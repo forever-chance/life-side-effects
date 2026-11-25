@@ -3,7 +3,7 @@
 //
 // СОСТОЯНИЕ: код закончен, прошёл ревью сборки 271 (замечания исправлены) и проверен tools/verify271_employers.js
 // и на заготовке данных, и на org-roots.json. Данные — только в org271-data.js. Когда
-// scratchpad/names271/org-roots.json обновится (или придёт заново), достаточно запустить  python3 tools/org271_build.py
+// docs/names271/org-roots.json обновится (или придёт заново), достаточно запустить  python3 tools/org271_build.py
 // и  node tools/verify271_employers.js  — этот файл не меняется. Открытый вопрос к ведущему — потолок
 // orgCityMax271 (см. «Набор работодателей города»): это одна константа, тест берёт её из ORG271_CAP.
 //

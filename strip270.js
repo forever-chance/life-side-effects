@@ -26,8 +26,8 @@ function view270(){
  const panel=s?.ui05?.panel;
  return panel==='left'?'character':panel==='right'?'actions':center;
 }
-// Стартовое окно держит полосу, только пока оно открыто: если страницу перезагрузили, окно само не возвращается,
-// и тогда строка «Ожидают ответа» — самый короткий путь к нему.
+// Стартовое окно держит полосу, только пока оно открыто. После перезагрузки его снова открывает onboarding270.js;
+// если окно закрыли без ответа, строка «Ожидают ответа» ведёт к нему.
 function stripBlocked270(){
  return !s||(typeof tutorialActive180==='function'&&tutorialActive180())||
   (typeof startupNotice180==='function'&&!!startupNotice180()&&!!document.getElementById('modal')?.open);

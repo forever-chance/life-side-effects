@@ -3,7 +3,7 @@
 
    python3 tools/names271_build.py [папка-с-данными] [--check]
 
-Папка по умолчанию — scratchpad/names271 этой сессии (можно передать свою или NAMES271_DIR). Читает:
+Папка по умолчанию — docs/names271 (можно передать свою или NAMES271_DIR). Читает:
   current-pools.json      — что игра использует сейчас (снимок пулов: f, m, surnames, region, __pets);
   <group>.json            — первый проход по странам: f, m, surnames, removeCurrent{f,m,surnames}, pets{"cc:вид:пол":[…]};
   topup-<group>.json      — добор: f, m, surnames; у kr/cn ещё surnameOrder [[фамилия, доля %], …], у in — surnameRegion;
@@ -29,7 +29,7 @@
 import json, os, re, sys, collections
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_DIR = '/tmp/claude-0/-home-user-life-side-effects/673b65e8-1bde-512a-aa02-ceb3dd19767c/scratchpad/names271'
+DEFAULT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'docs', 'names271')
 GROUPS = ['slavic', 'germanic', 'english', 'romance', 'asia', 'south']
 FIRST14 = ['nl', 'rs', 'ru', 'us', 'br', 'jp', 'fr', 'es', 'de', 'uk', 'ca', 'kr', 'cn', 'mx']
 LATE = ['it', 'au', 'tr', 'za', 'th', 'no', 'in', 'id', 'eg', 'ma', 'pl']
@@ -344,7 +344,7 @@ def build(d, write=True):
     data = {'build': 271, 'sources': sources, 'countries': {c.cc: c.entry for c in report}, 'origins': out_origins}
     if write:
         text = ("'use strict';\n// Сборка 271: пулы имён, фамилий и кличек по странам. Сгенерировано tools/names271_build.py из черновых "
-                "списков (scratchpad/names271) — руками не править, пересобрать скриптом.\n// Здесь итоговые списки страны: "
+                "списков (docs/names271) — руками не править, пересобрать скриптом.\n// Здесь итоговые списки страны: "
                 "что было в игре минус remove плюс новое. remove — старые написания: в пулах их больше нет, но по ним "
                 "names271.js узнаёт имена в старых сохранениях.\nconst names271Data=" +
                 json.dumps(data, ensure_ascii=False, separators=(',', ':')) + ';\n')

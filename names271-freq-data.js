@@ -1,5 +1,5 @@
 'use strict';
-// Сборка 271: частоты имён и фамилий по странам. Сгенерировано tools/names271_freq_build.py из черновых списков (scratchpad/names271, freq-*.json) — руками не править, пересобрать скриптом.
+// Сборка 271: частоты имён и фамилий по странам. Сгенерировано tools/names271_freq_build.py из черновых списков (docs/names271, freq-*.json) — руками не править, пересобрать скриптом.
 // f, m: «частота:эпохи» → имена через |; частота 1–3 (3 — самые частые), эпохи — когда имя давали: old до ~1965, mid ~1960–1985, modern ~1985–2010, new с ~2005.
 // s: частота → фамилии; pairs — пары «Иван Иванов», doubles — имя, которое бывает и фамилией («Томас Томас»); shares — доли фамилий в Корее и Китае, %.
 const namesFreq271Data={build:271,sources:["freq-slavic.json","freq-germanic.json","freq-english.json","freq-romance.json","freq-asia.json","freq-south.json","topup-asia.json (surnameOrder)"],countries:{

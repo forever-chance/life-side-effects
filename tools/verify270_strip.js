@@ -8,7 +8,7 @@ const fs = require('fs'), path = require('path');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.webp': 'image/webp' };
-const ORDER = ['films269.js', 'display269.js', 'notices270.js', 'family270.js', 'social270.js', 'jobs270.js', 'strip270.js', 'texts270.js'];
+const ORDER = ['films269.js', 'display269.js', 'notices270.js', 'family270.js', 'social270.js', 'jobs270.js', 'strip270.js', 'texts270.js', 'names270.js', 'onboarding270.js'];
 const PHONE = { width: 390, height: 844 }, WIDE = { width: 1280, height: 900 };
 
 async function page(browser, cfg, viewport) {
@@ -407,13 +407,17 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     check('итоговый порядок: strip270 подключён из index.html', await pg.evaluate(() => typeof topStrip270 === 'function' && [...document.scripts].some(x => /^strip270\.js/.test(x.getAttribute('src') || ''))), injected);
     check('рождение: стартовое окно открыто, полосы под ним нет', birth.notice && birth.modal && !birth.tut && !birth.strip, birth);
 
-    // Перезагрузка со стартовым окном: само окно не возвращается, строка «Ожидают ответа» ведёт к нему.
+    // Перезагрузка со стартовым окном: окно открывается само (onboarding270.js), полосы под ним нет.
     await pg.evaluate(() => { if (typeof flushSave264 === 'function') flushSave264(); });
     await pg.reload();
     await pg.waitForFunction("typeof s!=='undefined'&&s&&s.clock&&document.getElementById('app').classList.contains('playing')");
-    await pg.click('.mobile-panels button:has-text("История")');
     const re = await pg.evaluate(state);
-    check('перезагрузка до ответа на стартовое окно: окна нет, полоса ведёт к нему', re.notice && !re.modal && !re.tut && re.strip && re.waitingTitle === birth.title, { re, birth: birth.title });
+    check('перезагрузка до ответа на стартовое окно: окно открылось само, полосы под ним нет', re.notice && re.modal && !re.tut && !re.strip && re.title === birth.title, { re, birth: birth.title });
+    // Окно закрыто без ответа: строка «Ожидают ответа» на «Истории» ведёт к нему.
+    await pg.evaluate(() => { HTMLDialogElement.prototype.close.call($('#modal')); render(); });
+    await pg.click('.mobile-panels button:has-text("История")');
+    const waiting = await pg.evaluate(state);
+    check('окно закрыто без ответа: полоса ведёт к нему', waiting.notice && !waiting.modal && !waiting.tut && waiting.strip && waiting.waitingTitle === birth.title, { waiting, birth: birth.title });
     await pg.click('#app>.top-strip270 .strip-waiting270 .strip-open270');
     const reopened = await pg.evaluate(state);
     check('нажатие на полосу: открыто стартовое окно', reopened.modal && reopened.notice && reopened.title === birth.title, reopened);

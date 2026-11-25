@@ -3,7 +3,7 @@
 
    python3 tools/names271_freq_build.py [папка-с-данными] [--check]
 
-Папка по умолчанию — scratchpad/names271 этой сессии (можно передать свою или NAMES271_DIR). Читает:
+Папка по умолчанию — docs/names271 (можно передать свою или NAMES271_DIR). Читает:
   freq-<group>.json — {"<cc>": {"f": {имя: [эпохи, частота]}, "m": {…}, "surnames": {фамилия: частота},
                        "pairs": [[имя, фамилия]], "doubles": [имя]}};
                        эпохи ⊂ old (до ~1965), mid (~1960–1985), modern (~1985–2010), new (с ~2005); частота 1–3;
@@ -20,7 +20,7 @@
 import json, os, re, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_DIR = '/tmp/claude-0/-home-user-life-side-effects/673b65e8-1bde-512a-aa02-ceb3dd19767c/scratchpad/names271'
+DEFAULT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'docs', 'names271')
 GROUPS = ['slavic', 'germanic', 'english', 'romance', 'asia', 'south']
 ALL = ['nl', 'rs', 'ru', 'us', 'br', 'jp', 'fr', 'es', 'de', 'uk', 'ca', 'kr', 'cn', 'mx',
        'it', 'au', 'tr', 'za', 'th', 'no', 'in', 'id', 'eg', 'ma', 'pl']
@@ -112,7 +112,7 @@ def build(src, write=True):
     if write:
         body = ',\n'.join(f' {json.dumps(cc)}:' + json.dumps(v, ensure_ascii=False, separators=(',', ':')) for cc, v in data['countries'].items())
         text = ("'use strict';\n// Сборка 271: частоты имён и фамилий по странам. Сгенерировано tools/names271_freq_build.py из черновых "
-                "списков (scratchpad/names271, freq-*.json) — руками не править, пересобрать скриптом.\n"
+                "списков (docs/names271, freq-*.json) — руками не править, пересобрать скриптом.\n"
                 "// f, m: «частота:эпохи» → имена через |; частота 1–3 (3 — самые частые), эпохи — когда имя давали: old до ~1965, "
                 "mid ~1960–1985, modern ~1985–2010, new с ~2005.\n// s: частота → фамилии; pairs — пары «Иван Иванов», "
                 "doubles — имя, которое бывает и фамилией («Томас Томас»); shares — доли фамилий в Корее и Китае, %.\n"
