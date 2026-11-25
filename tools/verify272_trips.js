@@ -54,7 +54,7 @@ async function birth(p, raw = null) {
 function helpers() {
   window.__opts = () => [...document.querySelectorAll('#modal .options button')].map(b => (b.disabled ? '[x] ' : '') + b.textContent.replace(/\s+/g, ' ').trim());
   window.__click = src => { const re = new RegExp(src); const b = [...document.querySelectorAll('#modal .options button:not([disabled])')].find(b => re.test(b.textContent)); if (!b) return false; b.click(); return true; };
-  window.__ready = () => { const box = document.querySelector('#modal .ready272'); if (!box) return null; return { ok: box.classList.contains('ready272-ok'), head: box.querySelector('h3')?.textContent || '', items: [...box.querySelectorAll('.ready272-item')].map(e => ({ text: e.childNodes[0]?.textContent || e.textContent, fix: e.querySelector('small')?.textContent || null, button: e.tagName === 'BUTTON' })) }; };
+  window.__ready = () => { const box = document.querySelector('#modal .ready272'); if (!box) return null; if (box.dataset.v2722) return { ok: box.classList.contains('ready272-ok'), head: box.querySelector('h3')?.textContent || '', items: [...box.querySelectorAll('li.ready2722-why')].map(li => ({ text: li.textContent, fix: li.dataset.fix || null, button: !!li.dataset.fix })) }; return { ok: box.classList.contains('ready272-ok'), head: box.querySelector('h3')?.textContent || '', items: [...box.querySelectorAll('.ready272-item')].map(e => ({ text: e.childNodes[0]?.textContent || e.textContent, fix: e.querySelector('small')?.textContent || null, button: e.tagName === 'BUTTON' })) }; };
   window.__readyClick = src => { const re = new RegExp(src); const b = [...document.querySelectorAll('#modal .ready272 button')].find(b => re.test(b.textContent)); if (!b) return false; b.click(); return true; };
   window.__sections = () => [...document.querySelectorAll('#modal .detail-section20 h3')].map(h => h.textContent);
   window.__title = () => document.querySelector('#modal h2')?.textContent || '';
@@ -283,7 +283,7 @@ async function buildTrip(pg, how) {
       });
       // Настоящий клик по причине про детей.
       let clicked = false;
-      try { await P.pg.locator('#modal .ready272 button', { hasText: r.kid }).first().click({ timeout: 3000 }); clicked = true; } catch (e) {}
+      try { await P.pg.locator('#modal .ready272 button', { hasText: INDEX.includes('src="trips2722.js') ? 'Присмотр за детьми' : r.kid }).first().click({ timeout: 3000 }); clicked = true; } catch (e) {}
       const kidWin = await P.pg.evaluate(() => __title());
       check(tag + ': ребёнок младше 12 — причина наверху, клик открывает присмотр за детьми', r.draft?.items?.some(i => i.text.includes(r.kid) && i.fix === 'Присмотр за детьми') && clicked && kidWin === 'С кем останутся дети', { ready: r.draft, title: kidWin });
       const layout = await P.pg.evaluate(() => {
