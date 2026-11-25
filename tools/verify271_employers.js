@@ -454,7 +454,8 @@ async function life(pg, cfg) {
       out.bio = (bioRows().find(r => r[0] === 'education') || [])[3] || '';
       save(); if (typeof flushSave264 === 'function') flushSave264();
       out.stored = x.diplomas.find(d => d.id === 'dip-270')?.university;
-      out.saved = (localStorage.getItem(LIFE_PREFIX + s.saveId) || '').includes(JSON.stringify(out.stored));
+      // 275: с save275.js жизнь лежит сжатой («deflate-v1:…») — сохранение читается через readLife, а не как строка.
+      out.saved = JSON.stringify(readLife(s.saveId) || {}).includes(JSON.stringify(out.stored));
       return out;
     }, a.uniId);
     check(b.key === a.key && b.employers.length === a.employers.length && b.employers.every(n => a.employers.includes(n)), 'сохранение 270 после перезагрузки: записанные вакансии не переименованы', b.employers.join(' | '));

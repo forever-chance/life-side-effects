@@ -183,9 +183,10 @@ async function life(pg, cfg) {
           // сиблинги
           for (const b of sib) {
             const same = masc(b.surname) === masc(s.surname);
-            if (!same) P('сиблинг с другой фамилией: ' + b.name);
+            // 274: брат или сестра по маме или по папе (half274) — фамилия и происхождение от своих родителей.
+            if (!same && !b.half274) P('сиблинг с другой фамилией: ' + b.name);
             if ((b.birthCountry || b.country) !== birth) P('сиблинг родился в другой стране');
-            if ((b.origins || []).join('/') !== (s.origins || []).join('/')) P('у сиблинга другое происхождение');
+            if (!b.half274 && (b.origins || []).join('/') !== (s.origins || []).join('/')) P('у сиблинга другое происхождение');
             if (b.givenName166 === s.name) P('сиблинг — тёзка игрока');
           }
           // бабушки и дедушки
