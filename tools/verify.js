@@ -357,7 +357,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     });
     check('дело: ключевой сотрудник собирается уйти', leave[0] === 'staffLeave266', leave);
     await pg.evaluate(() => resolvePending());
-    await pg.evaluate(() => { const rnd = Math.random; Math.random = () => .1; try { [...document.querySelectorAll('#modal .options button')].find(b => /прибавку/.test(b.textContent)).click(); } finally { Math.random = rnd; } });
+    await pg.evaluate(() => { const rnd = Math.random; Math.random = () => .1; try { [...document.querySelectorAll('#modal .options button')].find(b => /прибавку|^Предложить \+20%/.test(b.textContent.trim())).click(); /* 272: прибавка на выбор +10/20/35% */ } finally { Math.random = rnd; } });
     const kept = await pg.evaluate(() => { const b = s.enterprise152; s.clock.ticks += 2; enterpriseLocationMonth168(b); return { staff: b.staff155.length, bonus: Object.values(b.bonus266 || {})[0], leaving: !!b.leaving266 }; });
     check('дело: прибавка удерживает сотрудника', kept.staff === 1 && kept.bonus > 0 && !kept.leaving, kept);
     const tax = await pg.evaluate(() => {

@@ -286,7 +286,8 @@ async function work(browser, viewport, name) {
       own: box?.querySelector('.work-own272')?.textContent.replace(/\s+/g, ' ') || '',
       minis: [...(box?.querySelectorAll('.work-mini272') || [])].map(n => n.textContent.replace(/\s+/g, ' ')),
       loss: [...(box?.querySelectorAll('.work-loss272') || [])].map(n => n.querySelector('strong').textContent),
-      scrollX: document.documentElement.scrollWidth > innerWidth + 1
+      scrollX: document.documentElement.scrollWidth > innerWidth + 1,
+      has2721: typeof bzStatus272 === 'function'
     };
   });
   check(v.found && v.first, name + ': сводка сразу под карточкой текущей работы', v);
@@ -294,7 +295,20 @@ async function work(browser, viewport, name) {
   check(v.minis.length === 2 && /Журналистика.*2 работы.*50\/100/.test(v.minis.join('|')) && /Музыка.*0 работ/.test(v.minis.join('|')), name + ': остальные портфолио — строками', v.minis);
   check(/Книжные «Полка»/.test(v.own) && /Книжный магазин/.test(v.own) && /2 точки/.test(v.own) && /Светлая комната/.test(v.own) && /Фотостудия/.test(v.own), name + ': своё дело — название, вид, точки', v.own);
   check(/Прошлый месяц: −2\s?500 A\$/.test(v.own) && /Прошлый месяц: \+3\s?000 A\$/.test(v.own), name + ': итог прошлого месяца по сети и по студии', v.own);
-  check(v.loss.length === 1 && v.loss[0] === 'Книжные «Полка»' && /Дело в минусе/.test(v.own), name + ': предупреждение о минусе только у сети в минусе', v);
+  if (!v.has2721) check(v.loss.length === 1 && v.loss[0] === 'Книжные «Полка»' && /Дело в минусе/.test(v.own), name + ': предупреждение о минусе только у сети в минусе', v);
+  else {
+    // 272.1: строка под делом — статус из карточки (bzStatus272). Новое дело в минусе — «Первый год», без красного;
+    // дело старше года в устойчивом минусе — красная рамка «Дело в минусе».
+    check(v.loss.length === 0 && /Первый год: пока в минусе/.test(v.own), name + ': новое дело в минусе — «Первый год», без красной рамки', v);
+    const old = await pg.evaluate(() => {
+      const net = s.enterpriseNetworks168.find(n => n.title === 'Книжные «Полка»'), pts = ownedEnterprises168().filter(b => net.ids.includes(b.id)), t = s.clock.ticks;
+      for (const b of pts) { b.opened159 = t - 30; b.history = []; for (let k = 12; k >= 0; k--) b.history.push({ tick: t - k, sales: 6000, costs: 9000, paid: 9000, cash: 20000 }); b.cash = 20000; }
+      render();
+      const box = document.querySelector('.work-sum272');
+      return { loss: [...(box?.querySelectorAll('.work-loss272') || [])].map(n => n.querySelector('strong').textContent), own: box?.querySelector('.work-own272')?.textContent.replace(/\s+/g, ' ') || '' };
+    });
+    check(old.loss.length === 1 && old.loss[0] === 'Книжные «Полка»' && /Дело в минусе/.test(old.own), name + ': дело в устойчивом минусе — красная рамка только у него', old);
+  }
   if (viewport.width > 1000) check(v.cards.length === 2 && Math.abs(v.cards[0].top - v.cards[1].top) < 2 && v.cards[1].left > v.cards[0].left + v.cards[0].width - 2, name + ': портфолио и дело — рядом в две колонки', v.cards);
   else check(v.cards.length === 2 && v.cards[1].top >= v.cards[0].bottom, name + ': портфолио и дело — одно под другим', v.cards);
   check(!v.scrollX, name + ': без горизонтальной прокрутки', v);
