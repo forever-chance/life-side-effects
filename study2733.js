@@ -646,6 +646,8 @@ if(study2733On){
    if(done)return old(title,text,opts,...more);
    done=true;
    let list=opts;
+   // 273.3.1: без «игровой модели» во вступлении (правило «Текст»).
+   text=String(text??'').replace(' Визовое решение — условная игровая модель, не правила реальных стран.',' Где нет права на учёбу, нужна виза: ответ — до 3 месяцев, иногда отказывают.');
    try{
     const prefix=lang&&lang16[lang]?lang16[lang]+' · ':'';
     list=opts.filter(o=>!prefix||!/ · /.test(o?.label||'')||String(o.label).startsWith(prefix)||o.hint).map(o=>{
@@ -710,7 +712,8 @@ if(study2733On){
   '.trajectory .language-lesson186 small,.trajectory .lang-more2733 button small,.trajectory .main2733 button small{display:block;font-size:11.5px;font-weight:400;line-height:1.35;opacity:.85}',
   '.trajectory .lang-more2733{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}',
   '.trajectory .lang-more2733 button{width:auto;margin:0;text-align:left}',
-  '.trajectory .path-card button.small small{display:block;font-size:11.5px;line-height:1.35;color:var(--muted)}'
+  // 273.3.1: тёмные главные кнопки 273.2 («Моя работа») держат свой цвет подсказки.
+  '.trajectory .path-card button.small:not(.main2732) small{display:block;font-size:11.5px;line-height:1.35;color:var(--muted)}'
  ].join('\n');
  document.head.appendChild(st);
 })();
