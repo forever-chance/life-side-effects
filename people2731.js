@@ -128,8 +128,11 @@ function asks2731(p){
  let items=[];try{items=decisionItems24();}catch(e){return [];}
  const mine=it=>{const q=it.q;if(!q||typeof q!=='object')return false;return Object.entries(q).some(([k,v])=>v===p.id&&k!=='decisionId24');};
  return items.filter(mine).slice(0,4).map(it=>{
+  // Имя уже стоит заголовком карточки: «Имя · …», «… · Имя» и «Имя: …» (просьба о помощи в быту, aging58) — без него.
   let title=String(it.title||'').replace(p.name+' · ','').replace(' · '+p.name,'');
+  if(title.startsWith(p.name+': '))title=title.slice(p.name.length+2);
   if(title===p.name||!title)title=String(it.note||'Ждёт ответа');
+  title=title.charAt(0).toUpperCase()+title.slice(1);
   const last=typeof untilMonth273==='function'?lastTick2731(it):null;
   return {text:title,fix:{label:'Ответить',hint:last===null?'':untilMonth273(last),fn:()=>openDecision24(it.ref.kind,it.ref.id)}};
  });
@@ -152,7 +155,9 @@ function lastMet2731(p){
   // Месяц — у последней такой записи, если p.contactTick05 из того же года (раньше записи не было).
   let when=m[1]+' год';
   if(ticked&&Number.isFinite(p.contactTick05)&&typeof dateLabel86==='function'){const d=String(dateLabel86(p.contactTick05));if(d.endsWith(' '+m[1]))when=d;}
-  const t=cleanText2731(text);
+  // Праздник у самого человека записан как «побывали вместе: День рождения · Имя» — в его карточке имя не повторяем.
+  let t=cleanText2731(text);
+  if(t.endsWith(' · '+p.name))t=t.slice(0,-(p.name.length+3));
   return {value:when,note:t.charAt(0).toUpperCase()+t.slice(1)};
  }
  return null;

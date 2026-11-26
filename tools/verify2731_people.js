@@ -17,8 +17,10 @@
 // • «Подробнее» запоминается по виду окна и не попадает в сохранение;
 // • срок у просьбы («Ответить · до конца …») — последний месяц, в котором она ещё в «Ожидают ответа» (время идёт
 //   по-настоящему; просьбы ребёнка ждут только до месяца срока, просьба о помощи в быту — и в нём);
-// • на 360×740 (маленький телефон) у детей с секцией и просьбой все главные кнопки и строка «Ещё» видны без прокрутки,
-//   «Открыть карточку» — в подвале окна;
+// • на 360×740 (маленький телефон) у детей с секцией и просьбой и у матери с просьбой о помощи в быту (на сохранении —
+//   в формате aging58) все главные кнопки и строка «Ещё» видны без прокрутки, «Открыть карточку» — в подвале окна;
+// • имя человека не повторяется в его карточке: ни в просьбах («Имя: нужна помощь в быту» → «Нужна помощь в быту»), ни
+//   в «Последней встрече» (праздник у него самого — без « · Имя»);
 // • тайные отношения: «Связь» в «Подробнее» не говорит «Друг», заголовок «Другие действия» цел, без карточки «Связь» —
 //   «Тайный партнёр», как раньше (social255);
 // • все живые люди (на сохранении — все 150+): роль под именем по полу, бывший сотрудник не спорит с «Сейчас»,
@@ -112,7 +114,14 @@ function setupOwner() {
   const add = (key, fn, p) => { if (p && !v.some(x => x[1] === fn && x[2] === p.id)) v.push([key, fn, p.id]); };
   add('партнёр', 'personDetail', P);
   add('взрослый ребёнок', 'personDetail', alive.filter(p => ownChild53(p) && p.age >= 18).sort((a, b) => b.bond - a.bond)[0]);
-  add('мать', 'personDetail', alive.find(p => p.role === 'Мать'));
+  const mom = alive.find(p => p.role === 'Мать');
+  add('мать', 'personDetail', mom);
+  // Просьба о помощи в быту — как её создаёт aging58 («Имя: нужна помощь в быту»): у матери она бывает чаще всего, и с ней
+  // карточка длиннее всего (на 360×740 «Ещё» должна остаться на первом экране).
+  if (mom) {
+    updateAging58(mom); mom.aging58.need = Math.max(mom.aging58.need || 0, 3);
+    generations58().requests.push({ id: 'verify2731-owner-elder', person: mom.id, status: 'offered', created: s.clock.ticks, expires: s.clock.ticks + 4, title: mom.name + ': нужна помощь в быту' });
+  }
   add('отец', 'personDetail', alive.find(p => p.role === 'Отец'));
   add('друг', 'personDetail', alive.filter(p => p.role === 'Друг').sort((a, b) => b.bond - a.bond)[0]);
   add('внук', 'personDetail', alive.find(p => p.age < 18));
@@ -346,6 +355,19 @@ async function extraChecks(pg, wins) {
         __close();
       }
     }
+    // Праздник у самого человека (events54, social270): «побывали вместе: День рождения · Имя» — в его карточке без имени.
+    {
+      __restore();
+      // Тот, с кем вы не живёте под одной крышей (иначе строки «Последняя встреча» нет); лучше всего — мать.
+      const away = wins.map(w => s.people.find(q => q.id === w[2])).filter(q => q?.alive && q.age >= 18 && (typeof where2731 !== 'function' || !['живёте вместе', 'живёт с вами'].includes(where2731(q))));
+      const p = away.find(q => q.role === 'Мать') || away[0];
+      if (p && typeof occasionNames54 === 'object') {
+        remember(p, 'побывали вместе: ' + occasionNames54.birthday + ' · ' + p.name);
+        __close(); personDetail(p.id); await new Promise(r => setTimeout(r, 0));
+        x.holiday = { who: p.name, top: __top()['Последняя встреча'] || null, want: 'Побывали вместе: ' + occasionNames54.birthday };
+        __close();
+      }
+    }
     __restore();
     return x;
   }, wins);
@@ -359,7 +381,7 @@ async function sweep(pg, wins) {
     const ids = wins ? [...new Set(wins.map(w => w[2]))] : s.people.filter(p => p.alive).map(p => p.id);
     const male = /^(Партнёр близкого|Друг ребёнка|Сотрудник своего дела|Клиент|Покупатель|Заказчик|Гость|Ученик|Зритель|Хозяин питомца|Турист|Подопечный|Знакомый|Друг|Внук|Родственник|Бывший партнёр|Бывший сотрудник|Партнёр|Муж|Сын)$/;
     const female = /^(Партнёрша близкого|Подруга ребёнка|Сотрудница своего дела|Клиентка|Покупательница|Заказчица|Гостья|Ученица|Зрительница|Хозяйка питомца|Туристка|Подопечная|Знакомая|Подруга|Внучка|Родственница|Бывшая партнёрша|Бывшая сотрудница|Партнёрша|Жена|Дочь)$/;
-    const out = { n: 0, gender: [], former: [], repeats: [], hints: [], romance: [], help: [], ill: [], met: 0, kids: 0 };
+    const out = { n: 0, gender: [], former: [], repeats: [], hints: [], romance: [], help: [], ill: [], names: [], met: 0, kids: 0 };
     const words = { person: { 'характер': x => x.sec.has('Характерная реплика') || x.rows.has('О человеке/Характер'), 'общая история': x => x.sec.has('Общая история'), 'новости': x => x.sec.has('Новости близкого'), 'биография': x => x.sec.has('Биография'), 'своя жизнь': x => x.sec.has('Собственная жизнь'), 'образование': x => x.sec.has('Образование и семья'), 'возраст и помощь': x => x.sec.has('Возраст и помощь'), 'прежняя жизнь': x => x.sec.has('Прежняя жизнь'), 'другие действия': x => x.acts.length > 0 },
       child: { 'интересы': x => x.info.has('Интересы'), 'секции': x => x.acts.some(l => x.clubs.has(l)), 'подарок': x => x.acts.includes('Велосипед или машина в подарок'), 'доверие': x => x.rows.has('Что важно ребёнку/Доверие'), 'своя история': x => x.sec.has('Своя история'), 'другие действия': x => x.acts.length > 0 } };
     const clubs = new Set(Object.values(clubsCatalog19).map(c => c.name));
@@ -390,6 +412,9 @@ async function sweep(pg, wins) {
         if (p.gender === 'f' && /оплачивает сам(?![а-яё])/.test(health) || p.gender === 'm' && /оплачивает сама/.test(health)) out.help.push(who + ': ' + health);
         // Болеющий ребёнок: без «в норме», с тем же примечанием, что в карточке человека.
         if (/^Болеет/.test(x.top['Здоровье']?.value || '') && (/в норме/.test(health) || !/обычные занятия пока на паузе/.test(health))) out.ill.push(who + ' (' + kind + '): ' + health);
+        // Имя — заголовок карточки: в «Последней встрече» и просьбах его нет.
+        const metNote = x.top['Последняя встреча']?.note || '', asks = [...document.querySelectorAll('#modal .need273 .fix273 > span')].map(e => e.textContent);
+        if (metNote.endsWith(' · ' + p.name) || asks.some(a => a.includes(p.name))) out.names.push(who + ': ' + [metNote, ...asks].filter(Boolean).join(' / '));
         // «Подробнее» не повторяет верх.
         if (kind === 'person' && p.alive) {
           const rep = [];
@@ -438,6 +463,9 @@ function compare(name, out, prep) {
     check(`${name} · ${k}: дописанные кнопки стоят среди вариантов, а не под ними`, !placed.length, placed);
     if (b.hadPic) check(`${name} · ${k}: портрет рядом с именем`, n.pic, n);
     check(`${name} · ${k}: каждая строка «Ждёт вашего ответа» — кнопка`, n.need.every(x => x.fix), n.need);
+    // Имя уже в заголовке карточки: в просьбах и «Последней встрече» его не повторяем, просьба — с большой буквы.
+    const met = n.top['Последняя встреча']?.note || '';
+    check(`${name} · ${k}: имя не повторяется в просьбах и «Последней встрече»` + (n.need.length ? ` («${n.need.map(x => x.text).join('», «')}»)` : ''), !!n.name && n.need.every(x => !x.text.includes(n.name) && x.text.charAt(0) === x.text.charAt(0).toUpperCase()) && !met.endsWith(' · ' + n.name), { need: n.need.map(x => x.text), met });
     note(`${k}: было ${b.first ? b.first.screen + '-й экран (' + b.first.y + ' px из ' + b.first.modalH + ')' : 'кнопок нет'}, стало: ${n.actions.map(a => a.label + ' ' + a.y).join(', ') || '—'} px из ${n.actions[0]?.modalH ?? '?'}; на 1280 — последняя ${w?.actions.at(-1)?.y ?? '?'} px`);
   }
   const e = N.extra;
@@ -453,6 +481,8 @@ function compare(name, out, prep) {
   if (name === 'family') check(`${name}: проверены сроки и просьб ребёнка (до месяца срока), и просьбы о помощи (включительно)`, (e.deadlines || []).some(r => r.kind === 'child55') && (e.deadlines || []).some(r => r.kind === 'elder58'), (e.deadlines || []).map(r => r.kind));
   if (e.meeting) check(`${name} · ${e.meeting.who}: после встречи «Последняя встреча» — её месяц и название (${e.meeting.want?.value} · ${e.meeting.want?.note})`, !!e.meeting.want && e.meeting.top?.value === e.meeting.want.value && e.meeting.top?.note === e.meeting.want.note, e.meeting);
   else if (name === 'family') check(`${name}: встреча с другом для «Последней встречи» состоялась`, false, 'нет друга');
+  if (e.holiday) check(`${name} · ${e.holiday.who}: праздник у человека — в «Последней встрече» без его имени («${e.holiday.want}»)`, e.holiday.top?.note === e.holiday.want, e.holiday);
+  else check(`${name}: проверен праздник у человека для «Последней встречи»`, false, 'нет взрослого, который живёт отдельно');
   // Тайные отношения: «Связь» в «Подробнее» не говорит прежнюю роль, «Другие действия» целы; без карточки — как было.
   for (const [k] of prep.v.filter(w => /^тайная связь/.test(w[0]))) {
     const n = N.wins[k];
@@ -468,6 +498,7 @@ function compare(name, out, prep) {
     check(`${name}: «помощника оплачивает сам/сама» — по полу`, !sw.help.length, sw.help.slice(0, 8));
     check(`${name}: у болеющего ребёнка — «обычные занятия пока на паузе», без «в норме»`, !sw.ill.length, sw.ill.slice(0, 8));
     check(`${name}: «Подробнее» не повторяет верх («Где живёт», «Пара», «Помощь», «Связь»)`, !sw.repeats.length, sw.repeats.slice(0, 8));
+    check(`${name}: имя человека не повторяется в его «Последней встрече» и просьбах (${sw.n} карточек)`, !sw.names.length, sw.names.slice(0, 8));
     check(`${name}: подпись «Подробнее» обещает только то, что в нём есть`, !sw.hints.length, sw.hints.slice(0, 8));
     check(`${name}: в «Ещё» у кнопки отношений одно условие, «Предложить тайные отношения» — только когда можно`, !sw.romance.length, sw.romance.slice(0, 8));
   }
