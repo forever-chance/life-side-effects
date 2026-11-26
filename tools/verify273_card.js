@@ -440,9 +440,11 @@ function compare(name, out) {
       if (BASE) { for (const k of out.base.kinds) { const b = out.base.wins[k]; check(`${name} · ${k}: окно с карточкой`, b.card, b.title); if (b.main) check(`${name} · ${k}: главная кнопка видна без прокрутки на 390×844`, b.main.fold, b.main); } continue; }
       compare(name, out);
     }
-    // Порядок подключения: windows273.js — последним перед bootstrap61.js.
+    // Порядок подключения: windows273.js — последним перед bootstrap61.js; между ними — только окна шагов 273.N
+    // (work2732.js и соседние), они строятся на windows273.js.
     const order = [...INDEX.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
-    check('windows273.js подключён последним перед bootstrap61.js', BASE || order[order.indexOf('bootstrap61.js') - 1] === 'windows273.js', order.slice(-4));
+    const after273 = order.slice(order.indexOf('windows273.js') + 1, order.indexOf('bootstrap61.js'));
+    check('windows273.js подключён последним перед bootstrap61.js (после него — только шаги 273.N)', BASE || order.includes('windows273.js') && after273.every(f => /^[a-z]+273\d\.js$/.test(f)), order.slice(-5));
   } finally { await browser.close(); }
   console.log(`\n${pass}/${pass + fail}` + (BASE ? ' (BASE=1: без windows273.js)' : ''));
   process.exit(fail ? 1 : 0);

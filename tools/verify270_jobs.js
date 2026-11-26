@@ -249,11 +249,12 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
           return { job: s.job.title, near, nearWant, far, farWant: want(s.job) + 'Офис · другой конец города', remote, remoteWant: want(s.job) + 'Удалённо', hybrid, hybridWant: want(s.job) + 'Гибрид' };
         }, a.appId);
         check('моя работа: заголовок «Должность · зарплата/год · Офис · рядом с домом», без часов в названии', w.job && w.near.head === w.nearWant && !/ч\/нед\.\s*·\s*\d/.test(w.near.head), w);
-        check('моя работа: строка с дорогой вместо старой «зарплата · формат»', w.job && /Дорога до работы: \d+ мин\. в одну сторону/.test(w.near.text) && (w.near.text.match(/\/год/g) || []).length === 1 && !/Очная работа|Рядом с домом/.test(w.near.text), w.near);
+        // 273.2: на карточке «Моей работы» (work2732.js) дорога — в строке под должностью: «… · 20 мин дороги».
+        check('моя работа: строка с дорогой вместо старой «зарплата · формат»', w.job && /Дорога до работы: \d+ мин\. в одну сторону| · \d+ мин дороги/.test(w.near.text) && (w.near.text.match(/\/год/g) || []).length === 1 && !/Очная работа|Рядом с домом/.test(w.near.text), w.near);
         check('моя работа: место в другом районе — «другой конец города»', w.job && w.far.head === w.farWant, w.far);
         check('моя работа: удалённая — «Удалённо», без дороги; гибрид — «Гибрид»', w.job && w.remote.head === w.remoteWant && !/Дорога до работы/.test(w.remote.text) && w.hybrid.head === w.hybridWant, { remote: w.remote, hybrid: w.hybrid });
         check('моя работа: у гибрида дорога названа средней («в среднем N мин.»), у офиса — без «в среднем»',
-          w.job && /Дорога до работы: в среднем \d+ мин\. в одну сторону/.test(w.hybrid.text) && !/в среднем/.test(w.near.text), { near: w.near.text, hybrid: w.hybrid.text });
+          w.job && /Дорога до работы: в среднем \d+ мин\. в одну сторону| · в среднем \d+ мин дороги/.test(w.hybrid.text) && !/в среднем/.test(w.near.text), { near: w.near.text, hybrid: w.hybrid.text });
 
         // 6. Внутренние вакансии в разговоре о карьере.
         const iv = await pg.evaluate(() => {
