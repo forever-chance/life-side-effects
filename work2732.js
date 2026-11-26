@@ -612,7 +612,7 @@ function requestPatch2732(html,a){
  if(!status16[a.status]&&requestStatus2732[a.status])html=html.replace(' · '+esc(a.status),()=>' · '+requestStatus2732[a.status]);
  html=html.replace(/ · ответить за \d+ мес\./,()=>active&&Number.isFinite(a.expires)?' · ответить '+untilMonth273(a.expires):'');
  if(decisionActive24({kind:'job',id:a.id})){
-  const b=button16('Отказаться от предложения / собеседования',"jobDeclineAsk273('"+a.id+"')");
+  const b=button16('Отказаться',"jobDeclineAsk273('"+a.id+"')");
   html=html.replace(/<\/article>\s*$/,()=>b+'</article>');
  }
  return html;

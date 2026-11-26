@@ -138,7 +138,7 @@ const PANEL = {
 // Новые кнопки, которых нет без work2732.js.
 const EXTRA = {
   hub: /.*/, // меню тем получает варианты окна зарплаты — сверяется отдельно
-  requests: /^Отказаться от предложения \/ собеседования$/,
+  requests: /^Отказаться$/,
   work: /^(Повышение зарплаты|Принять|Отклонить|Зарплата, повышение и внутренние вакансии|Обязанности и условия|Отделы и карьерные направления|Образование за счёт компании|Проекты и условия повышения|Карьерная история|Повышение в должности|Обучение за счёт работодателя|Внутренние вакансии и перевод|Обсудить карьерные перспективы|История изменений|Дополнительный проект|Уволиться)$/,
   vacancies: /^\d+ ч$/,
 };
@@ -256,7 +256,7 @@ async function extraChecks(pg, name, base) {
       const a = path16().jobApplications.find(a => a.id === window.__v.app);
       s.pending = [{ type: 'offer', job: { title: 'Проверочная должность', salary: Math.round(c().wage), tenure: 0 } }];
       openRequests58('work'); const card = [...document.querySelectorAll('.trajectory article.path-card')].find(q => (q.querySelector('button')?.getAttribute('onclick') || '').includes(a?.id));
-      const btn = card && [...card.querySelectorAll('button')].find(b => __label(b) === 'Отказаться от предложения / собеседования');
+      const btn = card && [...card.querySelectorAll('button')].find(b => __label(b) === 'Отказаться');
       const line = card?.textContent || '';
       if (btn) btn.click();
       const ask = __title(); __press('Да, отказаться');
