@@ -442,7 +442,9 @@ function compare(name, out) {
     }
     // Порядок подключения: windows273.js — последним перед bootstrap61.js.
     const order = [...INDEX.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
-    check('windows273.js подключён последним перед bootstrap61.js', BASE || order[order.indexOf('bootstrap61.js') - 1] === 'windows273.js', order.slice(-4));
+    /* 2734: между windows273.js и bootstrap61.js могут стоять файлы шагов 273.x (money2734.js и т. п.) — они не оборачивают show() насовсем */
+    const after273 = order.slice(order.indexOf('windows273.js') + 1, order.indexOf('bootstrap61.js'));
+    check('windows273.js подключён последним перед bootstrap61.js (после него — только шаги 273.x)', BASE || order.includes('windows273.js') && after273.every(f => /^[a-z]+273\d\.js$/.test(f)), order.slice(-5));
   } finally { await browser.close(); }
   console.log(`\n${pass}/${pass + fail}` + (BASE ? ' (BASE=1: без windows273.js)' : ''));
   process.exit(fail ? 1 : 0);

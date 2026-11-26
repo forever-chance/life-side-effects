@@ -213,7 +213,8 @@ function adopt273(card,ctx,d,h2){
   if(allBody.dataset.text273==='added')allBody.insertAdjacentHTML('afterbegin',textHTML273(ctx.text));
  }
  for(const e of [...d.children]){
-  if(e===h2||e.matches(mine)||e.matches('.modal-closebar38,.eyebrow,.options,button'))continue;
+  /* 2734: .hint-heading187 — <h2> со справкой «?» (attachHint180: «Финансы», «Жильё и дорога», careerMenu18); иначе заголовок уезжал в «Все условия» */
+  if(e===h2||e.matches(mine)||e.matches('.modal-closebar38,.eyebrow,.options,button,.hint-heading187'))continue;
   if(e.matches('input,select,textarea,label,form'))main.before(e);
   else if(e.matches('p')&&!e.textContent.trim()&&!e.children.length)e.remove();
   else allBody.append(e);
@@ -228,7 +229,7 @@ function adopt273(card,ctx,d,h2){
  }
  // Кнопки, дописанные прямо в #modal: дубль варианта убираем, главные — наверх, оплата — в строку «Платить».
  for(const b of [...d.querySelectorAll('button')]){
-  if(b.closest('.options,.modal-closebar38,.need273,.chips273,.others273')||b.classList.contains('fix273'))continue;
+  if(b.closest('.options,.modal-closebar38,.need273,.chips273,.others273,.hint-heading187')||b.classList.contains('fix273'))continue; /* 2734: «?» у заголовка остаётся у заголовка */
   const l=b.textContent.replace(/\s+/g,' ').trim();
   if(labels.has(l)){b.remove();continue;}
   if(chips&&card.pay&&is273(l,card.pay.chips)){chips.append(b);continue;}
