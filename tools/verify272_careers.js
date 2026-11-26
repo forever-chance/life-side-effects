@@ -200,6 +200,8 @@ function apply(pg, pickJunior) {
     const screen = async () => {
       await o.pg.evaluate(() => { const x = path16(); x.view = { ...x.view, country: s.country, format: 'near', fte28: 'all', page: 0 }; openPath16('vacancies58'); });
       await o.pg.selectOption('select[aria-label="Направление"]', 'computing');
+      // 273.2: «Опыт» — в свёрнутых «Ещё фильтры» (work2732.js): сначала раскрыть, как это сделал бы игрок.
+      await o.pg.evaluate(() => document.querySelectorAll('.trajectory details.filters2732').forEach(d => { d.open = true; }));
       await o.pg.selectOption('select[aria-label="Опыт"]', 'none');
       const text = await o.pg.locator('#vacancy-results180 > p').first().innerText();
       // все страницы списка: «→» нажимается, пока не станет неактивной

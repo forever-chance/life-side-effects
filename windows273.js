@@ -262,8 +262,11 @@ function adopt273(card,ctx,d,h2){
   allBody.dataset.text273=d.querySelector(':scope > p:not(.mnote273), :scope > .dialog-copy20:not(.text273)')?'own':'added';
   if(allBody.dataset.text273==='added')allBody.insertAdjacentHTML('afterbegin',textHTML273(ctx.text));
  }
+ /* 2732: подсказка «?» (onboarding180, attachHint180) переписывает окно после show() и заворачивает <h2> в
+    div.hint-heading187 — эта обёртка остаётся на месте заголовка, а не уходит в «Все условия» вместе с <h2>. */
+ const headBox=[...d.children].find(e=>e!==h2&&e.contains(h2));
  for(const e of [...d.children]){
-  if(e===h2||e.matches(mine)||e.matches('.modal-closebar38,.eyebrow,.options,button'))continue;
+  if(e===h2||e===headBox||e.matches(mine)||e.matches('.modal-closebar38,.eyebrow,.options,button'))continue;
   if(e.matches('input,select,textarea,label,form'))main.before(e);
   else if(e.matches('p')&&!e.textContent.trim()&&!e.children.length)e.remove();
   else allBody.append(e);
@@ -278,7 +281,7 @@ function adopt273(card,ctx,d,h2){
  }
  // Кнопки, дописанные прямо в #modal: дубль варианта убираем, главные — наверх, оплата — в строку «Платить».
  for(const b of [...d.querySelectorAll('button')]){
-  if(b.closest('.options,.modal-closebar38,.need273,.chips273,.others273')||b.classList.contains('fix273'))continue;
+  if(b.closest('.options,.modal-closebar38,.need273,.chips273,.others273')||b.classList.contains('fix273')||headBox?.contains(b))continue; /* 2732: «?» у заголовка */
   const l=b.textContent.replace(/\s+/g,' ').trim();
   // card.drop — дописанные кнопки, которые карточка заменила своим вариантом (отказ из «Ожидают ответа», navigation24).
   if(labels.has(l)||card.drop&&is273(l,card.drop)){b.remove();continue;}

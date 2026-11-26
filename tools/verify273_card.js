@@ -550,11 +550,11 @@ function compare(name, out) {
       compare(name, out);
     }
     // Порядок подключения: windows273.js — последним перед bootstrap61.js.
-    // 2731: окна шагов 273.1–273.4 (people2731.js и соседние) встают сразу после windows273.js — между ним и bootstrap61.js
-    // допускаются только они.
+    // 2731, 2732: окна шагов 273.x (people2731.js, work2732.js и соседние) и точечных сборок 275.x встают после
+    // windows273.js — они строятся на нём; между ним и bootstrap61.js допускаются только они.
     const order = [...INDEX.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
     const after = order.slice(order.indexOf('windows273.js') + 1, order.indexOf('bootstrap61.js'));
-    check('windows273.js подключён последним перед bootstrap61.js (после него — только окна шагов 273.x)', BASE || order.includes('windows273.js') && after.every(f => /^[a-z]+273\d\.js$/.test(f)), order.slice(-5));
+    check('windows273.js подключён последним перед bootstrap61.js (после него — только окна шагов 273.x/275.x)', BASE || order.includes('windows273.js') && after.every(f => /^[a-z]+27[35]\d\.js$/.test(f)), order.slice(-5));
   } finally { await browser.close(); }
   console.log(`\n${pass}/${pass + fail}` + (BASE ? ' (BASE=1: без windows273.js)' : ''));
   process.exit(fail ? 1 : 0);
