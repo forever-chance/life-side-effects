@@ -554,6 +554,7 @@ function compare(name, out) {
     // windows273.js — они строятся на нём; между ним и bootstrap61.js допускаются только они. 275.2: creative2752.js —
     // только дописывает текст в окна поверх windows273.js (рендерер не меняет). 275.3: illness2753.js оборачивает саму
     // карточку поездки (tripCard273, rescheduleWhy273) — стоит после people2731.js, до work2732.js и study2733.js.
+    // 275.4: fixes2754.js (решения, поиск, менторство; окон 273 не меняет) — последним перед bootstrap61.js.
     const order = [...INDEX.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
     const w273 = order.indexOf('windows273.js'), b61 = order.indexOf('bootstrap61.js');
     const after = order.slice(w273 + 1, b61);
