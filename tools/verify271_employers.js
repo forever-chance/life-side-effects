@@ -221,7 +221,9 @@ async function life(pg, cfg) {
     const r = await pg.evaluate(() => {
       const foreign = /[A-Za-z\u00C0-\u024F\u0600-\u06FF\u0E00-\u0E7F]/;
       const out = { foreign: universities16.filter(u => foreign.test(u.name)).map(u => u.country + ':' + u.name) };
-      out.medical = universities16.filter(u => u.fields.includes('medicine')).map(u => u.country + ':' + u.name);
+      // 2791: правило «медицине учат только в медицинском по названию» — про 250 шаблонных вузов 271; у 1304 заведений 279.1
+      // медицина есть и у университетов с медицинским факультетом, поэтому здесь — только прежние (у них нет kind2791).
+      out.medical = universities16.filter(u => !u.kind2791 && u.fields.includes('medicine')).map(u => u.country + ':' + u.name);
       out.notMedical = out.medical.filter(n => !/[Мм]едицин/.test(n));
       out.countries = new Set(universities16.map(u => u.country)).size;
       out.hyderabad = universities16.filter(u => u.country === 'in' && u.profile === 3).map(u => u.name);
@@ -233,6 +235,8 @@ async function life(pg, cfg) {
       if (act) act.fn();
       out.route = { field: x.view.field, level: x.view.level, section: x.view.section };
       out.programs = [...new Set(programs16.filter(p => p.country === s.country && p.field === 'medicine' && p.level === 'bachelor').map(p => uni16(p).name))];
+      // 2791: у новых заведений медицина — по направлениям заведения, а не по названию
+      out.medicalUnis = programs16.filter(p => p.country === s.country && p.field === 'medicine' && p.level === 'bachelor').every(p => /[Мм]едицин/.test(uni16(p).name) || uni16(p).kind2791 && uni16(p).fields.includes('medicine'));
       openPath16('admission58');
       const text = document.getElementById('app')?.innerText || '';
       out.shown = out.programs.filter(n => text.includes(n.split(' · ')[0]));
@@ -242,7 +246,7 @@ async function life(pg, cfg) {
     });
     check(r.foreign.length === 0, 'вузы: нет названий латиницей, тайским и арабским письмом', r.foreign.slice(0, 3).join(' | '));
     check(r.countries === 25 && r.notMedical.length === 0 && r.medical.length >= 25, 'вузы: где учат медицине — медицинский вуз по названию', r.notMedical.slice(0, 3).join(' | '));
-    check(r.route.field === 'medicine' && r.programs.length && r.programs.every(n => /[Мм]едицин/.test(n)), 'вакансия врача ведёт в медицинский вуз', r.programs.join(' | '));
+    check(r.route.field === 'medicine' && r.programs.length && r.medicalUnis, 'вакансия врача ведёт в медицинский вуз', r.programs.join(' | ')); // 2791: или в заведение с медициной в направлениях
     check(r.shown.length > 0 && !r.oldShown, 'экран учёбы после вакансии врача: медицинский вуз кириллицей, без «Institute of Urban Studies»', r.shown.join(' | '));
     check(r.ru.includes('Медицинский университет имени Н. П. Семашко · Санкт-Петербург'), 'вузы России — прежние названия', r.ru[3]);
     check(errors.length === 0, 'вузы: без ошибок страницы', errors.slice(0, 2).join(' | '));
@@ -432,7 +436,9 @@ async function life(pg, cfg) {
       const v = x.vacancies.find(v => v.profession === 'doctor');
       x.jobApplications.push({ id: 'app-270', vacancy: { ...v }, status: 'rejected', probability: .5 });
       // диплом 270 из вуза с названием арабским письмом
-      const u = universities16.find(u => u.country === 'eg' && u.profile === 3), p = programs16.find(p => p.university === u.id && p.field === 'medicine' && p.level === 'bachelor');
+      // 2791: программы прежних вузов ушли из programs16 в retiredPrograms2791 (unis2791.js), по id их находит prog16
+      const all = typeof retiredPrograms2791 !== 'undefined' ? [...programs16, ...retiredPrograms2791] : programs16;
+      const u = universities16.find(u => u.country === 'eg' && u.profile === 3), p = all.find(p => p.university === u.id && p.field === 'medicine' && p.level === 'bachelor');
       x.diplomas.push({ id: 'dip-270', field: p.field, level: p.level, track45: p.track45 || null, program46: p.id, profileSchema46: 1, title: levels16[p.level] + ' · ' + programName26(p), university: u.previousName271 || u.name, country: p.country, year: s.year, grade: 80, quality: p.quality, employment: p.employment });
       save(); if (typeof flushSave264 === 'function') flushSave264();
       return { key: x.marketKey, employers: [...new Set(x.vacancies.map(v => v.employer))], doctor: v.employer, uni: u.previousName271 || u.name, uniId: u.id };
