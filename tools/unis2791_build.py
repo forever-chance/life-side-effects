@@ -18,6 +18,8 @@
 --languages — ещё и напечатать, где источник называет другой основной язык обучения, чем даёт игра (279.1.1).
 279.1.2: в Марокко, Индии, Египте, Турции, Нидерландах, Франции, Корее, Китае и Таиланде заведение, где источник называет
 основным не язык страны, учит на обоих: последнее поле строки — 'fr+ar', 'en+hi', 'ru+zh'… (BOTH_COUNTRIES ниже).
+279.1.3: и в Испании — местный язык (каталанский, валенсийский как каталанский, галисийский, баскский; языки и их ключи
+читаются из langs27913.js) и испанский: 'cat+es', 'glg+es', 'eus+es'; Институт бизнеса Кастельяна — 'en+es'.
 """
 import json, os, re, sys
 
@@ -96,13 +98,16 @@ LANG_STEMS = [('нидерландск', 'нидерландский'), ('сер
               ('галисийск', 'галисийский'), ('баскск', 'баскский'), ('африкаанс', 'африкаанс'), ('зулу', 'зулу'),
               ('тамильск', 'тамильский'), ('маратхи', 'маратхи'), ('каннада', 'каннада'), ('бенгальск', 'бенгальский'),
               ('гуджарати', 'гуджарати'), ('телугу', 'телугу'), ('урду', 'урду'), ('амазигск', 'амазигский')]
+# 279.1.3: другое название того же языка в источнике — валенсийский в игре каталанский.
+LANG_ALIAS = {'валенсийский': 'каталанский'}
 # «по-французски» — наречие, не язык обучения: перед основой не буква и не дефис.
 LANG_WORD = re.compile(r'(?<![а-яё-])(' + '|'.join(s for s, _ in LANG_STEMS) + r')[а-яё]*')
 NOT_TEACHING = re.compile(r'преподают|свёрнут|свернут|сдавать|исследован|обязательн')
 
 
 def game_languages():
-    """Языки игры: {страна: код языка страны}, {код: название} — из catalog16.js и expansion95.js."""
+    """Языки игры: {страна: код языка страны}, {код: название} — из catalog16.js, expansion95.js и (279.1.3) местные языки
+    из langs27913.js."""
     cat = open(os.path.join(ROOT, 'catalog16.js'), encoding='utf8').read()
     exp = open(os.path.join(ROOT, 'expansion95.js'), encoding='utf8').read()
     m = re.search(r'const country16=\{(.*?)\};', cat)
@@ -113,6 +118,13 @@ def game_languages():
         lm = re.compile(r'"language":"(\w+)","languageName":"([^"]*)"').search(exp, at)
         country[cc] = lm.group(1)
         names[lm.group(1)] = lm.group(2)
+    loc = os.path.join(ROOT, 'langs27913.js')
+    if os.path.exists(loc):
+        m = re.search(r'const local27913=\{(.*?)\n\};', open(loc, encoding='utf8').read(), re.S)
+        if not m:
+            raise SystemExit('не разобрал langs27913.js')
+        for k, n in re.findall(r"^\s*(\w+):\{name:'([^']+)'", m.group(1), re.M):
+            names.setdefault(k, n)
     return country, names
 
 
@@ -120,7 +132,8 @@ def named_languages(langs, names):
     """Языки обучения из строки languages: (основной, [остальные]); язык — код игры, а если игра его не знает, название."""
     code = {v.lower(): k for k, v in names.items()}
     stem = dict(LANG_STEMS)
-    word = lambda m: code.get(stem[m.group(1)], stem[m.group(1)])
+    name = lambda w: LANG_ALIAS.get(w, w)
+    word = lambda m: code.get(name(stem[m.group(1)]), name(stem[m.group(1)]))
     l = (langs or '').lower()
     parts = l.split(';')
     head = re.sub(r'\([^()]*\)', ' ', parts[0])
@@ -154,10 +167,12 @@ def language_spec(cc, langs, country, names):
 # 279.1.2 (решение владелицы 27.11): в этих странах заведение, где источник называет основным не язык страны, учит и на
 # нём, и на языке страны — у каждой программы есть такая же на втором языке (копия с новым id, прежние программы не
 # меняются; unis2791.js). В Марокко — каждое заведение, где источник называет французский, даже вторым языком. Языки,
-# которых игра не знает (бенгальский, каталанский, галисийский…), не учитываются — заведение остаётся как было. Испания
-# (каталанский и галисийский) — отдельная сборка, Канада — как в 279.1.1 (LANG_COUNTRIES).
-BOTH_COUNTRIES = ('ma', 'in', 'eg', 'tr', 'nl', 'fr', 'kr', 'cn', 'th')
-BOTH_ALSO = {'ma': 'fr'}
+# которых игра не знает (бенгальский, маратхи…), не учитываются — заведение остаётся как было. Канада — как в 279.1.1
+# (LANG_COUNTRIES).
+# 279.1.3: Испания — местный язык, где источник его называет (и вторым: «испанский, баскский»), иначе — как всюду
+# (Институт бизнеса Кастельяна: английский).
+BOTH_COUNTRIES = ('ma', 'in', 'eg', 'tr', 'nl', 'fr', 'kr', 'cn', 'th', 'es')
+BOTH_ALSO = {'ma': ('fr',), 'es': ('cat', 'glg', 'eus')}
 
 
 def both_spec(cc, langs, country, names):
@@ -167,8 +182,8 @@ def both_spec(cc, langs, country, names):
     main, others = named_languages(langs, names)
     local = country[cc]
     own = main if main in names and main != local else None
-    if not own and BOTH_ALSO.get(cc) in others:
-        own = BOTH_ALSO[cc]
+    if not own:
+        own = next((x for x in others if x in BOTH_ALSO.get(cc, ())), None)
     return own + '+' + local if own else ''
 
 
@@ -432,7 +447,7 @@ def main():
             "//  программы, есть своя профессиональная школа 1/0, язык обучения (279.1.1, есть не у всех): основной язык и через\n"
             "//  «+» второй язык части программ — 'fr', 'fr+en', 'en+fr'; нет — язык страны и английский по полю выше;\n"
             "//  два языка обучения (279.1.2, есть не у всех, поле перед ним тогда пустое): язык источника и язык страны —\n"
-            "//  'fr+ar', 'en+hi'…, у каждой программы есть такая же на обоих].\n"
+            "//  'fr+ar', 'en+hi'…, у каждой программы есть такая же на обоих; 279.1.3 — и Испания: 'cat+es', 'glg+es', 'eus+es'].\n"
             "//  id заведения — cc-nНОМЕР;\n"
             "//  next — следующий свободный номер страны.\n")
     body = 'const unis2791Data={"version":1,"next":' + json.dumps(nxt, ensure_ascii=False, separators=(',', ':')) + ',"countries":{\n'

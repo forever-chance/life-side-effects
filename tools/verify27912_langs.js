@@ -26,6 +26,8 @@
 // • сохранение 279.1.1 франкоязычной в Монреале с вакансиями на английском: после обновления «Языки» сразу, до списка
 //   вакансий, — «Язык страны · Монреаль — французский и английский», не «Нужен для вакансий»;
 // • сохранение владелицы — без ошибок.
+// 279.1.3: Испания (местные языки — 'cat+es', 'glg+es', 'eus+es' и 'en+es' у Кастельяны, копии copy27912) здесь
+//   пропускается — её проверяет verify27913_langs.js; остальные страны сверяются, как раньше.
 const fs = require('fs'), path = require('path'), { execSync } = require('child_process');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
@@ -52,8 +54,8 @@ const EXPECT = {
   'Высшая отельная школа «Ворбюрг» · Гаага': 'en+nl', 'Школа менеджмента Гран-Плас · Лилль': 'en+fr', 'Институт науки и технологий Капчхон · Тэджон': 'en+ko',
   'Университет Цзюлун · Шэньчжэнь': 'en+zh', 'Российско-китайский университет Дунцзян · Шэньчжэнь': 'ru+zh', 'Университет Дой-Тунг · Чианграй': 'en+th',
   'Международный университет Сен-Мартен · Бангкок': 'en+th',
-  // не меняются: бенгальский (игра не знает), Испания (каталанский — следующая сборка), арабский с французским частью в Египте
-  'Университет искусств имени Бонкима · Калькутта': '', 'Университет Монжуик · Барселона': '', 'Университет Мукаттам · Каир': '', 'Институт бизнеса Кастельяна · Мадрид': ''
+  // не меняются: бенгальский (игра не знает), арабский с французским частью в Египте; Испания — с 279.1.3 (verify27913_langs.js)
+  'Университет искусств имени Бонкима · Калькутта': '', 'Университет Мукаттам · Каир': ''
 };
 const PREP = { fr: 'французском', ar: 'арабском', hi: 'хинди', tr: 'турецком', en: 'английском', nl: 'нидерландском', ko: 'корейском', zh: 'китайском', ru: 'русском', th: 'тайском' };
 const CASA = 'Касабланка', RABAT = 'Рабат', MUMBAI = 'Мумбаи', DELHI = 'Нью-Дели', MONTREAL = 'Монреаль', QUEBEC = 'Квебек', OTTAWA = 'Оттава';
@@ -187,16 +189,16 @@ const MAKE_SAVE = ([city, status, offerName, offerField]) => {
         const n = by.get(r[0]);
         if (!n || JSON.stringify(n.slice(0, r.length)) !== JSON.stringify(r)) { diff.push(cc + '-n' + r[0]); continue; }
         specs[n[2]] = n[14] || '';
-        if (n.length === r.length) continue;
+        if (n.length === r.length || cc === 'es') continue;   // 279.1.3: Испания — verify27913_langs.js
         if (cc === 'ca' || r.length !== 13 || n.length !== 15 || n[13] !== '' || !new RegExp('^[a-z]{2}\\+' + LOCAL[cc] + '$').test(n[14]) || n[14].startsWith(LOCAL[cc] + '+')) diff.push(cc + '-n' + r[0] + ' ' + JSON.stringify(n.slice(13)));
         else both[cc] = (both[cc] || 0) + 1;
       }
       if ((now?.countries?.[cc] || []).length !== rows.length) diff.push(cc + ' число');
     }
     check('данные: строки 279.1.1 те же, у заведений на двух языках в конце — пустое поле и «язык источника+язык страны»', now && diff.length === 0, diff.slice(0, 8));
-    check('данные: на двух языках — ' + Object.entries(BOTH).map(([k, v]) => k + ' ' + v).join(', ') + ' (Канада и Испания — нет)', JSON.stringify(Object.fromEntries(Object.entries(both).sort())) === JSON.stringify(Object.fromEntries(Object.entries(BOTH).sort())), both);
+    check('данные: на двух языках — ' + Object.entries(BOTH).map(([k, v]) => k + ' ' + v).join(', ') + ' (Канада — нет; Испания — verify27913_langs.js)', JSON.stringify(Object.fromEntries(Object.entries(both).sort())) === JSON.stringify(Object.fromEntries(Object.entries(BOTH).sort())), both);
     const bad = Object.entries(EXPECT).filter(([n, v]) => specs[n] !== v).map(([n, v]) => n + ': ' + JSON.stringify(specs[n]) + ' вместо ' + JSON.stringify(v));
-    check('данные: примеры по источнику (Марокко — и где французский вторым; бенгальский, Испания и арабский с частью французского в Египте — без изменений)', bad.length === 0, bad);
+    check('данные: примеры по источнику (Марокко — и где французский вторым; бенгальский и арабский с частью французского в Египте — без изменений)', bad.length === 0, bad);
     check('данные: нет real_name, source и ссылок', !/real_name|"source"|https?:|www\./.test(dataText + codeText));
     if (RESEARCH && fs.existsSync(RESEARCH)) {
       const src = JSON.parse(fs.readFileSync(RESEARCH, 'utf8'));
@@ -248,6 +250,7 @@ const MAKE_SAVE = ([city, status, offerName, offerField]) => {
         if (JSON.stringify(now) !== JSON.stringify(r)) out.changed.push(r[0]);
       }
       for (const p of programs16) if (!known.has(p.id)) {
+        if (p.country === 'es' && p.copy27912) continue;   // 279.1.3: копии Испании — verify27913_langs.js
         out.added++;
         const m = /^(.*)-([a-z]{2})$/.exec(p.id), base = m && known.get(m[1]);
         out.per[p.country] = (out.per[p.country] || 0) + 1;
@@ -258,12 +261,12 @@ const MAKE_SAVE = ([city, status, offerName, offerField]) => {
       const by = new Map();
       for (const p of programs16) { const l = by.get(p.university); if (l) l.push(p); else by.set(p.university, [p]); }
       let pairs = 0;
-      for (const u of universities16.filter(u => u.langs27912)) for (const p of by.get(u.id) || []) {
+      for (const u of universities16.filter(u => u.langs27912 && u.country !== 'es')) for (const p of by.get(u.id) || []) {
         if (p.copy27911 || p.english2791 || p.subject26 || !['bachelor', 'master', 'phd', 'vocational'].includes(p.level)) continue;
         for (const l of u.langs27912) { if (p.language === l) continue; pairs++; const c = prog16(p.id + '-' + l); if (!c || c.language !== l) out.incomplete.push(p.id + ' → ' + l); }
       }
       out.pairs = pairs;
-      out.unis = universities16.filter(u => u.langs27912).length;
+      out.unis = universities16.filter(u => u.langs27912 && u.country !== 'es').length;
       return { ...out, missing: out.missing.slice(0, 5), changed: out.changed.slice(0, 5), addedBad: out.addedBad.slice(0, 5), incomplete: out.incomplete.slice(0, 5), caNew: out.caNew.slice(0, 5) };
     }, [ref.programs, PREP, LOCAL]);
     check('id: все ' + ref.programs.length + ' программ 279.1.1 на месте — вуз, направление, ступень, цена, отбор, срок, название и язык', ids.missing.length === 0 && ids.changed.length === 0, { missing: ids.missing, changed: ids.changed });
@@ -356,14 +359,13 @@ const MAKE_SAVE = ([city, status, offerName, offerField]) => {
       }
       const about = n => aboutUni2791(universities16.find(u => u.name === n));
       out.about = { cairo: about('Американский университет Гарден-Сити · Каир'), alex: about('Франкоязычный университет «Тауфик аль-Хаким» · Александрия'), ist: about('Университет Мехмет Тунчель · Стамбул'), bey: about('Университет Бейоглу · Стамбул'),
-        ru: about('Российско-китайский университет Дунцзян · Шэньчжэнь'), nl: about('Высшая отельная школа «Ворбюрг» · Гаага'), es: about('Университет Монжуик · Барселона') };
-      out.es = programs16.filter(p => p.country === 'es' && p.copy27912).length;
+        ru: about('Российско-китайский университет Дунцзян · Шэньчжэнь'), nl: about('Высшая отельная школа «Ворбюрг» · Гаага') };
       return out;
     });
     check('Египет (' + et.eg.length + '): у английских и французского заведений есть программы на арабском, арабоязычному шанс больше нуля', et.eg.length === BOTH.eg && et.eg.every(r => r[2] > 0 && r[3] > 0), et.eg);
     check('Турция (' + et.tr.length + '): у английских и французского заведений есть программы на турецком, турецкоязычному шанс больше нуля', et.tr.length === BOTH.tr && et.tr.every(r => r[2] > 0 && r[3] > 0), et.tr);
     check('«О вузе»: Каир — «Учат на английском и арабском.», Александрия — «на французском и арабском», Стамбул — «на английском и турецком», «на французском и турецком»', /Учат на английском и арабском\./.test(et.about.cairo) && /Учат на французском и арабском\./.test(et.about.alex) && /Учат на английском и турецком\./.test(et.about.ist) && /Учат на французском и турецком\./.test(et.about.bey), et.about);
-    check('«О вузе»: Шэньчжэнь — «Учат на русском и китайском.», Гаага — «на английском и нидерландском»; Испания без копий', /Учат на русском и китайском\./.test(et.about.ru) && /Учат на английском и нидерландском\./.test(et.about.nl) && !/Учат на /.test(et.about.es) && et.es === 0, et.about);
+    check('«О вузе»: Шэньчжэнь — «Учат на русском и китайском.», Гаага — «на английском и нидерландском» (Испания — verify27913_langs.js)', /Учат на русском и китайском\./.test(et.about.ru) && /Учат на английском и нидерландском\./.test(et.about.nl), et.about);
     check('новая сборка (программы): без ошибок страницы и NaN', errors.length === 0 && (await pg.evaluate(() => __nan())).length === 0, errors.slice(0, 2));
     await ctx.close();
   }

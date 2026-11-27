@@ -555,10 +555,11 @@ function compare(name, out) {
     // только дописывает текст в окна поверх windows273.js (рендерер не меняет). 275.3: illness2753.js оборачивает саму
     // карточку поездки (tripCard273, rescheduleWhy273) — стоит после people2731.js, до work2732.js и study2733.js.
     // 275.4: fixes2754.js (решения, поиск, менторство; окон 273 не меняет) — последним перед bootstrap61.js.
+    // 279.1.3: langs27913-hints.js — подсказки о местных языках поверх study2733.js и windows273.js (langNeed273).
     const order = [...INDEX.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
     const w273 = order.indexOf('windows273.js'), b61 = order.indexOf('bootstrap61.js');
     const after = order.slice(w273 + 1, b61);
-    check('windows273.js подключён последним перед bootstrap61.js (после него — только окна шагов 273.x/275.x)', BASE || w273 >= 0 && w273 < b61 && after.every(f => /^[a-z]+27[35]\d+\.js$/.test(f)), order.slice(w273, b61 + 1));
+    check('windows273.js подключён последним перед bootstrap61.js (после него — только окна шагов 273.x/275.x)', BASE || w273 >= 0 && w273 < b61 && after.every(f => /^[a-z]+27[35]\d+\.js$/.test(f) || f === 'langs27913-hints.js'), order.slice(w273, b61 + 1));
   } finally { await browser.close(); }
   console.log(`\n${pass}/${pass + fail}` + (BASE ? ' (BASE=1: без windows273.js)' : ''));
   process.exit(fail ? 1 : 0);
