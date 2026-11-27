@@ -474,7 +474,9 @@ const ev = (pg, fn, arg) => pg.evaluate(fn, arg);
   // ---------- 8. Подключение ----------
   {
     const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), order = [...html.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
-    check(order.indexOf('fixes2755.js') > 0 && order.indexOf('fixes2755.js') === order.indexOf('windows273.js') - 1, 'подключение: fixes2755.js — сразу перед windows273.js', order.slice(-12));
+    // 2759: после fixes2755.js перед windows273.js — только точечные файлы более поздних сборок (fixes2759-data.js, fixes2759.js).
+    const between = order.slice(order.indexOf('fixes2755.js') + 1, order.indexOf('windows273.js'));
+    check(order.indexOf('fixes2755.js') > 0 && order.indexOf('fixes2755.js') < order.indexOf('windows273.js') && between.every(f => /^fixes27[5-9]\d+(-data)?\.js$/.test(f) && f !== 'fixes2755.js'), 'подключение: fixes2755.js — перед windows273.js (между ними — только поздние fixesNNNN.js)', order.slice(-12));
     const assets = fs.readFileSync(path.join(ROOT, 'offline-assets.json'), 'utf8');
     const list = JSON.parse(assets);
     check(list.includes('fixes2755.js') && JSON.stringify([...list].sort()) === JSON.stringify(list) && !assets.endsWith('\n') && !/\n/.test(assets), 'офлайн: fixes2755.js в offline-assets.json, список одной строкой по алфавиту', '');

@@ -113,7 +113,7 @@ const ev = (pg, fn, arg) => pg.evaluate(fn, arg);
     const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), order = [...html.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
     // 275.5: между fixes27371.js и windows273.js — только точечные fixesNNNN.js более поздних сборок (fixes2755.js).
     const between = order.slice(order.indexOf('fixes27371.js') + 1, order.indexOf('windows273.js'));
-    check(order.indexOf('fixes27371.js') >= 0 && order.indexOf('fixes27371.js') < order.indexOf('windows273.js') && between.every(f => /^fixes27[5-9]\d+\.js$/.test(f)) && order.indexOf('fixes27371.js') > order.indexOf('fixes2758.js'), 'порядок: fixes27371.js — после fixes2758.js, перед windows273.js (между ними — только поздние fixesNNNN.js)', order.slice(-6));
+    check(order.indexOf('fixes27371.js') >= 0 && order.indexOf('fixes27371.js') < order.indexOf('windows273.js') && between.every(f => /^fixes27[5-9]\d+(-data)?\.js$/.test(f)) /* 2759: и таблицы fixes2759-data.js */ && order.indexOf('fixes27371.js') > order.indexOf('fixes2758.js'), 'порядок: fixes27371.js — после fixes2758.js, перед windows273.js (между ними — только поздние fixesNNNN.js)', order.slice(-6));
   }
 
   // ---------- 1. Сохранение владелицы ----------
@@ -236,8 +236,9 @@ const ev = (pg, fn, arg) => pg.evaluate(fn, arg);
       check(!!r.it && r.it.title === 'Fiat Panda: нужен ремонт · состояние 24/100' && r.it.note === r.wantNote, 'ремонт: пункт «Fiat Panda: нужен ремонт · состояние 24/100» — «' + r.wantNote + '»', r.items);
       check(!!r.win && r.win.opts[0]?.label === r.wantQuote && r.win.opts.some(o => o.label.startsWith('Продать как есть · ')) && /ездите общественным: дорога \d+ мин вместо \d+, .* в месяц на транспорт .* вместо /.test(r.win.text),
         'ремонт: окно — «' + r.wantQuote + '» (цена игры), «Продать как есть», время и деньги вместе', r.win);
-      check(!!r.win && r.quote > r.sale && /Ремонт [\d\s\u00a0\u202f]+A\$ — сама машина стоит [\d\s\u00a0\u202f]+A\$/.test(r.win.text),
-        'ремонт: ремонт дороже машины — «Ремонт X — сама машина стоит Y»', r.win?.text);
+      // 2759: машина стоит по рынку (fixes2759.js) — строка «ремонт дороже машины» только если ремонт правда дороже.
+      check(!!r.win && (r.quote > r.sale ? /Ремонт [\d\s\u00a0\u202f]+A\$ — сама машина стоит [\d\s\u00a0\u202f]+A\$/.test(r.win.text) : !/сама машина стоит/.test(r.win.text)),
+        'ремонт: ' + (r.quote > r.sale ? 'ремонт дороже машины — «Ремонт X — сама машина стоит Y»' : 'ремонт (' + Math.round(r.quote) + ' A$) дешевле машины (' + Math.round(r.sale) + ' A$) — строки «ремонт дороже машины» нет'), r.win?.text);
       check(!!r.card && /Не ездит: состояние 24\/100 — нужен ремонт/.test(r.card.text) && r.card.opts.some(o => o.label === 'Использовать для регулярных поездок' && o.disabled && /нужен ремонт/i.test(o.why)),
         'ремонт: карточка говорит, почему не ездит, «Использовать» серая с причиной', r.card);
       check(!!r.card && (r.card.text.match(/списывается/g) || []).length === 1 && /Пока не почините, ездите общественным: дорога \d+ мин вместо \d+/.test(r.card.text),
@@ -377,8 +378,9 @@ const ev = (pg, fn, arg) => pg.evaluate(fn, arg);
       });
       const leftFiat = r.away.items.find(i => i.id === 'left');
       check(!!leftFiat && /^3 единицы транспорта в других городах · /.test(leftFiat.title) && /Сидней/.test(leftFiat.note) && r.away.list?.opts.some(o => o.label === 'Fiat Panda · Сидней' && o.hint.includes('перевезти')), 'переезд: в Риме — пункт «' + (leftFiat?.title || '…') + '» («' + (leftFiat?.note || '') + '»), в нём «Fiat Panda · Сидней»', r.away);
-      check(!!r.away.win && r.away.win.title === 'Fiat Panda — в городе Сидней (Австралия)' && r.away.win.opts.some(o => o.label.startsWith('Перевезти к себе · ')) && r.away.win.opts.some(o => o.label.startsWith('Продать · ')) && /Перевозка дороже самого транспорта/.test(r.away.win.text),
-        'переезд: окно — «Перевезти к себе · цена», «Продать · цена», перевозка дороже машины', r.away.win);
+      // 2759: машина стоит по рынку (fixes2759.js) — «Перевозка дороже самого транспорта» только если перевозка правда дороже.
+      check(!!r.away.win && r.away.win.title === 'Fiat Panda — в городе Сидней (Австралия)' && r.away.win.opts.some(o => o.label.startsWith('Перевезти к себе · ')) && r.away.win.opts.some(o => o.label.startsWith('Продать · ')) && (r.away.move > r.away.sale) === /Перевозка дороже самого транспорта/.test(r.away.win.text),
+        'переезд: окно — «Перевезти к себе · цена», «Продать · цена»' + (r.away.move > r.away.sale ? ', перевозка дороже машины' : ', перевозка дешевле машины — без «дороже самого транспорта»'), r.away);
       const idle = r.back.items.find(i => i.id === 'idle');
       check(r.back.selected === 'public' && r.back.minutes === r.back.pub.minutes && !!idle && idle.note.startsWith('Ездить на ней · ' + r.back.car.minutes + ' мин вместо ' + r.back.pub.minutes + ' · ') && r.back.car.minutes === r.back.drive,
         'переезд: вернулись в Сидней — сама машина не включилась (общественным ' + r.back.pub.minutes + ' мин), но пункт снова предлагает «Ездить на ней · ' + r.back.car.minutes + ' мин вместо ' + r.back.pub.minutes + '»', r.back);
