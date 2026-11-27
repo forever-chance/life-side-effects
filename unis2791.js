@@ -38,6 +38,18 @@
 //   не язык страны. Заявка, предложение или учёба 279.1 на программе, где язык сменился, идёт на прежнем языке, пока она
 //   жива: в сохранении s.unisLang27911.pins {id программы: язык} (заполняется при первом чтении сохранения прежней
 //   сборки, в том числе восстановленного при открытии игры).
+// • 279.1.2 (решение владелицы 27.11): в Марокко, Индии, Египте, Турции и по одному-два заведения в Нидерландах, Франции,
+//   Корее, Китае и Таиланде заведение, где источник называет основным другой язык (в Марокко — где назван французский),
+//   учит на обоих: на нём и на языке страны (данные 'fr+ar', 'en+hi', 'ru+zh'…, последнее поле строки). Прежние программы
+//   остаются с теми же id и языком; рядом с каждой — такая же на втором языке (id …-fr, …-ar, …-hi, …-tr, …-en и т. д.,
+//   «· на французском», «· на хинди»…), если такой ещё нет: бакалавриат, магистратура, PhD, профессиональные программы и
+//   подготовка к профессии, у английских вузов Индии, Египта, Турции и Таиланда — и медицина с правом на английском.
+//   Сертификаты и предметы учителя — без копий. Язык учёбы, заявок и предложений в сохранениях не меняется. На карточке
+//   такого заведения подписаны обе кнопки: и прежняя программа не на языке страны («Информатика · на английском»).
+// • 279.1.2: работа в Монреале и Квебеке — по-английски или по-французски: требование языка вакансии (и внутренней
+//   вакансии, творческого заказа, приглашения в кино, профессионального допуска) закрывает и французский. Кому хватает
+//   английского, у того всё как раньше; кому не хватает, а французский лучше, — вакансия на французском. Оттава и
+//   остальная Канада — как раньше.
 
 const unis2791On=typeof unis2791Data!=='undefined'&&typeof universities16!=='undefined'&&typeof programs16!=='undefined'&&typeof country16!=='undefined';
 
@@ -126,6 +138,23 @@ function languageCopies27911(own,lang){
 }
 // Язык программы в 279.1: язык страны, у целиком английских — английский, кроме медицины и права.
 function oldLanguage27911(u,field){return u.intl2791&&field!=='medicine'&&field!=='law'?'en':country16[u.country][0];}
+/* 279.1.2: заведение на двух языках (u.langs27912 — язык источника и язык страны): у каждой программы ступени (кроме
+   сертификатов и предметов учителя) — такая же на другом из двух языков. Прежние программы не меняются; копия — новый id
+   (id программы и «-fr», «-ar», «-hi»…), только если программы с таким id ещё нет: английская «-en» 279.1 уже есть —
+   второй не будет. Копии, варианты «· на английском» и копии 279.1.1 сами не копируются. */
+function bothCopies27912(own,langs,taken){
+ const out=[];
+ for(const p of own){
+  if(p.subject26||p.english2791||p.copy27911||!copyLevels27911.includes(p.level))continue;
+  for(const lang of langs){
+   const id=p.id+'-'+lang;
+   if(p.language===lang||taken.has(id))continue;
+   taken.add(id);
+   out.push({...p,id,language:lang,copy27911:lang,copy27912:true,...(lang==='en'?{english2791:true}:{})});
+  }
+ }
+ return out;
+}
 // Общая программа — формулы catalog16 (programs16): срок по стране и ступени, цена от countries.tuition, язык, нагрузка.
 // Отбор программы: отбор заведения и надбавка ступени, как в catalog16; вместо «+3 за каждое следующее направление»
 // (порядок направлений в данных случайный) — медицине +6.
@@ -145,11 +174,12 @@ function baseProgramme2791(u,field,level){
 const retiredPrograms2791=[];
 const unis2791=[];
 function makeUni2791(country,row){
- const [n,city,name,kind,pub,fields,prestige,selectivity,tier,foreigners,english,programs,voc,langs]=row;
+ const [n,city,name,kind,pub,fields,prestige,selectivity,tier,foreigners,english,programs,voc,langs,both]=row;
  const levels=kindLevels2791(kind,prestige);
  const k=kinds2791[kind]||kinds2791.university;
  /* 279.1.1: язык заведения из данных — основной и второй для части программ; нет — как в 279.1 */
  const own=String(langs||'').split('+').filter(l=>typeof lang16!=='undefined'&&lang16[l]),intl=Number(english)===3&&country16[country]?.[0]!=='en';
+ const two=String(both||'').split('+').filter(l=>typeof lang16!=='undefined'&&lang16[l]); /* 279.1.2: учит на обоих языках */
  return {id:country+'-n'+n,country,city,name,fields:String(fields).split(' ').filter(f=>fields16[f]),
   prestige:prestige2791[prestige],selectivity:select2791[selectivity],price:tierPrice2791(tier),
   load:Math.max(40,Math.min(96,k.load+(prestige-3)*2)),quality:quality2791[prestige],
@@ -158,6 +188,7 @@ function makeUni2791(country,row){
   english2791:own.length||country16[country]?.[0]==='en'?0:Number(english)||0,
   international:!own.length&&intl,
   ...(own.length?{lang27911:own[0],copies27911:own.slice(1),intl2791:intl}:{}),
+  ...(two.length>1?{langs27912:two}:{}),
   kind2791:kind,public2791:!!pub,stars2791:prestige,select2791:selectivity,tier2791:tier,foreigners2791:!!foreigners,
   levels2791:voc&&!levels.includes('vocational')?['vocational',...levels]:levels,programs2791:programs||''};
 }
@@ -176,6 +207,7 @@ function makeUni2791(country,row){
   const base=baseProgramme2791(u,field,level),en=englishVariant2791(u,base),own=fieldProgrammes2791(u,base);
   list.push(...own);if(en)list.push(en);
   for(const lang of u.copies27911||[])list.push(...languageCopies27911(own,lang)); /* 279.1.1 */
+  if(u.langs27912)list.push(...bothCopies27912(own,u.langs27912,new Set(list.map(p=>p.id)))); /* 279.1.2 */
  }}
  for(const list of byUni.values())for(const p of list)if(p.occupation68)hasRole.add(p.country+'|'+p.occupation68);
  // Подготовка к профессии с обязательным вузовским дипломом (и к рабочей, если в стране её направлению на этой ступени
@@ -195,6 +227,7 @@ function makeUni2791(country,row){
    const local=country16[country][0],langs=[...(host.copies27911||[])];
    const extra=host.lang27911&&host.lang27911!==local&&!langs.includes(local);if(extra)langs.push(local);
    for(const lang of langs){const c=languageCopies27911([occ],lang);list.push(...c);if(c.length&&extra&&lang===local)(host.occCopies27911||=[]).push([local,role.title]);}
+   if(host.langs27912)list.push(...bothCopies27912([occ],host.langs27912,new Set(list.map(p=>p.id)))); /* 279.1.2: и на втором языке заведения */
   }
  }
  // 279.1.1: программа, которая в 279.1 учила на другом языке, помнит его (was27911) — для заявок и учёбы тех лет.
@@ -292,7 +325,15 @@ function fieldsShort2791(u){
 }
 function programsShort2791(u){const list=String(u.programs2791||'').split(', ').filter(Boolean);return list.slice(0,6).join(', ')+(list.length>6?' и другие':'');}
 // Подпись кнопки программы на карточке: у подготовки к профессии — сама профессия.
-function chipLabel2791(p){const r=p.occupation68&&!(typeof vocationalTitles68!=='undefined'&&vocationalTitles68[p.occupation68])&&profession16(p.occupation68);return r?r.title+(p.copy27911?' · на '+langPrep27911(p.copy27911):''):programName26(p);} /* 279.1.1: язык копии */
+function chipLabel2791(p){const r=p.occupation68&&!(typeof vocationalTitles68!=='undefined'&&vocationalTitles68[p.occupation68])&&profession16(p.occupation68);return chipLang27912(p,r?r.title+(p.copy27911?' · на '+langPrep27911(p.copy27911):''):programName26(p));} /* 279.1.1: язык копии; 279.1.2: и язык прежней программы (chipLang27912) */
+/* 279.1.2: у заведения на двух языках подписаны обе кнопки: прежняя программа не на языке страны (английская в Мумбаи,
+   Каире, Стамбуле) — «Информатика · на английском» рядом с «Информатика · на хинди». Только подпись кнопки: название
+   программы (programName26), id и сохранения прежние. Канада и заведения на одном языке — как в 279.1.1. */
+function chipLang27912(p,label){
+ let u=null;try{u=uni16(p);}catch(e){}
+ if(!u||!u.langs27912||!p.language||p.language===country16[p.country]?.[0]||/ · на [^ ]+$/.test(label))return label;
+ return label+' · на '+langPrep27911(p.language);
+}
 // «Берут иностранцев» / «иностранцев мало» — только тому, кто учится в этой стране как иностранец (нет гражданства и
 // вида на жительство). Это сведения, не условие: заявку можно подать и туда, где иностранцев мало.
 function foreignNote2791(u){
@@ -315,11 +356,16 @@ function languageLine27911(u){
  if(u.lang27911!==local)return 'Учат на '+langPrep27911(u.lang27911)+(also?', '+also:'')+'.'+occLine;
  return (also?cap2791(also)+'.':'')+occLine;
 }
+/* 279.1.2: «Учат на французском и арабском.» — и английский 279.1 у части программ, если его нет среди двух. */
+function languageLine27912(u){
+ const en=!u.langs27912.includes('en')&&englishLine2791(u);
+ return 'Учат на '+u.langs27912.map(langPrep27911).join(' и ')+'.'+(en?' '+en:'');
+}
 function aboutUni2791(u){
  if(!u?.kind2791)return '';
  const price=priceWord2791(u);
  return [kindLine2791(u)+', престиж '+u.stars2791+' из 5.',price?'Плата: '+price+(u.tier2791===0?', только взносы':'')+'.':'',
-  u.lang27911?languageLine27911(u):englishLine2791(u),'Направления: '+fieldsLine2791(u)+'.',
+  u.lang27911?languageLine27911(u):u.langs27912?languageLine27912(u):englishLine2791(u),'Направления: '+fieldsLine2791(u)+'.',
   u.programs2791?'Здесь учат: '+u.programs2791+'.':''].filter(Boolean).join(' ');
 }
 
@@ -533,6 +579,72 @@ if(unis2791On){
     if(ok)return true;
    }
    return continueBase2791.call(this,tr,...rest);
+  };
+ }
+}
+
+// ---------- 279.1.2: работа в Монреале и Квебеке — по-английски или по-французски ----------
+
+// Язык вакансий — язык страны (makeVacancies16, internalVacancies18 и прочие). В этих городах его требование закрывает и
+// второй язык (в Канаде — французский). Кому хватает языка страны — всё как раньше: вакансия на нём. Кому не хватает, а
+// второй язык знает лучше, — та же вакансия на втором: так её показывают список, окно вакансии, «Нужен для вакансий»,
+// отклик и работа (s.job.language), и по ней же внутренние вакансии. Удалённая работа — как раньше.
+const workCities27912={ca:['Монреаль','Квебек']},workAlt27912={ca:'fr'};
+function cityWorkLanguages27912(country,city){
+ const list=workCities27912[country];
+ return list&&list.includes(city)&&typeof country16!=='undefined'&&country16[country]?[country16[country][0],workAlt27912[country]]:null;
+}
+function workLanguage27912(country,city,lang,need){
+ const langs=cityWorkLanguages27912(country,city);
+ if(!langs||!langs.includes(lang))return lang;
+ try{const [main,alt]=langs;return level16(main)>=need||level16(alt)<=level16(main)?main:alt;}catch(e){return lang;}
+}
+function jobLanguage27912(v){
+ if(!v||v.format==='remote')return v&&v.language;
+ let need=3;try{const p=profession16(v.profession);if(p&&Number.isFinite(p.language))need=p.language;}catch(e){}
+ return workLanguage27912(v.country,v.city,v.language,need);
+}
+// Вакансии в списке — на языке, который их закрывает (тот же список и в «Языках»: langNeeds2733 в study2733.js читает
+// сохранённые вакансии и до того, как список откроют, — например, сохранение 279.1.1 после обновления игры).
+function vacanciesLanguage27912(list){if(Array.isArray(list))for(const v of list){try{const l=jobLanguage27912(v);if(l&&l!==v.language)v.language=l;}catch(e){console.error(e);}}return list;}
+function homeCity27912(country){try{return typeof s!=='undefined'&&s&&s.country===country?residenceCity():null;}catch(e){return null;}}
+// Профессиональный допуск страны: живёте в Монреале или Квебеке — экзамен и по-французски (trajectory16.js, license16).
+function licenseLanguage27912(country,p){const local=country16[country][0];return workLanguage27912(country,homeCity27912(country),local,p&&Number.isFinite(p.language)?p.language:3);}
+// Творческий заказ, проба или приглашение в кино своей страны (creativeCheck47 ниже, cinemaInvitation191 в cinema191.js):
+// язык, который закрывает «Язык страны»; в Монреале и Квебеке — и французский.
+function creativeLanguage27912(o){const local=o&&country16[o.country]?.[0];return local?workLanguage27912(o.country,homeCity27912(o.country),local,o.language):local;}
+// Подсказка «Язык страны» (study2733.js, langTop2733) в Монреале и Квебеке: оба языка города, карточка — того, который вы
+// знаете лучше (поровну — французского), если он не родной и не C2. undefined — город не такой, подсказка прежняя.
+function langHint27912(){
+ if(typeof s==='undefined'||!s)return undefined;
+ const city=homeCity27912(s.country),langs=cityWorkLanguages27912(s.country,city);
+ if(!langs)return undefined;
+ const x=path16(),order=[langs[1],langs[0]],open=order.filter(l=>lang16[l]&&!x.native.includes(l)&&level16(l)<6);
+ if(!open.length)return null;
+ const l=open.reduce((a,b)=>level16(b)>level16(a)?b:a);
+ return {l,need:level16(l)+1,why:city+' — '+order.map(k=>String(lang16[k]).toLowerCase()).join(' и '),eyebrow:'Язык страны'};
+}
+if(unis2791On){
+ const normalize27912=vacanciesLanguage27912;
+ if(typeof makeVacancies16==='function'){
+  const makeBase27912=makeVacancies16;
+  makeVacancies16=function(...a){const out=makeBase27912.apply(this,a);try{normalize27912(path16().vacancies);}catch(e){console.error(e);}return out;};
+ }
+ if(typeof internalVacancies18==='function'){
+  const internalBase27912=internalVacancies18;
+  internalVacancies18=function(...a){return normalize27912(internalBase27912.apply(this,a));};
+ }
+ if(typeof jobEligibility16==='function'){
+  const eligibleBase27912=jobEligibility16;
+  jobEligibility16=function(v,...rest){let w=v;try{const l=jobLanguage27912(v);if(l&&l!==v.language)w={...v,language:l};}catch(e){console.error(e);}return eligibleBase27912.call(this,w,...rest);};
+ }
+ // Творческие заказы и пробы своей страны: «Язык страны: B1» закрывает и французский, если вы живёте в Монреале или Квебеке.
+ if(typeof creativeCheck47==='function'){
+  const creativeBase27912=creativeCheck47;
+  creativeCheck47=function(o,...rest){
+   const r=creativeBase27912.call(this,o,...rest);
+   try{const local=o&&country16[o.country]?.[0],l=local&&creativeLanguage27912(o);if(l&&l!==local&&level16(l)>=o.language&&Array.isArray(r?.why))r.why=r.why.filter(w=>!/^Язык страны: /.test(w));}catch(e){console.error(e);}
+   return r;
   };
  }
 }

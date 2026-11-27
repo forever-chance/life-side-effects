@@ -17,6 +17,8 @@
 // • обычное открытие игры после обновления (персонаж 279.1 восстановлен при загрузке страницы): предложение и заявки —
 //   на английском, учёба начинается; заявке отказали — та же программа уже по-французски, и после чтения сохранения тоже;
 // • новая жизнь — пустой список прежних языков; сохранение владелицы — без ошибок.
+// 279.1.2: заведения на двух языках вне Канады (последнее поле строки, копии copy27912) здесь пропускаются — их проверяет
+//   verify27912_langs.js; Канада по-прежнему сверяется вся.
 const fs = require('fs'), path = require('path'), { execSync } = require('child_process');
 const { chromium } = require('playwright');
 const ROOT = path.resolve(__dirname, '..');
@@ -108,7 +110,9 @@ async function catalog(pg, view) {
       const by = new Map((now?.countries?.[cc] || []).map(r => [r[0], r]));
       for (const r of rows) {
         const n = by.get(r[0]);
-        if (!n || JSON.stringify(n.slice(0, 13)) !== JSON.stringify(r) || n.length > 13 && (cc !== 'ca' || typeof n[13] !== 'string')) diff.push(cc + '-n' + r[0]);
+        // 279.1.2: у заведений на двух языках вне Канады — пустое поле и 'fr+ar' / 'en+hi'… (их проверяет verify27912_langs.js)
+        const two = cc !== 'ca' && n && n.length === 15 && n[13] === '' && typeof n[14] === 'string';
+        if (!n || JSON.stringify(n.slice(0, 13)) !== JSON.stringify(r) || n.length > 13 && !two && (cc !== 'ca' || typeof n[13] !== 'string')) diff.push(cc + '-n' + r[0]);
         if (cc === 'ca' && n) specs[n[2]] = n[13] || '';
       }
       if ((now?.countries?.[cc] || []).length !== rows.length) diff.push(cc + ' число');
@@ -173,6 +177,7 @@ async function catalog(pg, view) {
         if (p.language !== language) { out.lang.push(id); const u = uni16(p); if (p.country !== 'ca' || !u.lang27911 || p.language !== u.lang27911 || language !== 'en') out.langBad.push(id); }
       }
       for (const p of programs16) if (!known.has(p.id)) {
+        if (p.country !== 'ca' && p.copy27912) continue;   // 279.1.2: копии на втором языке вне Канады — verify27912_langs.js
         out.added.push(p.id);
         const base = programs.find(r => r[0] === p.id.replace(/-(en|fr)$/, ''));
         if (p.country !== 'ca' || !p.copy27911 || !p.id.endsWith('-' + p.copy27911) || !base || p.language !== p.copy27911 || programName26(p) !== base[8] + ' · на ' + (p.copy27911 === 'en' ? 'английском' : 'французском')) out.addedBad.push(p.id);

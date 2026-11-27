@@ -25,7 +25,7 @@ function cinemaInvitation191(work){
   country:s.country,kind:'invitation',sourceWork191:work.id,specialty184:specialty,level184:level,
   hours:Math.min(12,4+level),duration:level+1,fee:Math.round(c().wage*.013*level),language:2,
   skill:0,samples:0,quality:0,created:s.clock.ticks,expires:s.clock.ticks+3};
- if(creativeRights47(o).length||level16(country16[o.country][0])<o.language)return;
+ if(creativeRights47(o).length||level16(/* 279.1.2: в Монреале и Квебеке — и по-французски (unis2791.js) */typeof creativeLanguage27912==='function'?creativeLanguage27912(o):country16[o.country][0])<o.language)return;
  x.applications.push({id:id16('creativeApp47'),offer:o,status:'offered',tick:s.clock.ticks,until:o.expires});
  x.nextCinema191=s.clock.ticks+6;
  log('Приглашение в новый проект','После работы «'+work.title+'» вам предложили проект «'+o.title+'». Ответить можно в разделе «Портфолио и заказы».','Творчество',true);

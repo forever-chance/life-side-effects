@@ -16,6 +16,8 @@
     (в сохранениях могут быть ссылки на него) — уберите его из источника осознанно, с флагом --allow-remove.
 --check — только проверить и напечатать сводку, файл не писать.
 --languages — ещё и напечатать, где источник называет другой основной язык обучения, чем даёт игра (279.1.1).
+279.1.2: в Марокко, Индии, Египте, Турции, Нидерландах, Франции, Корее, Китае и Таиланде заведение, где источник называет
+основным не язык страны, учит на обоих: последнее поле строки — 'fr+ar', 'en+hi', 'ru+zh'… (BOTH_COUNTRIES ниже).
 """
 import json, os, re, sys
 
@@ -149,6 +151,27 @@ def language_spec(cc, langs, country, names):
     return '' if spec == country[cc] else spec
 
 
+# 279.1.2 (решение владелицы 27.11): в этих странах заведение, где источник называет основным не язык страны, учит и на
+# нём, и на языке страны — у каждой программы есть такая же на втором языке (копия с новым id, прежние программы не
+# меняются; unis2791.js). В Марокко — каждое заведение, где источник называет французский, даже вторым языком. Языки,
+# которых игра не знает (бенгальский, каталанский, галисийский…), не учитываются — заведение остаётся как было. Испания
+# (каталанский и галисийский) — отдельная сборка, Канада — как в 279.1.1 (LANG_COUNTRIES).
+BOTH_COUNTRIES = ('ma', 'in', 'eg', 'tr', 'nl', 'fr', 'kr', 'cn', 'th')
+BOTH_ALSO = {'ma': 'fr'}
+
+
+def both_spec(cc, langs, country, names):
+    """Языки заведения для копий 279.1.2: '' — как раньше, иначе язык источника и язык страны через «+»: 'fr+ar'."""
+    if cc not in BOTH_COUNTRIES:
+        return ''
+    main, others = named_languages(langs, names)
+    local = country[cc]
+    own = main if main in names and main != local else None
+    if not own and BOTH_ALSO.get(cc) in others:
+        own = BOTH_ALSO[cc]
+    return own + '+' + local if own else ''
+
+
 def language_report(src, country, names):
     """--languages: где источник называет другой основной язык, чем даёт игра (по странам, с примерами)."""
     print('\nЯзык обучения: источник и игра')
@@ -164,10 +187,12 @@ def language_report(src, country, names):
             else:
                 e = english_state(langs)
                 game, copies = ('en' if e == 3 and local != 'en' else local), (['en'] if e in (1, 2) else [])
+            both = both_spec(cc, langs, country, names)   # 279.1.2: учит на обоих — расхождения нет
+            copies = copies + [x for x in both.split('+') if both and x not in copies]
             name = u['game_name'].strip()
-            if main and main != game:
+            if main and main != game and main not in copies:
                 diff.setdefault(main, []).append(name + ' — «' + langs + '»')
-            if game == 'en' and local != 'en' and not spec and {'medicine', 'law'} & set(u['fields']):
+            if game == 'en' and local != 'en' and not spec and not both and {'medicine', 'law'} & set(u['fields']):
                 medlaw.append(name)
             for x in others:
                 if x not in (game, local) and x not in copies:
@@ -333,7 +358,7 @@ def main():
     src = json.load(open(args[0], encoding='utf8'))
     old, nxt = read_ids(OUT)
     country_lang, lang_names = game_languages()
-    countries, used, stats = {}, set(), {'kinds': {}, 'tiers': {}, 'english': {}, 'dropped': [], 'language': {}}
+    countries, used, stats = {}, set(), {'kinds': {}, 'tiers': {}, 'english': {}, 'dropped': [], 'language': {}, 'both': {}}
     for c in src:
         cc = c['code']
         rows = []
@@ -373,6 +398,12 @@ def main():
             if spec:
                 row.append(spec)
                 stats['language'][spec] = stats['language'].get(spec, 0) + 1
+            both = both_spec(cc, u.get('languages'), country_lang, lang_names)
+            if both:   # 279.1.2: поле после языка 279.1.1 (у этих стран его нет — пустая строка)
+                if spec:
+                    raise SystemExit('и язык 279.1.1, и два языка 279.1.2: ' + name)
+                row += ['', both]
+                stats['both'][cc + ' ' + both] = stats['both'].get(cc + ' ' + both, 0) + 1
             rows.append(row)
             stats['kinds'][code] = stats['kinds'].get(code, 0) + 1
             stats['tiers'][tier] = stats['tiers'].get(tier, 0) + 1
@@ -384,6 +415,7 @@ def main():
     print('заведений', sum(len(r) for r in countries.values()), 'видов', stats['kinds'])
     print('плата', dict(sorted(stats['tiers'].items())), 'английский', dict(sorted(stats['english'].items())), 'убрано строк программ', len(stats['dropped']))
     print('язык обучения не по стране (279.1.1):', stats['language'])
+    print('учат на двух языках (279.1.2):', dict(sorted(stats['both'].items())))
     if '--languages' in flags:
         language_report(src, country_lang, lang_names)
     for x in stats['kinds']:
@@ -398,7 +430,9 @@ def main():
             "//  отбор 1–5, плата 0–4 (0 бесплатно, 1 низкая, 2 средняя, 3 высокая, 4 очень высокая; .5 — между), есть набор\n"
             "//  иностранцев 1/0 (0 — иностранцев мало), английский 0–3 (0 нет, 1 часть программ, 2 часть магистратур, 3 всё),\n"
             "//  программы, есть своя профессиональная школа 1/0, язык обучения (279.1.1, есть не у всех): основной язык и через\n"
-            "//  «+» второй язык части программ — 'fr', 'fr+en', 'en+fr'; нет — язык страны и английский по полю выше].\n"
+            "//  «+» второй язык части программ — 'fr', 'fr+en', 'en+fr'; нет — язык страны и английский по полю выше;\n"
+            "//  два языка обучения (279.1.2, есть не у всех, поле перед ним тогда пустое): язык источника и язык страны —\n"
+            "//  'fr+ar', 'en+hi'…, у каждой программы есть такая же на обоих].\n"
             "//  id заведения — cc-nНОМЕР;\n"
             "//  next — следующий свободный номер страны.\n")
     body = 'const unis2791Data={"version":1,"next":' + json.dumps(nxt, ensure_ascii=False, separators=(',', ':')) + ',"countries":{\n'

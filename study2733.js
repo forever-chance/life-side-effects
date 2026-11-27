@@ -449,7 +449,10 @@ function langNeeds2733(){
  const x=path16(),out=[];
  const add=(l,need,why,kind)=>{if(!lang16[l]||level16(l)>=need)return;const o=out.find(o=>o.l===l);if(!o)out.push({l,need,why,kind});else if(need>o.need)Object.assign(o,{need,why});};
  for(const a of x.applications.filter(a=>['submitted','offered','accepted','enrolled'].includes(a.status))){const p=prog16(a.program);if(p)add(p.language,p.minLanguage,levels16[p.level]+' · '+programName26(p),'study');}
- for(const a of x.jobApplications.filter(a=>['submitted','interview','interviewing','offered','accepted'].includes(a.status))){const p=profession16(a.vacancy.profession);if(p)add(a.vacancy.language,p.language,jobTitle270(a.vacancy.title),'job');}
+ /* 279.1.2: в Монреале и Квебеке язык вакансии — тот, что её закрывает (unis2791.js): у отклика — как при проверке, сохранённые вакансии — как в списке, и до того, как его откроют */
+ const lang27912=v=>typeof jobLanguage27912==='function'?jobLanguage27912(v):v.language;
+ if(typeof vacanciesLanguage27912==='function')vacanciesLanguage27912(x.vacancies);
+ for(const a of x.jobApplications.filter(a=>['submitted','interview','interviewing','offered','accepted'].includes(a.status))){const p=profession16(a.vacancy.profession);if(p)add(lang27912(a.vacancy),p.language,jobTitle270(a.vacancy.title),'job');}
  if(s.age>=16){const count={};for(const v of x.vacancies||[]){const p=profession16(v.profession);if(p&&level16(v.language)<p.language){const k=v.language+':'+p.language;count[k]=(count[k]||0)+1;}}
   const best=Object.entries(count).sort((a,b)=>b[1]-a[1])[0];if(best){const [l,n]=best[0].split(':');add(l,+n,best[1]+' '+plural273(best[1],'вакансия','вакансии','вакансий')+' в списке','vacancy');}}
  return out;
@@ -458,7 +461,10 @@ function langTop2733(){
  const x=path16(),need=langNeeds2733()[0];
  if(need)return {...need,eyebrow:need.kind==='study'?'Нужен для учёбы':need.kind==='job'?'Нужен для работы':'Нужен для вакансий'};
  const home=country16[s.country]?.[0];
- if(home&&lang16[home]&&!x.native.includes(home)&&level16(home)<6)return {l:home,need:level16(home)+1,why:countries[s.country].name,eyebrow:'Язык страны'};
+ /* 279.1.2: в Монреале и Квебеке работа и по-французски — подсказка называет оба языка города (langHint27912, unis2791.js) */
+ const city27912=typeof langHint27912==='function'?langHint27912():undefined;
+ if(city27912)return city27912;
+ if(city27912===undefined&&home&&lang16[home]&&!x.native.includes(home)&&level16(home)<6)return {l:home,need:level16(home)+1,why:countries[s.country].name,eyebrow:'Язык страны'};
  const busy=s.clock.tasks.find(t=>t.kind==='pathLanguage'&&!['completed','cancelled'].includes(t.state));
  if(busy)return {l:busy.language,need:Math.min(6,level16(busy.language)+1),why:'',eyebrow:'Сейчас изучаете'};
  return null;
