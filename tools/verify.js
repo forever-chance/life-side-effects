@@ -376,7 +376,8 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     await ctx.close();
   }
 
-  // 14. Лента: «Будни» (267).
+  // 14. Лента: рутина не пишется отдельными записями (267); строки «Будни» с 275.5 нет — счётчики раз в три месяца
+  // просто обнуляются.
   {
     const { pg, errors, ctx } = await page(browser, { startAge: '18', country: 'nl' });
     const r = await pg.evaluate(() => {
@@ -385,13 +386,13 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       log('Симптомы вернулись', 'Обострение.', 'Здоровье', true); log('Обострение закончилось', 'Прошло.', 'Здоровье');
       log('Бумажный самолётик', 'Долетел.', 'Быт'); log('Бумажный самолётик', 'Долетел.', 'Быт');
       out.added = s.log.length - n0; out.week = { ...s.feed267.week };
-      s.clock.month = 5; flushWeekdays267(); out.weekdays = s.log[0].title + ' | ' + s.log[0].text;
+      const nLog = s.log.length; s.clock.month = 5; flushWeekdays267(); out.weekdays = s.log.length - nLog; out.weekLeft = Object.keys(s.feed267.week).length; out.anyWeekdays = s.log.some(e => e.tag === 'Будни');
       s.log = Array.from({ length: 499 }, (_, i) => ({ title: 'x' + i, text: '', major: i === 498, year: 1 }));
       log('Новая запись', 'Текст.', 'Тест'); out.keepsMajor = s.log.some(e => e.title === 'x498') && s.log.length <= 500;
       return out;
     });
     check('лента: рутина не пишется отдельными записями, зарисовка — раз в два года', r.added === 1 && r.week['книжный клуб'] === 4 && r.week['обострения'] === 1 && r.week['бумажный самолётик'] === 1, r);
-    check('лента: раз в три месяца — строка «Будни»', /^Будни · апрель — июнь \| Книжный клуб ×4, /.test(r.weekdays), r.weekdays);
+    check('лента: раз в три месяца счётчики рутины обнуляются, строки «Будни» нет (275.5)', r.weekdays === 0 && r.weekLeft === 0 && !r.anyWeekdays, r);
     check('лента: крупные записи не вытесняются при 500', r.keepsMajor, r);
     const est = await pg.evaluate(() => {
       const far = s.people.find(p => p.alive && !kin27(p)); if (!far) return null; far.bond = 10;
@@ -416,10 +417,10 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       const p = s.people.find(p => p.alive && p.age >= 18 && p.country === s.country && (!p.city18 || p.city18 === residenceCity()));
       if (p) { task16('meeting53', 'Сходить в кино · ' + p.name, 1, { person53: p.id, meeting53: 'cinema', home53: s.country, city53: residenceCity(), partner53: false, startCostRatio: 0 }, 2); const t = s.clock.tasks.at(-1); t.progress = t.duration; finishTask(t); out.meeting = s.log.find(e => e.title === 'Сходить в кино')?.text || ''; }
       out.stats = practiceDetails250('film');
-      // Киноклуб: фильм раз в месяц участия, в ленте — «Будни».
+      // Киноклуб: фильм раз в месяц участия; в ленту не идёт (рутина), виден в карточке клуба (275.5).
       s.cash = 1e7; path16().languages[activityLanguage86('cinema269')] = 6; joinClub19('cinema269');
       const m = clubState19().memberships.find(m => m.type === 'cinema269');
-      if (m) { s.feed267 = null; for (let i = 0; i < 3; i++) { s.clock.ticks++; clubProgramMonth245(m); } out.club = m.films269.length === 3 && new Set(m.films269).size === 3 && s.feed267.week['киноклуб'] === 3; }
+      if (m) { s.feed267 = null; for (let i = 0; i < 3; i++) { s.clock.ticks++; clubProgramMonth245(m); } out.club = m.films269.length === 3 && new Set(m.films269).size === 3 && s.feed267.week['киноклуб'] === 3; clubDetail19(m.id); out.clubCard = [...document.querySelectorAll('#modal p')].map(p => p.textContent).join('\n'); closeModal(); out.club = out.club && /Последний показ/.test(out.clubCard) && !/пьес/.test(out.clubCard) && !s.log.slice(0, 5).some(e => e.title === 'Фильм клуба'); }
       // Будущее: с 2028 года в каждом месяце не меньше двух премьер, одни и те же после перезагрузки.
       s.year = 2061; s.clock.month = 6;
       const now = filmsNow269(1), ids = now.map(f => f.id + f.title + f.director).join();
@@ -432,7 +433,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     check('кино: у ретроспективы, обсуждения и домашней программы есть фильмы', r.hobby.length === 3 && r.hobby.every(t => /«[^»]+»/.test(t) && !/Занятие увлекло/.test(t)), r.hobby);
     check('кино: в походе в кино назван фильм', /Смотрели «[^»]+» \(\d{4}\)\./.test(r.meeting), r.meeting);
     check('кино: в увлечении видно, сколько посмотрено и любимый фильм', /Посмотрено фильмов: \d+\. Любимый — «/.test(r.stats), r.stats);
-    check('кино: киноклуб — новый фильм каждый месяц, в ленте через «Будни»', r.club, r);
+    check('кино: киноклуб — новый фильм каждый месяц, в ленту не идёт, виден в карточке клуба', r.club, r);
     check('кино: после каталога премьеры придумываются и не меняются', r.future, r);
     const biz = await pg.evaluate(() => {
       s.age = 30; s.year = 2045; s.cash = 1e8;
