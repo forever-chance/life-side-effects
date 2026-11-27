@@ -51,6 +51,9 @@ async function page(browser, opts = {}) {
         s.pending = []; if ($('#modal').open) closeModal();
         s.clock.running = false; advanceMonth();
         s.pending = []; if ($('#modal').open) closeModal();
+        /* 279.1.1: если в месяц дня рождения было окно, advanceMonth (clock.js) откладывает год (yearDue), а игра проводит его
+           после ответа (pulse); без этого год пропадал и через 18 лет вам было 17. */
+        if (s.clock.yearDue && !s.dead && typeof rollYear === 'function') { try { transact('year', rollYear); } catch (e) {} s.pending = []; if ($('#modal').open) closeModal(); }
       }
     };
     window.__bad = () => {
@@ -170,7 +173,9 @@ function buildFamily(o = {}) {
   }
   check(stats['Восточная Азия'].total < stats['Египет, Индия, Индонезия'].total, 'в Восточной Азии братьев и сестёр меньше, чем в Египте, Индии, Индонезии',
     stats['Восточная Азия'].total.toFixed(2) + ' < ' + stats['Египет, Индия, Индонезия'].total.toFixed(2));
-  check(stats['Восточная Азия'].only > 0.2 && stats['Восточная Азия'].only < 0.6, 'единственных детей в Восточной Азии 20–60%', Math.round(stats['Восточная Азия'].only * 100) + '%');
+  /* 279.1.1: доля из 50 случайных рождений — в среднем около 35%, разброс от прогона к прогону около 7%: строгая граница 20%
+     срабатывала примерно в 2–3% прогонов (ровно 10 из 50). Граница 15% — три разброса от среднего. */
+  check(stats['Восточная Азия'].only >= 0.15 && stats['Восточная Азия'].only < 0.6, 'единственных детей в Восточной Азии 15–60%', Math.round(stats['Восточная Азия'].only * 100) + '%');
   check(stats['Египет, Индия, Индонезия'].only < 0.2, 'единственных детей в Египте, Индии, Индонезии меньше 20%', Math.round(stats['Египет, Индия, Индонезия'].only * 100) + '%');
   const ranges = { 'Восточная Азия': [0.5, 1.4], 'Европа': [0.7, 1.7], 'Америка и Австралия': [0.9, 2.0], 'Египет, Индия, Индонезия': [1.6, 3.4] };
   check(Object.entries(ranges).every(([k, [a, b]]) => stats[k].total >= a && stats[k].total <= b), 'среднее число братьев и сестёр (со старшими и младшими по плану) правдоподобно по регионам',
@@ -243,7 +248,9 @@ function buildFamily(o = {}) {
   check(allYoung.every(y => y.roleOk), 'роль младших — «Брат» или «Сестра» по полу');
   check(allYoung.every(y => y.inTree), 'младшие связаны с родителями в древе');
   // Родившийся через 10–11 месяцев после вас до вашего первого дня рождения ровесник по целым годам: возраст растёт у всех в ваш день рождения.
-  check(allYoung.every(y => y.age <= y.life.age), 'возраст младших не больше вашего', allYoung.filter(y => y.age > y.life.age).map(y => y.name + ' ' + y.age + ' / ' + y.life.age + (y.half ? ' ' + y.half : '')).join('; '));
+  /* 279.1.1: приёмные не в счёт — family27 (birthKin27) берёт приёмного ребёнка двухлетним, и взятый, пока вам меньше двух,
+     старше вас. */
+  check(allYoung.every(y => y.adopted || y.age <= y.life.age), 'возраст младших не больше вашего (кроме приёмных)', allYoung.filter(y => !y.adopted && y.age > y.life.age).map(y => y.name + ' ' + y.age + ' / ' + y.life.age + (y.half ? ' ' + y.half : '')).join('; '));
   const full = allYoung.filter(y => !y.half);
   const root = x => String(x || '').replace(/(ая|ий|ой|ый|а)$/, '');
   check(full.filter(y => root(y.surname) !== root(y.player) && y.life.country !== 'eg').length <= Math.ceil(full.length * 0.1), 'фамилия младших — семейная', full.filter(y => y.surname !== y.player).map(y => y.name + '/' + y.player).slice(0, 3).join('; '));
@@ -487,7 +494,11 @@ function buildFamily(o = {}) {
   // 3е. Вдова или вдовец в своём доме, где жили вместе: остаётся там совладельцем, а не уходит в аренду.
   const fam6 = await pg.evaluate(new Function('o', 'return (' + buildFamily.toString() + ')(o)'), { home: true });
   const before7 = errors.length;
+  /* 279.1.1: год без смерти — вдове или вдовцу 78 лет, риск умереть за год около 3% (mortality258), и тогда «через год вы
+     живёте там же» и «продали свою долю» не выполняются по другой причине. */
   const asH = await pg.evaluate(new Function('ids', advanceSrc + `
+    const keepMort = mortality258; mortality258 = () => false;
+    try {
     const ok = continueAs274(ids.spouse);
     const mode = s.housing.mode, city = s.housing.city, prop = s.properties.find(p => p.id === s.housing.propertyId);
     const a = prop && estates58().assets.find(a => a.id === prop.familyRecord58), part = a?.owners?.player || 0;
@@ -508,7 +519,8 @@ function buildFamily(o = {}) {
     const stay = s.housing.mode === 'own' && s.housing.propertyId === prop?.id && s.properties.some(p => p.id === prop?.id);
     const sold = a ? sellShare58(a.id) : false;
     return { ok, mode, city, share: !!prop?.share274, part, locked: locked.length > 0 && locked.every(o => o.disabled), cost, upkeep, stay, sold, after: s.housing.mode, props: s.properties.length,
-      text: s.log.find(e => e.title === 'История семьи продолжается')?.text || '', bad: __bad() };`), fam6);
+      text: s.log.find(e => e.title === 'История семьи продолжается')?.text || '', bad: __bad() };
+    } finally { mortality258 = keepMort; }`), fam6);
   console.log('     вдова в своём доме: ' + asH.text);
   check(asH.ok && asH.mode === 'own' && asH.city === 'Рим' && asH.share && asH.part > 0 && asH.part < 1, 'вдова или вдовец остаётся в доме, где жили вместе, — совладельцем', JSON.stringify([asH.mode, asH.city, asH.share, asH.part]));
   check(asH.locked && asH.stay && Number.isFinite(asH.cost), 'дом с долей нельзя продать или сдать целиком; через год вы живёте там же', JSON.stringify([asH.locked, asH.stay, asH.cost]));

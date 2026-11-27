@@ -391,7 +391,9 @@ async function life(pg, cfg) {
   // careers45.js при загрузке сбрасывает marketKey, и первый makeVacancies16 собирает тот же рынок с теми же id.
   {
     const { pg, errors, ctx } = await open(browser);
-    await life(pg, { country: 'ru', gender: 'f' });
+    /* 279.1.1: семья местная — у «Случайной семьи» в 1 случае из 6 мигранты, у героини русский A2, а всем вакансиям
+       «Уход» нужен русский B1: фоновый поиск откликаться некуда («нет отклика»), это не про работодателей. */
+    await life(pg, { country: 'ru', gender: 'f', familyOrigin17: 'local' });
     const look = field => pg.evaluate(field => {
       const x = path16(); x.view = { ...x.view, country: s.country, field, format: 'near' };
       makeVacancies16();

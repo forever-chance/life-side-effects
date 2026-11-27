@@ -5,7 +5,7 @@
 
 Источник — исследовательский файл (all.json, 25 стран, по заведению на запись). В репозиторий он не кладётся:
 в нём настоящие прототипы (real_name, real_name_en, source), а владелица решила, что в игре их не видно. В данные
-игры идут только поля ниже; настоящие названия, ссылки, сырой «kind» и языки не попадают никуда.
+игры идут только поля ниже; настоящие названия, ссылки, сырой «kind» и строка языков не попадают никуда.
 
 Что делает:
   • вид заведения (kind — свободный текст) сводит к коду вида игры (KINDS ниже; ступени по коду — в unis2791.js);
@@ -15,6 +15,7 @@
     новым — следующий свободный номер страны; если заведение пропало из источника, сборка останавливается
     (в сохранениях могут быть ссылки на него) — уберите его из источника осознанно, с флагом --allow-remove.
 --check — только проверить и напечатать сводку, файл не писать.
+--languages — ещё и напечатать, где источник называет другой основной язык обучения, чем даёт игра (279.1.1).
 """
 import json, os, re, sys
 
@@ -74,6 +75,113 @@ def english_state(langs):
     if 'магистр' in l and 'часть программ' not in l:
         return 2
     return 1
+
+
+# 279.1.1: основной язык обучения из того же поля languages. Первый язык до «;» (без скобок) — основной, остальные
+# названные языки — второй язык части программ. «Работы можно сдавать по-французски», «преподают немецкий», «африкаанс
+# свёрнут», «немецкий как обязательный язык», «амазигские исследования» — не язык обучения. Применяется только в странах
+# LANG_COUNTRIES (Канада: французские заведения учат по-французски, двуязычные — на основном языке и частью на втором;
+# вторым берутся только языки из списка страны). По остальным странам --languages печатает, где источник называет другой
+# основной язык, чем даёт игра, — это решает владелица. Языки, которые знает игра (lang16), и язык страны (country16)
+# читаются из catalog16.js и expansion95.js.
+LANG_COUNTRIES = {'ca': ('en', 'fr')}
+LANG_STEMS = [('нидерландск', 'нидерландский'), ('сербск', 'сербский'), ('русск', 'русский'), ('английск', 'английский'),
+              ('португальск', 'португальский'), ('японск', 'японский'), ('французск', 'французский'), ('испанск', 'испанский'),
+              ('немецк', 'немецкий'), ('корейск', 'корейский'), ('китайск', 'китайский'), ('итальянск', 'итальянский'),
+              ('турецк', 'турецкий'), ('тайск', 'тайский'), ('норвежск', 'норвежский'), ('хинди', 'хинди'),
+              ('индонезийск', 'индонезийский'), ('арабск', 'арабский'), ('польск', 'польский'), ('венгерск', 'венгерский'),
+              ('боснийск', 'боснийский'), ('татарск', 'татарский'), ('каталанск', 'каталанский'), ('валенсийск', 'валенсийский'),
+              ('галисийск', 'галисийский'), ('баскск', 'баскский'), ('африкаанс', 'африкаанс'), ('зулу', 'зулу'),
+              ('тамильск', 'тамильский'), ('маратхи', 'маратхи'), ('каннада', 'каннада'), ('бенгальск', 'бенгальский'),
+              ('гуджарати', 'гуджарати'), ('телугу', 'телугу'), ('урду', 'урду'), ('амазигск', 'амазигский')]
+# «по-французски» — наречие, не язык обучения: перед основой не буква и не дефис.
+LANG_WORD = re.compile(r'(?<![а-яё-])(' + '|'.join(s for s, _ in LANG_STEMS) + r')[а-яё]*')
+NOT_TEACHING = re.compile(r'преподают|свёрнут|свернут|сдавать|исследован|обязательн')
+
+
+def game_languages():
+    """Языки игры: {страна: код языка страны}, {код: название} — из catalog16.js и expansion95.js."""
+    cat = open(os.path.join(ROOT, 'catalog16.js'), encoding='utf8').read()
+    exp = open(os.path.join(ROOT, 'expansion95.js'), encoding='utf8').read()
+    m = re.search(r'const country16=\{(.*?)\};', cat)
+    country = dict(re.findall(r"(\w\w):\['(\w+)',", m.group(1)))
+    m = re.search(r'const lang16=\{(.*?)\};', cat)
+    names = dict(re.findall(r"(\w+):'([^']+)'", m.group(1)))
+    for cc, at in [(m.group(1), m.start()) for m in re.finditer(r'"(\w\w)":\{"givenNames"', exp)]:
+        lm = re.compile(r'"language":"(\w+)","languageName":"([^"]*)"').search(exp, at)
+        country[cc] = lm.group(1)
+        names[lm.group(1)] = lm.group(2)
+    return country, names
+
+
+def named_languages(langs, names):
+    """Языки обучения из строки languages: (основной, [остальные]); язык — код игры, а если игра его не знает, название."""
+    code = {v.lower(): k for k, v in names.items()}
+    stem = dict(LANG_STEMS)
+    word = lambda m: code.get(stem[m.group(1)], stem[m.group(1)])
+    l = (langs or '').lower()
+    parts = l.split(';')
+    head = re.sub(r'\([^()]*\)', ' ', parts[0])
+    pieces = [head] + re.findall(r'\(([^()]*)\)', parts[0]) + parts[1:]
+    if NOT_TEACHING.search(head):
+        pieces = [re.split(NOT_TEACHING, head)[0]]
+    seen = []
+    for i, piece in enumerate(pieces):
+        if i and NOT_TEACHING.search(piece):
+            continue
+        for m in LANG_WORD.finditer(piece):
+            w = word(m)
+            if w not in seen:
+                seen.append(w)
+    return (seen[0] if seen else None), seen[1:]
+
+
+def language_spec(cc, langs, country, names):
+    """Строка языка для данных: '' — как раньше (язык страны и английский по english_state), иначе основной язык и через
+    «+» второй язык части программ: 'fr', 'fr+en', 'en+fr'."""
+    if cc not in LANG_COUNTRIES:
+        return ''
+    main, others = named_languages(langs, names)
+    if main not in names:
+        return ''
+    copies = [x for x in others if x in LANG_COUNTRIES[cc] and x != main]
+    spec = '+'.join([main] + copies)
+    return '' if spec == country[cc] else spec
+
+
+def language_report(src, country, names):
+    """--languages: где источник называет другой основной язык, чем даёт игра (по странам, с примерами)."""
+    print('\nЯзык обучения: источник и игра')
+    for c in src:
+        cc, local = c['code'], country[c['code']]
+        diff, medlaw, extra = {}, [], {}
+        for u in c['institutions']:
+            langs = u.get('languages') or ''
+            main, others = named_languages(langs, names)
+            spec = language_spec(cc, langs, country, names)
+            if spec:
+                game, copies = spec.split('+')[0], spec.split('+')[1:]
+            else:
+                e = english_state(langs)
+                game, copies = ('en' if e == 3 and local != 'en' else local), (['en'] if e in (1, 2) else [])
+            name = u['game_name'].strip()
+            if main and main != game:
+                diff.setdefault(main, []).append(name + ' — «' + langs + '»')
+            if game == 'en' and local != 'en' and not spec and {'medicine', 'law'} & set(u['fields']):
+                medlaw.append(name)
+            for x in others:
+                if x not in (game, local) and x not in copies:
+                    extra.setdefault(x, []).append(name)
+        if not (diff or medlaw or extra):
+            continue
+        say = lambda x: names.get(x, x).lower() + ('' if x in names else ' (игра не знает)')
+        print('==', cc, 'язык страны в игре —', names[local].lower())
+        for x, rows in sorted(diff.items(), key=lambda kv: -len(kv[1])):
+            print('   основной в источнике', say(x) + ':', len(rows), '·', '; '.join(rows[:3]))
+        if medlaw:
+            print('   учат на английском, а медицина и право в игре на языке страны:', len(medlaw), '·', '; '.join(medlaw[:3]))
+        for x, rows in sorted(extra.items(), key=lambda kv: -len(kv[1])):
+            print('   второй язык не учтён —', say(x) + ':', len(rows), '·', '; '.join(rows[:3]))
 
 
 def kind_code(raw, name):
@@ -224,7 +332,8 @@ def main():
     out = next((f.split('=', 1)[1] for f in flags if f.startswith('--out=')), OUT)
     src = json.load(open(args[0], encoding='utf8'))
     old, nxt = read_ids(OUT)
-    countries, used, stats = {}, set(), {'kinds': {}, 'tiers': {}, 'english': {}, 'dropped': []}
+    country_lang, lang_names = game_languages()
+    countries, used, stats = {}, set(), {'kinds': {}, 'tiers': {}, 'english': {}, 'dropped': [], 'language': {}}
     for c in src:
         cc = c['code']
         rows = []
@@ -258,8 +367,13 @@ def main():
                 if u[k] not in (1, 2, 3, 4, 5):
                     raise SystemExit(k + ': ' + name)
             voc = 1 if code not in VOC_KINDS and VOC_INSIDE.search((u.get('kind') or '') + ' | ' + ' ; '.join(u.get('programs') or [])) else 0
-            rows.append([num, u['city'], name, code, 1 if u.get('public') else 0, ' '.join(fields), u['prestige'], u['selectivity'],
-                         tier, 1 if u.get('foreigners') else 0, english, ', '.join(progs), voc])
+            row = [num, u['city'], name, code, 1 if u.get('public') else 0, ' '.join(fields), u['prestige'], u['selectivity'],
+                   tier, 1 if u.get('foreigners') else 0, english, ', '.join(progs), voc]
+            spec = language_spec(cc, u.get('languages'), country_lang, lang_names)
+            if spec:
+                row.append(spec)
+                stats['language'][spec] = stats['language'].get(spec, 0) + 1
+            rows.append(row)
             stats['kinds'][code] = stats['kinds'].get(code, 0) + 1
             stats['tiers'][tier] = stats['tiers'].get(tier, 0) + 1
         countries[cc] = rows
@@ -269,6 +383,9 @@ def main():
         raise SystemExit('пропали заведения (в сохранениях могут быть ссылки): ' + '; '.join(k[0] + ' ' + k[1] for k in gone[:10]))
     print('заведений', sum(len(r) for r in countries.values()), 'видов', stats['kinds'])
     print('плата', dict(sorted(stats['tiers'].items())), 'английский', dict(sorted(stats['english'].items())), 'убрано строк программ', len(stats['dropped']))
+    print('язык обучения не по стране (279.1.1):', stats['language'])
+    if '--languages' in flags:
+        language_report(src, country_lang, lang_names)
     for x in stats['kinds']:
         if x not in KINDS:
             raise SystemExit('неизвестный вид ' + x)
@@ -280,7 +397,9 @@ def main():
             "// countries.cc — строки заведений: [номер, город, название, вид, государственное 1/0, направления, престиж 1–5,\n"
             "//  отбор 1–5, плата 0–4 (0 бесплатно, 1 низкая, 2 средняя, 3 высокая, 4 очень высокая; .5 — между), есть набор\n"
             "//  иностранцев 1/0 (0 — иностранцев мало), английский 0–3 (0 нет, 1 часть программ, 2 часть магистратур, 3 всё),\n"
-            "//  программы, есть своя профессиональная школа 1/0]. id заведения — cc-nНОМЕР;\n"
+            "//  программы, есть своя профессиональная школа 1/0, язык обучения (279.1.1, есть не у всех): основной язык и через\n"
+            "//  «+» второй язык части программ — 'fr', 'fr+en', 'en+fr'; нет — язык страны и английский по полю выше].\n"
+            "//  id заведения — cc-nНОМЕР;\n"
             "//  next — следующий свободный номер страны.\n")
     body = 'const unis2791Data={"version":1,"next":' + json.dumps(nxt, ensure_ascii=False, separators=(',', ':')) + ',"countries":{\n'
     body += ',\n'.join('"' + cc + '":[\n' + ',\n'.join(json.dumps(r, ensure_ascii=False, separators=(',', ':')) for r in rows) + ']'

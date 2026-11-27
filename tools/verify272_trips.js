@@ -67,7 +67,9 @@ function helpers() {
   window.__month = (n = 1) => { for (let i = 0; i < n; i++) { s.pending = []; if ($('#modal').open) closeModal(); if (s.clock.yearDue && typeof rollYear === 'function') { try { transact('year', rollYear); } catch (e) {} } s.pending = []; if ($('#modal').open) closeModal(); advanceMonth(); } s.pending = []; if ($('#modal').open) closeModal(); };
   window.__adult = (role, age, trust = 90, gender = 'f') => { const p = person(role, age, gender, s.country); p.city18 = residenceCity(); s.people.push(p); enrichPerson(p); p.inner.trust = trust; p.inner.strain = 5; p.bond = Math.max(p.bond || 0, trust); return p; };
   // Взрослый без работы, живёт один в съёмной квартире, родители в другом городе: дома никто не остаётся.
-  window.__base = () => { s.age = 40; s.cash = 5e6; s.job = null; s.clock.running = false; activateHome(); const list = cities[s.country]; moveHome('rent', list[0], 'center'); for (const q of parents17()) q.city18 = list[3]; s.pending = []; if ($('#modal').open) closeModal(); };
+  /* 279.1.1: полного тёзки нет (names270: в 1 жизни из 50 новый знакомый — тёзка игрока, и запись «Полный тёзка» попадает
+     в счёт записей разговора — «одна запись в истории на разговор»). */
+  window.__base = () => { s.age = 40; s.cash = 5e6; s.job = null; s.clock.running = false; s.namesake270 = { on: false, at: 0, done: true }; activateHome(); const list = cities[s.country]; moveHome('rent', list[0], 'center'); for (const q of parents17()) q.city18 = list[3]; s.pending = []; if ($('#modal').open) closeModal(); };
   window.__dogs = (names = ['Рекс', 'Белка', 'Шарик', 'Тоша', 'Луна']) => names.map((name, i) => { const roll = shelterRoll38('dog'); placePet79({ ...roll, id: 'dog-' + name, kind: 'dog', name, sex38: i % 2 ? 'f' : 'm', months: 30 }, 'shelter', 0); return s.pets.find(p => p.name === name); });
   window.__trip = (i = 0, extra = {}) => ({ country: s.country, city: cities[s.country].filter(c => c !== residenceCity())[i], days: 7, comfort: 'simple', companion: null, party53: [], pay53: 'all', ...extra });
   window.__name = id => s.pets.find(p => p.id === id)?.name || id;

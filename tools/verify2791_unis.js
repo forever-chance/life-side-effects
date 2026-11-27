@@ -15,6 +15,8 @@
 // • каталог на 390×844: фильтр направления, ступени и города, сначала свой город, карточка с видом, престижем,
 //   платой, направлениями и программами; «берут иностранцев» — только иностранцу; окно программы — «О вузе»;
 // • выбор учёбы близким, «Где учиться» и предметы учителя — только новые заведения, без ошибок.
+// • 279.1.1: копии «· на французском» у двуязычных заведений Канады в счёт названий не входят (их проверяет
+//   verify27911_quebec.js), английские копии Канады могут быть и у права (оба языка свои).
 // • после рецензии: язык — свой с английским B1 учится на бакалавриате по всем направлениям двух первых городов, рядом
 //   с программой на языке страны есть такая же «· на английском»; «берут иностранцев» — сведения, не запрет; плата
 //   «символическая», а не «бесплатно»; «PhD» в счётчике; предметы учителя — по заведению на предмет; наследник прежнего
@@ -196,8 +198,9 @@ const LANG_ACCESS = () => {
         vanFilm: progs(van, p => p.track45 === 'cinema').map(p => uni16(p).name),
         nyLaw: progs(ny, p => p.field === 'law' && p.level === 'master').map(p => uni16(p).name),
         nyTrade: progs(ny, p => p.field === 'trade' && p.level === 'vocational').map(p => uni16(p).name),
-        names: [...new Set(programs16.filter(p => !p.english2791).map(p => programName26(p)))].sort(),
-        enBad: programs16.filter(p => p.english2791).filter(p => { const b = prog16(p.id.replace(/-en$/, '')); return !b || b.language === 'en' || p.language !== 'en' || p.field === 'law' || programName26(p) !== programName26(b) + ' · на английском'; }).map(p => p.id).slice(0, 5),
+        // 279.1.1: копии на втором языке (английском или французском) — те же программы с языком в названии
+        names: [...new Set(programs16.filter(p => !p.english2791 && !p.copy27911).map(p => programName26(p)))].sort(),
+        enBad: programs16.filter(p => p.english2791).filter(p => { const b = prog16(p.id.replace(/-en$/, '')); return !b || b.language === 'en' || p.language !== 'en' || p.field === 'law' && !p.copy27911 || programName26(p) !== programName26(b) + ' · на английском'; }).map(p => p.id).slice(0, 5),
         enCount: programs16.filter(p => p.english2791).length,
         stale: programs16.filter(p => uni16(p)?.retired2791).length, inChoice: programs16.filter(p => /^[a-z]{2}-u\d+-/.test(p.id) || /^profession68-[a-z]{2}-[a-z0-9]+$/.test(p.id)).length };
     });

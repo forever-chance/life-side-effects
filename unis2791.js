@@ -30,6 +30,14 @@
 //   названию; фильтр по направлению, ступени и городу; одна карточка — одно заведение с видом, престижем, платой,
 //   направлениями и программами. В окне программы — то же в «О вузе».
 // В сохранение нового не пишется ничего, кроме выбранного города в фильтре каталога (path16().view.city2791).
+// • 279.1.1: язык заведения из источника (поле данных «fr», «fr+en», «en+fr»; пока только Канада). Французские
+//   заведения Монреаля, Квебека, Оттавы и Торонто учат по-французски всему, и праву с медициной тоже; у двуязычных рядом
+//   с программой на основном языке — такая же на втором (id …-en или …-fr, «· на английском», «· на французском»):
+//   бакалавриат, магистратура, PhD и профессиональные программы, кроме предметов учителя. Подготовка к профессии, одна
+//   на страну, у такого заведения есть и на втором языке, и на языке страны. Карточка и «О вузе» называют язык, если он
+//   не язык страны. Заявка, предложение или учёба 279.1 на программе, где язык сменился, идёт на прежнем языке, пока она
+//   жива: в сохранении s.unisLang27911.pins {id программы: язык} (заполняется при первом чтении сохранения прежней
+//   сборки, в том числе восстановленного при открытии игры).
 
 const unis2791On=typeof unis2791Data!=='undefined'&&typeof universities16!=='undefined'&&typeof programs16!=='undefined'&&typeof country16!=='undefined';
 
@@ -63,6 +71,9 @@ const tierMul2791=[.15,.5,1,1.8,2.6];
 const tierWords2791={0:'символическая',.5:'очень низкая',1:'низкая',1.5:'ниже средней',2:'средняя',2.5:'выше средней',3:'высокая',3.5:'высокая',4:'очень высокая'};
 function tierPrice2791(t){const lo=Math.floor(t),hi=Math.ceil(t);return lo===hi?tierMul2791[lo]:(tierMul2791[lo]+tierMul2791[hi])/2;}
 function kindLevels2791(kind,prestige){const k=kinds2791[kind]||kinds2791.university;return k.phd&&prestige>=k.phd?BMPC2791:k.levels;}
+/* 279.1.1: язык заведения. Копии на втором языке — у этих ступеней (сертификаты, как и в 279.1, без копий). */
+const copyLevels27911=['bachelor','master','phd','vocational'];
+function langPrep27911(l){const n=String(typeof lang16!=='undefined'&&lang16[l]||l).toLowerCase();return n.endsWith('ий')?n.slice(0,-2)+'ом':n;}
 
 // ---------- программы направления: одно место ----------
 
@@ -107,13 +118,21 @@ function englishVariant2791(u,base){
  if(base.field==='law'||base.language==='en'||!englishLevels2791[u.english2791]?.includes(base.level))return null;
  return {...base,id:base.id+'-en',language:'en',english2791:true};
 }
+/* 279.1.1: у двуязычного заведения (данные «fr+en», «en+fr») — те же программы ступени на втором языке, право тоже
+   (в Канаде оба языка свои), кроме предметов учителя (у них свой язык предмета). id — id программы и «-en» / «-fr». */
+function languageCopies27911(own,lang){
+ if(!own.length||!copyLevels27911.includes(own[0].level))return [];
+ return own.filter(p=>!p.subject26&&p.language!==lang).map(p=>({...p,id:p.id+'-'+lang,language:lang,copy27911:lang,...(lang==='en'?{english2791:true}:{})}));
+}
+// Язык программы в 279.1: язык страны, у целиком английских — английский, кроме медицины и права.
+function oldLanguage27911(u,field){return u.intl2791&&field!=='medicine'&&field!=='law'?'en':country16[u.country][0];}
 // Общая программа — формулы catalog16 (programs16): срок по стране и ступени, цена от countries.tuition, язык, нагрузка.
 // Отбор программы: отбор заведения и надбавка ступени, как в catalog16; вместо «+3 за каждое следующее направление»
 // (порядок направлений в данных случайный) — медицине +6.
 function baseProgramme2791(u,field,level){
  const cfg=country16[u.country];
  return {id:u.id+'-'+field+'-'+level,university:u.id,field,level,country:u.country,city:u.city,
-  language:u.international&&field!=='medicine'&&field!=='law'?'en':cfg[0],
+  language:u.lang27911||(u.international&&field!=='medicine'&&field!=='law'?'en':cfg[0]), /* 279.1.1: язык заведения */
   minLanguage:level==='phd'?5:level==='vocational'||level==='certificate'?3:4,
   months:level==='vocational'?cfg[6]:level==='certificate'?9:field==='medicine'&&level==='bachelor'?72:cfg[{bachelor:1,master:2,phd:3}[level]],
   fee:Math.round(countries[u.country].tuition*u.price*(level==='certificate'?.5:level==='phd'?.7:1)*(field==='medicine'?1.3:1)/12),
@@ -126,16 +145,19 @@ function baseProgramme2791(u,field,level){
 const retiredPrograms2791=[];
 const unis2791=[];
 function makeUni2791(country,row){
- const [n,city,name,kind,pub,fields,prestige,selectivity,tier,foreigners,english,programs,voc]=row;
+ const [n,city,name,kind,pub,fields,prestige,selectivity,tier,foreigners,english,programs,voc,langs]=row;
  const levels=kindLevels2791(kind,prestige);
  const k=kinds2791[kind]||kinds2791.university;
+ /* 279.1.1: язык заведения из данных — основной и второй для части программ; нет — как в 279.1 */
+ const own=String(langs||'').split('+').filter(l=>typeof lang16!=='undefined'&&lang16[l]),intl=Number(english)===3&&country16[country]?.[0]!=='en';
  return {id:country+'-n'+n,country,city,name,fields:String(fields).split(' ').filter(f=>fields16[f]),
   prestige:prestige2791[prestige],selectivity:select2791[selectivity],price:tierPrice2791(tier),
   load:Math.max(40,Math.min(96,k.load+(prestige-3)*2)),quality:quality2791[prestige],
   employment:Math.max(50,Math.min(95,k.employment+(prestige-3)*2)),
   scholarships:kind==='business'?.12:prestige>=4&&['research','technical','medical'].includes(kind)?.42:.28,
-  english2791:country16[country]?.[0]==='en'?0:Number(english)||0,
-  international:Number(english)===3&&country16[country]?.[0]!=='en',
+  english2791:own.length||country16[country]?.[0]==='en'?0:Number(english)||0,
+  international:!own.length&&intl,
+  ...(own.length?{lang27911:own[0],copies27911:own.slice(1),intl2791:intl}:{}),
   kind2791:kind,public2791:!!pub,stars2791:prestige,select2791:selectivity,tier2791:tier,foreigners2791:!!foreigners,
   levels2791:voc&&!levels.includes('vocational')?['vocational',...levels]:levels,programs2791:programs||''};
 }
@@ -151,8 +173,9 @@ function makeUni2791(country,row){
  universities16.push(...unis2791);
  const byUni=new Map(),hasRole=new Set();
  for(const u of unis2791){const list=[];byUni.set(u.id,list);for(const field of u.fields)for(const level of u.levels2791){
-  const base=baseProgramme2791(u,field,level),en=englishVariant2791(u,base);
-  list.push(...fieldProgrammes2791(u,base));if(en)list.push(en);
+  const base=baseProgramme2791(u,field,level),en=englishVariant2791(u,base),own=fieldProgrammes2791(u,base);
+  list.push(...own);if(en)list.push(en);
+  for(const lang of u.copies27911||[])list.push(...languageCopies27911(own,lang)); /* 279.1.1 */
  }}
  for(const list of byUni.values())for(const p of list)if(p.occupation68)hasRole.add(p.country+'|'+p.occupation68);
  // Подготовка к профессии с обязательным вузовским дипломом (и к рабочей, если в стране её направлению на этой ступени
@@ -164,9 +187,19 @@ function makeUni2791(country,row){
   const host=(own.length?own:offers).sort(rankUni2791)[0];
   if(!host)continue;
   const list=byUni.get(host.id),plain=p=>p.level===role.required&&!p.track45&&!p.subject26&&!p.occupation68;
-  const base=list.find(p=>plain(p)&&!p.english2791&&p.field===role.field)||list.find(p=>plain(p)&&!p.english2791);
-  if(base){list.push(occupationProgramme2791(host,{...base,field:role.field},role));hasRole.add(country+'|'+role.id);}
+  const base=list.find(p=>plain(p)&&!p.english2791&&!p.copy27911&&p.field===role.field)||list.find(p=>plain(p)&&!p.english2791&&!p.copy27911); /* 279.1.1: и не копия */
+  if(base){
+   const occ=occupationProgramme2791(host,{...base,field:role.field},role);list.push(occ);hasRole.add(country+'|'+role.id);
+   /* 279.1.1: у двуязычного заведения — и на втором языке, как его другие программы; у заведения не на языке страны —
+      ещё и на языке страны: другой такой программы в стране нет (новые id …-en / …-fr, у прежней id и язык заведения) */
+   const local=country16[country][0],langs=[...(host.copies27911||[])];
+   const extra=host.lang27911&&host.lang27911!==local&&!langs.includes(local);if(extra)langs.push(local);
+   for(const lang of langs){const c=languageCopies27911([occ],lang);list.push(...c);if(c.length&&extra&&lang===local)(host.occCopies27911||=[]).push([local,role.title]);}
+  }
  }
+ // 279.1.1: программа, которая в 279.1 учила на другом языке, помнит его (was27911) — для заявок и учёбы тех лет.
+ const uniOf=new Map(unis2791.map(u=>[u.id,u]));
+ for(const [id,list] of byUni){const u=uniOf.get(id);if(u.lang27911)for(const p of list){const old=oldLanguage27911(u,p.field);if(!p.copy27911&&p.language!==old)p.was27911=old;}}
  for(const list of byUni.values())programs16.push(...list);
 })();
 
@@ -194,6 +227,38 @@ function countryPrograms2791(country){
  if(byCountryCount2791!==programs16.length){byCountry2791.clear();for(const p of programs16){const l=byCountry2791.get(p.country);if(l)l.push(p);else byCountry2791.set(p.country,[p]);}byCountryCount2791=programs16.length;}
  return byCountry2791.get(country)||[];
 }
+
+// ---------- 279.1.1: прежний язык у заявок и учёбы 279.1 ----------
+
+// Заявка, предложение или учёба 279.1 на программе, где язык сменился (was27911), идёт на прежнем языке: prog16 отдаёт
+// такую же программу на прежнем языке (те же id, название и всё остальное). Список — s.unisLang27911.pins {id: язык}.
+// Сохранение прежней сборки (поля нет) получает его при чтении: действующие заявки и учёба игрока на таких программах.
+// Новая жизнь — пустой список. Заявка или учёба закончилась — прежний язык больше не действует (pinOf27911), новая заявка
+// на ту же программу — уже на нынешнем языке (apply16 снимает привязку), из списка программа уходит при следующем чтении.
+const activeApplication27911=['submitted','offered','accepted','enrolled'];
+function activePrograms27911(life){
+ const x=life&&life.path16;if(!x||typeof x!=='object')return [];
+ const ids=(Array.isArray(x.applications)?x.applications:[]).filter(a=>a&&activeApplication27911.includes(a.status)).map(a=>a.program);
+ if(x.study&&x.study.program)ids.push(x.study.program);
+ return ids;
+}
+function langPins27911(life){
+ if(!life||typeof life!=='object')return;
+ const had=life.unisLang27911&&typeof life.unisLang27911==='object'&&life.unisLang27911.pins&&typeof life.unisLang27911.pins==='object'?life.unisLang27911.pins:null,pins={};
+ for(const id of activePrograms27911(life)){
+  const p=progIndexed2791().get(id);
+  if(!p||!p.was27911)continue;
+  if(!had)pins[id]=p.was27911;else if(had[id])pins[id]=had[id];
+ }
+ life.unisLang27911={pins};
+}
+const pinned27911=new Map();
+function pinnedProgramme27911(p,lang){
+ const key=p.id+'|'+lang;let q=pinned27911.get(key);
+ if(!q||q.source27911!==p){q={...p,language:lang};Object.defineProperty(q,'source27911',{value:p});pinned27911.set(key,q);}
+ return q;
+}
+function pinOf27911(p){const pin=p&&p.was27911&&typeof s!=='undefined'&&s&&s.unisLang27911&&s.unisLang27911.pins&&s.unisLang27911.pins[p.id];return pin&&pin!==p.language&&activePrograms27911(s).includes(p.id)?pin:null;} /* 279.1.1: только пока заявка или учёба жива */
 
 // ---------- порядок: ваш город, престиж, название ----------
 
@@ -227,7 +292,7 @@ function fieldsShort2791(u){
 }
 function programsShort2791(u){const list=String(u.programs2791||'').split(', ').filter(Boolean);return list.slice(0,6).join(', ')+(list.length>6?' и другие':'');}
 // Подпись кнопки программы на карточке: у подготовки к профессии — сама профессия.
-function chipLabel2791(p){const r=p.occupation68&&!(typeof vocationalTitles68!=='undefined'&&vocationalTitles68[p.occupation68])&&profession16(p.occupation68);return r?r.title:programName26(p);}
+function chipLabel2791(p){const r=p.occupation68&&!(typeof vocationalTitles68!=='undefined'&&vocationalTitles68[p.occupation68])&&profession16(p.occupation68);return r?r.title+(p.copy27911?' · на '+langPrep27911(p.copy27911):''):programName26(p);} /* 279.1.1: язык копии */
 // «Берут иностранцев» / «иностранцев мало» — только тому, кто учится в этой стране как иностранец (нет гражданства и
 // вида на жительство). Это сведения, не условие: заявку можно подать и туда, где иностранцев мало.
 function foreignNote2791(u){
@@ -241,21 +306,57 @@ function englishLine2791(u){
  if(u.english2791===3)return u.fields.some(f=>f!=='law'&&f!=='medicine')?'Учат на английском, кроме медицины и права.':'';
  return !has?'':u.english2791===1?'Часть программ есть и на английском.':'Магистратура и PhD есть и на английском.';
 }
+/* 279.1.1: язык заведения, если он не язык страны, и второй язык части программ; подготовка к профессии, одна на страну, —
+   ещё и на языке страны («Подготовка по профессии «Помощник юриста» есть и на английском»). */
+function languageLine27911(u){
+ const local=country16[u.country]?.[0],copies=u.levels2791.some(l=>copyLevels27911.includes(l))?(u.copies27911||[]):[];
+ const also=copies.length?'часть программ есть и на '+copies.map(langPrep27911).join(' и '):'';
+ const occ=(u.occCopies27911||[]).filter(([l])=>!copies.includes(l)),occLine=occ.length?' Подготовка по профессии '+occ.map(([,t])=>'«'+t+'»').join(', ')+' есть и на '+langPrep27911(occ[0][0])+'.':'';
+ if(u.lang27911!==local)return 'Учат на '+langPrep27911(u.lang27911)+(also?', '+also:'')+'.'+occLine;
+ return (also?cap2791(also)+'.':'')+occLine;
+}
 function aboutUni2791(u){
  if(!u?.kind2791)return '';
  const price=priceWord2791(u);
  return [kindLine2791(u)+', престиж '+u.stars2791+' из 5.',price?'Плата: '+price+(u.tier2791===0?', только взносы':'')+'.':'',
-  englishLine2791(u),'Направления: '+fieldsLine2791(u)+'.',
+  u.lang27911?languageLine27911(u):englishLine2791(u),'Направления: '+fieldsLine2791(u)+'.',
   u.programs2791?'Здесь учат: '+u.programs2791+'.':''].filter(Boolean).join(' ');
 }
 
 if(unis2791On){
- prog16=function(id){return progIndexed2791().get(id);};
+ prog16=function(id){const p=progIndexed2791().get(id),pin=pinOf27911(p);return pin?pinnedProgramme27911(p,pin):p;}; /* 279.1.1: прежний язык */
  uni16=function(p){return uniIndexed2791().get(p.university);};
 
  // Программа на английском рядом с такой же на языке страны: в названии — язык (каталог, заявки, учёба, диплом).
  const programNameBase2791=programName26;
- programName26=function(p,...rest){const n=programNameBase2791.call(this,p,...rest);return p?.english2791?n+' · на английском':n;};
+ programName26=function(p,...rest){const n=programNameBase2791.call(this,p,...rest);return p?.english2791?n+' · на английском':p?.copy27911?n+' · на '+langPrep27911(p.copy27911):n;}; /* 279.1.1: и на французском */
+ // 279.1.1: сохранение прежней сборки при чтении получает список программ с прежним языком (см. langPins27911),
+ // новая жизнь — пустой.
+ if(typeof parseLife==='function'){
+  const parseLifeBase27911=parseLife;
+  parseLife=function(...args){const life=parseLifeBase27911.apply(this,args);try{langPins27911(life);}catch(e){console.error(e);}return life;};
+ }
+ if(typeof start==='function'){
+  const startBase27911=start;
+  start=function(...args){const out=startBase27911.apply(this,args);try{if(s&&typeof s==='object'&&!s.unisLang27911)s.unisLang27911={pins:{}};}catch(e){console.error(e);}return out;};
+ }
+ // 279.1.1: старое сохранение из прежнего ключа (resume без «Персонажей») — так же, как при чтении.
+ if(typeof resume==='function'){
+  const resumeBase27911=resume;
+  resume=function(...args){const out=resumeBase27911.apply(this,args);try{if(typeof s!=='undefined'&&s&&typeof s==='object'&&!s.unisLang27911)langPins27911(s);}catch(e){console.error(e);}return out;};
+ }
+ // 279.1.1: новая заявка на программу, где прежний язык уже не действует (прошлая заявка или учёба закончилась), — на
+ // нынешнем языке: привязка снимается до подачи, чтобы и при следующем чтении сохранения она не вернулась.
+ if(typeof apply16==='function'){
+  const applyBase27911=apply16;
+  apply16=function(programId,...rest){
+   try{const pins=s&&s.unisLang27911&&s.unisLang27911.pins;if(pins&&pins[programId]&&!activePrograms27911(s).includes(programId))delete pins[programId];}catch(e){console.error(e);}
+   return applyBase27911.call(this,programId,...rest);
+  };
+ }
+ // 279.1.1: при обычном открытии игры активного персонажа восстанавливает saves.js при своей загрузке — раньше этой
+ // обёртки parseLife. Такой персонаж получает список прежних языков здесь (unis2791.js грузится до bootstrap61.js).
+ try{if(typeof s!=='undefined'&&s&&typeof s==='object'&&!s.unisLang27911)langPins27911(s);}catch(e){console.error(e);}
 }
 
 // ---------- каталог программ: карточка на заведение ----------
@@ -272,7 +373,8 @@ function catalogCity2791(country){const v=path16().view.city2791;return v&&citie
 function catalogGroups2791(){
  const v=path16().view,country=v.country||s.country,city=catalogCity2791(country),byUni=new Map();
  const fits=typeof matchesStudy46==='function'?matchesStudy46:()=>true;
- for(const p of countryPrograms2791(country)){
+ for(let p of countryPrograms2791(country)){
+  if(pinOf27911(p))p=prog16(p.id); /* 279.1.1: ваша заявка или учёба — на прежнем языке */
   if(p.field!==v.field||p.level!==v.level||city&&p.city!==city||!fits(p))continue;
   const g=byUni.get(p.university);if(g)g.push(p);else byUni.set(p.university,[p]);
  }
@@ -288,7 +390,7 @@ function uniCard2791(g){
  const fee=money(localAmount16(main.fee,main.country)),price=priceWord2791(u),foreign=foreignNote2791(u);
  let need='';
  if(r.why.length){let w=r.why[0];try{if(typeof programNeed273==='function')w=programNeed273(w,main).text||w;}catch(e){}need=w;}
- const terms=levels16[main.level]+' · '+span2791(main.months)+' · '+fee+'/мес.'+(main.language==='en'&&country16[u.country]?.[0]!=='en'?' · на английском':'');
+ const terms=levels16[main.level]+' · '+span2791(main.months)+' · '+fee+'/мес.'+(main.language!==country16[u.country]?.[0]?' · на '+langPrep27911(main.language):''); /* 279.1.1: любой язык не страны */
  const chance=need?'<span class="need2791">Не хватает: '+esc2791(need)+(r.why.length>1?' и ещё '+(r.why.length-1):'')+'</span>':'<span class="chance2791">Шанс поступить '+pct2791(r.probability)+'</span>';
  const names=ps.map(p=>[p,chipLabel2791(p)]);
  return '<article class="path-card uni2791" data-uni="'+esc2791(u.id)+'"><h3>'+esc2791(u.name)+'</h3>'+
@@ -362,7 +464,9 @@ function hookCard2791(kinds,p){
   try{
    const about=(card.more||[]).find(m=>m.title==='О вузе');
    const tail='Качество '+p.quality+', сложность '+p.difficulty+', связи с работодателями '+p.employment+'.';
-   if(about)about.text=aboutUni2791(u)+' '+tail;
+   // 279.1.1: заявка или учёба тех времён, когда здесь учили на другом языке, — на нём и остаётся.
+   const kept=p.was27911&&p.language===p.was27911?' Эта программа — на '+langPrep27911(p.language)+'.':'';
+   if(about)about.text=aboutUni2791(u)+kept+' '+tail;
    const foreign=foreignNote2791(u);
    if(foreign&&!String(card.sub||'').includes(foreign))card.sub=(card.sub?card.sub+' · ':'')+foreign;
   }catch(e){console.error(e);}
@@ -388,7 +492,9 @@ if(unis2791On){
  // Подготовка к профессии: в каждом заведении одна программа — именная, если есть, иначе общая направления.
  if(unisUiBase2791.trainingPrograms68)trainingPrograms68=function(role,country,...rest){
   const list=unisUiBase2791.trainingPrograms68.call(this,role,country,...rest),seen=new Map();
-  for(const p of list){const old=seen.get(p.university);if(!old||!old.occupation68&&p.occupation68)seen.set(p.university,p);}
+  // 279.1.1: из двух программ заведения на разных языках — та, для которой вам хватает языка.
+  const lang=p=>{try{return level16(p.language)>=p.minLanguage;}catch(e){return true;}};
+  for(const p of list){const old=seen.get(p.university);if(!old||!old.occupation68&&p.occupation68||!!old.occupation68===!!p.occupation68&&!lang(old)&&lang(p))seen.set(p.university,p);}
   return rankPrograms2791(list.filter(p=>seen.get(p.university)===p));
  };
  // Предметы учителя: у каждой кнопки — заведение (в одном городе их теперь несколько), свой город и сильные — первыми.
