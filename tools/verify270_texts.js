@@ -76,7 +76,7 @@ function helpers() {
     click(re) { const b = [...document.querySelectorAll('#modal .options button:not([disabled])')].find(b => re.test(b.textContent)); if (!b) return false; b.click(); return true; },
     out(id) { for (const e of catalog245.events) for (const c of e.choices) for (const o of c.outcomes) if (o.id === id) return o.text; return null; },
     event(id) { return catalog245.events.find(e => e.id === id); },
-    // Запись журнала с этим заголовком среди последних (рутина уходит в «Будни», s.log[0] может быть чужой).
+    // Запись журнала с этим заголовком среди последних (рутина в ленту не идёт, s.log[0] может быть чужой).
     logged(title) { return s.log.slice(0, 12).find(e => e.title === title) || null; },
     calm() { if ($('#modal').open) closeModal(); s.pending = []; s.clock.running = false; }
   };

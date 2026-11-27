@@ -111,7 +111,9 @@ const ev = (pg, fn, arg) => pg.evaluate(fn, arg);
     const src = fs.readFileSync(path.join(ROOT, 'fixes27371.js'), 'utf8').replace(/\/\/[^\n]*/g, '');
     check(!/resolvePending\s*=|s\.pending\s*=|s\.pending\.(push|unshift|splice)/.test(src), 'очередь: fixes27371.js не меняет s.pending и resolvePending');
     const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8'), order = [...html.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
-    check(order.indexOf('fixes27371.js') === order.indexOf('windows273.js') - 1 && order.indexOf('fixes27371.js') > order.indexOf('fixes2758.js'), 'порядок: fixes27371.js — после fixes2758.js, сразу перед windows273.js', order.slice(-6));
+    // 275.5: между fixes27371.js и windows273.js — только точечные fixesNNNN.js более поздних сборок (fixes2755.js).
+    const between = order.slice(order.indexOf('fixes27371.js') + 1, order.indexOf('windows273.js'));
+    check(order.indexOf('fixes27371.js') >= 0 && order.indexOf('fixes27371.js') < order.indexOf('windows273.js') && between.every(f => /^fixes27[5-9]\d+\.js$/.test(f)) && order.indexOf('fixes27371.js') > order.indexOf('fixes2758.js'), 'порядок: fixes27371.js — после fixes2758.js, перед windows273.js (между ними — только поздние fixesNNNN.js)', order.slice(-6));
   }
 
   // ---------- 1. Сохранение владелицы ----------
