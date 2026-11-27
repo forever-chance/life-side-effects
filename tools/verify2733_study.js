@@ -442,7 +442,9 @@ function compare(name, out) {
     if (f.move) {
       check(`${name}: переезд — суммы из moveQuote68 (самый дешёвый вариант), денег хватает — кнопка есть, без нулей`, !!f.move.hint && f.move.hint.includes(f.move.upfront) && f.move.hint.includes('резерв ' + f.move.reserve) && /1 мес\. без ваших часов/.test(f.move.hint) && !zero(f.move.hint), f.move);
       check(`${name}: переезд — не хватает 10: строка с суммой moveQuote68, без кнопки`, f.moveShort.rows.some(r => /^Переезд/.test(r.text) && !r.fix && r.small.includes(f.move.needed) && r.small.includes('не хватает ' + f.moveShort.gap)), f.moveShort);
-      check(`${name}: переезд — кнопка ведёт в «Бюджет переезда»`, /^Бюджет переезда/.test(f.moveWin?.title || ''), f.moveWin);
+      /* слияние 273.4: с money2734.js переезд по пути — одно окно «Подтвердить переезд · город» (жильё и кто платит выбираются в нём) */
+      const oneWin = /<script src="money2734\.js/.test(INDEX);
+      check(`${name}: переезд — кнопка ведёт в ${oneWin ? '«Подтвердить переезд · …» (273.4: одно окно)' : '«Бюджет переезда»'}`, (oneWin ? /^Подтвердить переезд · / : /^Бюджет переезда/).test(f.moveWin?.title || ''), f.moveWin);
     }
     if (f.zero) {
       const all = [...f.zero.starts, ...Object.values(f.zero.offered).map(r => r.value + ' ' + r.note)];
