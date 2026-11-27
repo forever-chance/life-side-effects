@@ -137,8 +137,8 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
     console.log('подгружены после старта: ' + (loaded.join(', ') || 'ничего'));
     check('телефон: strip270 загружен и считает экран узким', await pg.evaluate(() => typeof topStrip270 === 'function' && mobile270()), {});
 
-    // Записи, которые полоса должна пропустить: рутина (feed267 — в «Будни»), тихая запись, рутинное знакомство,
-    // сама строка «Будни». Последним настоящим событием остаётся «Проверка полосы».
+    // Записи, которые полоса должна пропустить: рутина (feed267 — не в ленту; строки «Будни» с 275.5 нет), тихая
+    // запись, рутинное знакомство. Последним настоящим событием остаётся «Проверка полосы».
     const feed = await pg.evaluate(() => {
       s.clock.running = false;
       log('Проверка полосы', 'Ребенок пошёл в первый класс, и в доме стало тихо по утрам.', 'Семья', true);
@@ -151,12 +151,12 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
       flushWeekdays267();
       return { top, routineContact, first: s.log[0].title, weekdays: !!s.log[0].weekdays267, clubInLog: s.log.slice(0, 5).some(e => e.title === 'Книга клуба') };
     });
-    check('лента: рутина ушла в «Будни», а не в историю', !feed.clubInLog && feed.weekdays && /^Будни/.test(feed.first), feed);
+    check('лента: рутина не в истории, строки «Будни» нет (275.5)', !feed.clubInLog && !feed.weekdays && feed.first === feed.routineContact, feed);
 
     await go(pg, 'right', 'story');
     let st = await pg.evaluate(strip);
     check('телефон «Действия»: сверху последнее событие, без списка ответов', st.shown && st.latest && !st.waiting, st);
-    check('телефон «Действия»: пропущены «Будни», знакомство и тихая запись', st.latestTitle === 'Проверка полосы', { title: st.latestTitle, feed });
+    check('телефон «Действия»: пропущены рутина, знакомство и тихая запись', st.latestTitle === 'Проверка полосы', { title: st.latestTitle, feed });
     check('телефон «Действия»: ё в хранимых значениях (Ребёнок)', /Ребёнок пошёл/.test(st.text) && !/Ребенок/.test(st.text), st.text);
     let lay = await pg.evaluate(layout);
     check('телефон «Действия»: полоса видна (не сжата гридом) и стоит над колонками', lay.stripHeight > 20 && lay.stripHeight < 110 && Math.abs(lay.stripBottom - lay.shellTop) < 1.5 && Math.abs(lay.shellBottom - lay.innerHeight) < 1.5, lay);
@@ -329,7 +329,7 @@ const go = (pg, panel, t) => pg.evaluate(([panel, t]) => { s.pending = []; if ($
       const arts = [...box.querySelectorAll('article.event')].map(a => ({ title: a.querySelector('h3')?.textContent, tag: a.querySelector('.tag')?.textContent }));
       return { title, first: arts.find(a => !['Будни', 'Годовая сводка'].includes(a.tag))?.title, top: arts.slice(0, 4), weekdays: seen.has('Будни'), summary: seen.has('Годовая сводка'), ticks: s.clock.ticks };
     });
-    check('год настоящих месяцев: полоса — первая настоящая запись «Истории», «Будни» и итоги года пропущены', year.title && year.title === year.first && year.summary && !/^Будни|^Итоги прожитого года/.test(year.title), year);
+    check('год настоящих месяцев: полоса — первая настоящая запись «Истории», итоги года пропущены, «Будни» нет (275.5)', year.title && year.title === year.first && year.summary && !year.weekdays && !/^Будни|^Итоги прожитого года/.test(year.title), year);
 
     // Возраст в строке часов — с правильным окончанием.
     const ages = await pg.evaluate(() => { const age = s.age, out = {}; for (const n of [21, 22, 25, 31, 44, 111]) { s.age = n; out[n] = clockView().match(/· (\d+ \S+)<\/small>/)?.[1]; } s.age = age; render(); return out; });

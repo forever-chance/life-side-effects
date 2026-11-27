@@ -376,6 +376,8 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         const z = events54(); z.invitations = []; z.lastOffer = -100;
         const mom = s.people.find(p => p.alive && p.role === 'Мать') || T.mk('Мать', 55, { gender: 'f' });
         mom.alive = true; mom.city18 = residenceCity(); mom.country = s.country; mom.bond = 80; mom.inner.affection = 80; mom.inner.trust = 70; mom.inner.strain = 5; mom.lastBond = 80;
+        // 275.5: на своё новоселье зовёт мама, которая живёт отдельно (с кем вы живёте, та на новоселье не зовёт).
+        s.housing.mode = 'rent'; s.housing.occupant = null;
         out.hostBefore = occasionHosts54().includes(mom) && hostEligible53(mom) && partyCandidate53(mom);
         const q = offerOccasion54(mom, 'housewarming', true); out.offerBefore = !!q && occasionAvailable54(q);
         mom.custody145 = { status: 'serving', ends: s.clock.ticks + 6 };
