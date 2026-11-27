@@ -550,7 +550,9 @@ function compare(name, out) {
       compare(name, out);
     }
     // Порядок подключения: windows273.js — последним перед bootstrap61.js.
-    const order = [...INDEX.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
+    // 275.2: между windows273.js и bootstrap61.js стоит creative2752.js — он только дописывает текст в окна поверх windows273.js
+    // (рендерер не меняет), поэтому подключён после него.
+    const order = [...INDEX.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]).filter(f => f !== 'creative2752.js');
     check('windows273.js подключён последним перед bootstrap61.js', BASE || order[order.indexOf('bootstrap61.js') - 1] === 'windows273.js', order.slice(-4));
   } finally { await browser.close(); }
   console.log(`\n${pass}/${pass + fail}` + (BASE ? ' (BASE=1: без windows273.js)' : ''));
