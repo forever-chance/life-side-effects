@@ -551,7 +551,8 @@ function compare(name, out) {
     }
     // Порядок подключения: windows273.js — последним перед bootstrap61.js.
     // 2731, 2732: окна шагов 273.x (people2731.js, work2732.js и соседние) и точечных сборок 275.x встают после
-    // windows273.js — они строятся на нём; между ним и bootstrap61.js допускаются только они.
+    // windows273.js — они строятся на нём; между ним и bootstrap61.js допускаются только они. 275.2: creative2752.js —
+    // только дописывает текст в окна поверх windows273.js (рендерер не меняет).
     const order = [...INDEX.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
     const after = order.slice(order.indexOf('windows273.js') + 1, order.indexOf('bootstrap61.js'));
     check('windows273.js подключён последним перед bootstrap61.js (после него — только окна шагов 273.x/275.x)', BASE || order.includes('windows273.js') && after.every(f => /^[a-z]+27[35]\d\.js$/.test(f)), order.slice(-5));
