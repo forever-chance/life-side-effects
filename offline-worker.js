@@ -1,6 +1,6 @@
 'use strict';
 
-const offlineCache = 'life-offline-275.4';
+const offlineCache = 'life-offline-275.9';
 const root = self.registration.scope;
 const local = path => new URL(path, root).href;
 
