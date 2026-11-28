@@ -222,7 +222,9 @@ const STUDY_HERE = ([cc, city]) => {
     const data = fs.readFileSync(path.join(ROOT, 'unis2791-data.js'), 'utf8');
     check('данные: unis2791-data.js тот же, что в 279.1.3 (данные не пересобирались)', data === OLD['unis2791-data.js']);
     const html = BASE ? OLD['index.html'] : fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-    check('подключение: unis2791.js, trajectory16.js и clubs19.js — ?v=279.1.4, данные — прежние', ['unis2791', 'trajectory16', 'clubs19'].every(f => html.includes('src="' + f + '.js?v=279.1.4"')) && html.includes('src="unis2791-data.js?v=279.1.3"'));
+    // 276: trajectory16.js и clubs19.js правит и 276 — достаточно, что версия поднята против 279.1.3.
+    const ver = (h, f) => (h.match(new RegExp('src="' + f + '\\.js\\?v=([^"]+)"')) || [])[1];
+    check('подключение: unis2791.js — ?v=279.1.4, trajectory16.js и clubs19.js — версия поднята, данные — прежние', html.includes('src="unis2791.js?v=279.1.4"') && ['trajectory16', 'clubs19'].every(f => ver(html, f) && ver(html, f) !== ver(OLD['index.html'], f)) && html.includes('src="unis2791-data.js?v=279.1.3"'));
     if (RESEARCH && fs.existsSync(RESEARCH)) {
       const src = JSON.parse(fs.readFileSync(RESEARCH, 'utf8'));
       const real = src.flatMap(c => c.institutions.flatMap(u => [u.real_name, u.real_name_en])).filter(n => n && n.length >= 6);
