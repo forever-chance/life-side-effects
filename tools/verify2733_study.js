@@ -336,6 +336,10 @@ async function extraChecks(pg, name, base) {
         try { let lo = 0, hi = 200; for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; weekBudget29 = () => wb() - mid; if ((squeeze276(week276()).f.study || 0) < .04) lo = mid; else hi = mid; }
           weekBudget29 = () => wb() - hi; fx.pace = 1 - .75 * (squeeze276(week276()).f.study || 0);
           openPath16('education'); await wait(10); fx.panelSlow = __top()['Осталось'] || null; } finally { weekBudget29 = wb; }
+        // 276: заочно, часов хватает — срок вдвое дольше по программе, но это не нехватка часов: без «не хватает часов» и «≈».
+        if (typeof setPartTime276 === 'function' && typeof span2733 === 'function') { __restore(); studyStart16(__v.app, 'self'); setPartTime276(true); const st = path16().study, L = studyLoad273(p);
+          openPath16('education'); await wait(10);
+          fx.partTime = { f: +(squeeze276(week276()).f.study || 0).toFixed(3), part: !!st?.partTime276, left: Math.max(0, p.months - (st?.progress || 0)), months: L.months, pace: L.pace, row: __top()['Осталось'] || null, span: span2733(Math.max(1, Math.ceil(2 * Math.max(0, p.months - (st?.progress || 0)) - 1e-9))) }; }
         // Отказ от места — «Что изменится», как у увольнения в 273.2.
         __restore(); openDecision24('study', __v.app); await wait(20); __press('Принять предложение'); await wait(10);
         { const b = __find('Отказаться от места'); if (b) b.click(); await wait(20); fx.decline = { h2: __title(), title: document.querySelector('#modal .title273')?.textContent || '', area: document.querySelector('#modal .eyebrow')?.textContent || '', top: __top(), btns: __modalBtns().map(__lbl) }; __close(); }
@@ -458,6 +462,7 @@ function compare(name, out) {
     check(`${name}: «Моя учёба» — родители перестали платить: без «0 ₽» и без повтора цены`, !!f.panelFamily0 && !zero(f.panelFamily0.value) && /родители сейчас не платят/.test(f.panelFamily0.value) && f.panelFamily0.value.split(f.zero?.fee).length === 2, f.panelFamily0);
     check(`${name}: «Моя учёба» — кредит на всю учёбу назван один раз`, !!f.panelLoan && (f.panelLoan.value.match(/кредит/g) || []).length === 1, f.panelLoan);
     check(`${name}: «Моя учёба» — темп ${Math.round((f.pace || 0) * 100) / 100}: не «в 1 раза медленнее»`, !!f.panelSlow && f.pace < 1 && !/в 1 раза/.test(f.panelSlow.note) && /медленнее/.test(f.panelSlow.note), { pace: f.pace, row: f.panelSlow });
+    if (f.partTime) check(`${name}: «Моя учёба» — заочно, часов хватает: срок вдвое, без «не хватает часов» и «≈», заметка «заочно — вдвое дольше»`, f.partTime.part && f.partTime.f === 0 && f.partTime.pace === 1 && f.partTime.months === Math.ceil(2 * f.partTime.left - 1e-9) && !!f.partTime.row && f.partTime.row.value.startsWith(f.partTime.span) && !/не хватает часов|медленнее/.test(f.partTime.row.note) && /заочно — вдвое дольше/.test(f.partTime.row.note), f.partTime);
     check(`${name}: отказ от места — окно «Что изменится» (как в 273.2): раздел «Учёба», последствия строками, без «в «Университет…»»`, f.decline && f.decline.h2 === 'Что изменится' && f.decline.title === 'Отказаться от места?' && f.decline.area === 'Учёба' && !!f.decline.top['Место'] && !!f.decline.top['Снова подать'] && !/«/.test(JSON.stringify(f.decline.top)) && f.decline.btns.join() === 'Да, отказаться,Вернуться к предложению', f.decline);
     if (f.askAgain) { const [m, y] = String(f.askAgain.want || '').split(' ');
       check(`${name}: просьба к родителям — на кнопке месяц, когда можно спросить снова (М3), тот же, что ставит educationSupport17`, !!f.askAgain.want && [f.askAgain.hint, f.askAgain.menu].every(h => h && /если откажет, снова можно в \S+ \d{4}/.test(h) && h.includes(y)) && !/через полгода/.test(f.askAgain.menu), f.askAgain); }

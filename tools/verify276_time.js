@@ -751,10 +751,11 @@ const near = (a, b, eps = .06) => Number.isFinite(a) && Number.isFinite(b) && Ma
       //    о здоровье; когда за месяцы дойдёт до note — одна запись «Перегрузка сказывается на здоровье» и строка в «Самочувствии».
       reset(30); assign('rest'); const logs2 = () => s.log.filter(e => e.title === 'Перегрузка сказывается на здоровье');
       const f0 = { notes: [], first: null, at: null, text: '' }; let lastPen = 0;
-      for (let i = 0; i < 72; i++) { if (!s.clock.tasks.some(t => t.kind === 'rest' && !['completed', 'cancelled'].includes(t.state))) assign('rest'); s.clock.fatigue = Math.min(s.clock.fatigue, 40); keepJob(Math.round(time276.strain.hours / 4));
+      for (let i = 0; i < 72; i++) { if (!s.clock.tasks.some(t => t.kind === 'rest' && !['completed', 'cancelled'].includes(t.state))) assign('rest'); s.clock.fatigue = Math.min(s.clock.fatigue, 40); s.illness = null; keepJob(Math.round(time276.strain.hours / 4));
         if (i === 0) f0.notes0 = healthNotes259().filter(x => /здоровье теряет/.test(x)); month(); const m = s.time276.month; lastPen = m.strainPen || 0;
         if (f0.first == null) f0.first = lastPen; if (f0.at == null && logs2().length) { f0.at = i; f0.penAt = lastPen; f0.text = logs2()[0].text; f0.prevPen = f0.prev; } f0.prev = lastPen; }
-      f0.logs = logs2().length; f0.notes = healthNotes259().filter(x => /здоровье теряет/.test(x)); f0.notice = healthNotices58().find(x => x.ref?.id === 'fatigue')?.note || ''; f0.F = s.clock.fatigue; f0.last = lastPen;
+      // Болезнь за 72 месяца могла снять работу или часы: та же неделя и перед чтением «Самочувствия».
+      s.illness = null; keepJob(Math.round(time276.strain.hours / 4)); f0.logs = logs2().length; f0.notes = healthNotes259().filter(x => /здоровье теряет/.test(x)); f0.notice = healthNotices58().find(x => x.ref?.id === 'fatigue')?.note || ''; f0.F = s.clock.fatigue; f0.last = lastPen;
       out.f = f0;
       // ж) Восстановление здоровья ниже потолка: при нехватке от strain.hours и низкой усталости — вдвое медленнее, как при
       //    переутомлении; при половине — на четверть; при усталости от 70 — только «переутомление» (не вдвойне); неделя

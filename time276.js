@@ -188,25 +188,36 @@ function wrapStudyLoad276(){
   try{
    if(!mine)x.study={id:'hours273',program:p.id,status:'active',payer:'self',progress:0,grades:70,badTerms:0,startedAt:s.clock.ticks};
    const f=squeeze276(week276()).f.study||0;
-   out.pace=(1-.75*f)*(x.study.partTime276?.5:1);
+   // 276: pace — только нехватка часов (окна 273 читают pace < 1 как «не хватает часов»); заочно — отдельный множитель
+   // part276: срок вдвое дольше, но это не перегрузка.
+   out.pace=1-.75*f;
+   out.part276=x.study.partTime276?.5:1;
    out.falls=1-8*f<0;
    out.f276=f;
   }catch(e){console.error(e);}finally{x.study=old;}
-  out.months=Math.max(1,Math.ceil(out.left/out.pace-1e-9));
+  out.months=Math.max(1,Math.ceil(out.left/(out.pace*(out.part276||1))-1e-9));
   return out;
  };
  studyLoad273.time276=true;
 }
 /* 276: «Моя учёба» (study2733.js) — те же прежние формулы: темп studyPace2733 (capacity / (планы + часы)) и оценки
    «+1, если capacity() > totalHours(), иначе −3». Темп — как в окне программы (studyLoad273), оценки к ближайшей
-   проверке — как studyGrade276 по нынешней неделе: +1 − 8 × доля недостающих учёбе часов, не ниже −4. */
+   проверке — как studyGrade276 по нынешней неделе: +1 − 8 × доля недостающих учёбе часов, не ниже −4.
+   276: studyPace2733 — ход учёбы целиком (нехватка × заочно), им считается срок; заметка в «Осталось» у заочника
+   говорит «заочно — вдвое дольше», а «не хватает часов» — только при настоящей нехватке. */
 function wrapStudyTop276(){
- if(typeof studyPace2733==='function'&&!studyPace2733.time276){studyPace2733=function(p){return studyLoad273(p).pace;};studyPace2733.time276=true;}
+ if(typeof studyPace2733==='function'&&!studyPace2733.time276){studyPace2733=function(p){const l=studyLoad273(p);return l.pace*(l.part276||1);};studyPace2733.time276=true;}
  if(typeof studyTop2733!=='function'||studyTop2733.time276)return;
  const topBase276=studyTop2733;
  studyTop2733=function(t,p,...rest){
   const rows=topBase276.call(this,t,p,...rest);
   try{
+   const o=rows.find(r=>r.label==='Осталось'),load=t&&p&&t.partTime276?studyLoad273(p):null;
+   if(o&&load&&load.part276<1&&typeof o.note==='string'&&/: не хватает часов/.test(o.note)){
+    const was=slower2733(load.pace*load.part276)+': не хватает часов',now=['заочно — вдвое дольше',load.pace<1?slower2733(load.pace)+': не хватает часов':''].filter(Boolean).join(' · ');
+    o.note=o.note.replace(was,now);
+    if(!(load.pace<1))o.value=o.value.replace(/^≈ /,'');
+   }
    const r=rows.find(r=>r.label==='Оценки');
    if(r&&t&&/ → \d+ /.test(r.value)){
     const f=squeeze276(week276()).f.study||0,d=Math.max(-4,Math.round((1-8*f)*10)/10);
