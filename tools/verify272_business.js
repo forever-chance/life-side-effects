@@ -270,7 +270,7 @@ const ev = async (pg, fn, arg) => { try { return await pg.evaluate(fn, arg); } c
       // Три кинотеатра, владелец «сам» во всех, без людей.
       const three = ['А', 'Б', 'В'].map(n => T.open('culture253', cin.id, 'Кино ' + n, 0));
       businessTasks263();
-      out.hours = s.clock.tasks.filter(t => t.kind === 'business263').map(t => t.hours);
+      out.hours = typeof week276 === 'function' ? week276().lines.filter(l => l.area === 'business').map(l => l.hours) : s.clock.tasks.filter(t => t.kind === 'business263').map(t => t.hours); // 276: часы дела — в неделе
       T.month(three, 1);
       out.three = three.map(b => ({ cap: b.history.at(-1).capacity263, cover: b.history.at(-1).cover272, profit: b.history.at(-1).sales - b.history.at(-1).costs }));
       selectEnterprise168(three[0].id); enterpriseMenu152(); out.threeCard = T.text(); T.clean();

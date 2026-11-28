@@ -246,6 +246,16 @@ const setup = (pg, o) => pg.evaluate(o => {
     await pg.evaluate(() => { const free = Math.floor(capacity() - totalHours()); task16('verify272', 'Проверка', 6, {}, Math.max(0, free)); });
     const h = await openLearning(pg, 'literature');
     const hm = opt(h, 'Найти наставника'), hp = opt(h, 'Запланировать практику');
+    // 276: нехватка часов не прячет вариант — после клика открывается окно «Неделя не сходится» с выбором, что сократить.
+    if (await pg.evaluate(() => typeof week276 === 'function')) {
+      check(hm && !hm.disabled, 'часы (276): «Найти наставника» не выключен из-за часов', hm?.hint);
+      await clickOpt(pg, 'Найти наставника'); await pg.waitForTimeout(80);
+      // Окно выбора специализации — первая строка (всё направление).
+      await pg.evaluate(() => document.querySelector('#modal[open] .options button:not([disabled])')?.click()); await pg.waitForTimeout(80);
+      const g = await modal(pg);
+      check(g.open && g.title === 'Неделя не сходится' && g.opts.some(o => o.label === 'Взять всё равно'), 'часы (276): «Найти наставника» — окно «Неделя не сходится»', g.title);
+      await pg.evaluate(() => { if ($('#modal').open) closeModal(); });
+    } else
     check(hm?.disabled && /Не хватает 2 ч\/нед\. в расписании: свободно 0 из нужных 2/.test(hm.hint), 'часы: «Найти наставника» — не хватает 2 ч/нед.', hm?.hint);
     check(hp && !hp.disabled && /перегрузятся/.test(hp.hint), 'часы: практику можно, с предупреждением о перегрузке', hp?.hint);
     await pg.evaluate(() => { s.clock.tasks = s.clock.tasks.filter(t => t.kind !== 'verify272'); });

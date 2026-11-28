@@ -463,6 +463,14 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         out.ok = startEnterprise152('services', 'Тестовая мастерская', 'hair'); const b = s.enterprise152;
         const task = () => s.clock.tasks.find(t => t.kind === 'business263' && t.business263 === b.id);
         out.mode = b.mode263; out.schDiff = schedule23().total - sch0; out.totDiff = totalHours() - tot0;
+        // 276: часы дела — одно обязательство недели (schedule23), дела в расписании нет совсем.
+        if (typeof week276 === 'function') {
+          out.w276 = true; out.noTask = !task(); out.list = { noBiz: !/business263|Как вести дело/.test(taskList05()) };
+          s.clock.tasks.push({ id: 'business263-' + b.id, kind: 'business263', business263: b.id, progress: 2, duration: 1e9, hours: 35, label: 'Своё дело', state: 'paused' });
+          out.old = { sch: schedule23().total - sch0, tot: totalHours() - tot0 }; T.month(1); out.migrated = !task();
+          setBusinessMode263(b.id, 'partial'); out.partial = { hours: week276().lines.find(l => l.key === 'business:' + b.id)?.hours, sch: schedule23().total - sch0, tot: totalHours() - tot0 };
+          return out;
+        }
         T.quiet(); pauseTask05(task().id); out.pauseState = task().state; out.pauseModal = T.modal().title;
         T.quiet(); cancelTask(task().id); out.afterCancel = !!task();
         const html = taskList05(); out.list = { mode: /Как вести дело/.test(html), noBillion: !/1000000000/.test(html), noPause: !html.includes("pauseTask05('business263") };
@@ -471,6 +479,14 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
         setBusinessMode263(b.id, 'partial'); out.partial = { hours: task().hours, sch: schedule23().total - sch0, tot: totalHours() - tot0 };
         return out;
       });
+      if (r.w276) {
+        check('своё дело (276): часы один раз — 35 ч в обязательствах недели, не в делах', r.ok && r.mode === 'self' && Math.abs(r.schDiff - 35) < 1e-9 && r.totDiff === 0, r);
+        check('своё дело (276): дела «своё дело» в расписании нет — ни паузы, ни «1e9 мес.»', r.noTask && r.list.noBiz, r);
+        check('своё дело (276): дело на паузе из старого сохранения — часы один раз, после месяца его нет', Math.abs(r.old.sch - 35) < 1e-9 && r.old.tot === 0 && r.migrated, r);
+        check('своё дело (276): «частично» — 15 ч один раз', r.partial.hours === 15 && Math.abs(r.partial.sch - 15) < 1e-9 && r.partial.tot === 0, r.partial);
+        check('своё дело: без ошибок страницы', !errors.length, errors);
+        await ctx.close();
+      } else {
       check('своё дело: часы не идут дважды (schedule23 без надбавки, 35 ч в делах)', r.ok && r.mode === 'self' && Math.abs(r.schDiff) < 1e-9 && r.totDiff === 35, r);
       check('своё дело: «Приостановить» не снимает часы, открывает режим', r.pauseState !== 'paused' && /Как вы ведёте дело/.test(r.pauseModal), r);
       check('своё дело: «Прекратить» в списке дел не убирает дело', r.afterCancel, r);
@@ -479,6 +495,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
       check('своё дело: «частично» — 15 ч один раз', r.partial.hours === 15 && r.partial.tot === 15 && Math.abs(r.partial.sch) < 1e-9, r.partial);
       check('своё дело: без ошибок страницы', !errors.length, errors);
       await ctx.close();
+      }
     }
 
     // Прогон: 10 лет настоящего месяца — у каждого женатого есть живой супруг, нет NaN и ошибок.
