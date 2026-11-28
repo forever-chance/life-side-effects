@@ -34,7 +34,7 @@ const orgHouse2711='Дом культуры|Дворец культуры';
 if(roots2711.ready){
  // Регулярки без учёта регистра: «Театр» ловил и «Кинотеатр», «Фильмтеатр» — тоже отсекаем.
  for(const k of Object.keys(orgProfFit271))orgProfFit271[k]=orgProfFit271[k].map(x=>typeof x==='string'?
-  x.replace(/Кино/g,'Кино(?!театр)').replace(/Театр/g,'(?<!Кино|Фильм)Театр'):x);
+  x.replace(/Кино/g,'Кино(?!театр)').replace(/Театр/g,'(?:^|[^а-яё])Театр') /* 271.1: без lookbehind — его нет в Safari до 16.4 */:x);
  for(const k of ['lightingtech','sound16']){const f=orgProfFit271[k];if(f)f[1]=f[1]?f[1]+'|Кинотеатр':'Кинотеатр';}
  for(const k of ['stageactor','stagehand','setdesigner','musician','dancer']){
   const f=orgProfFit271[k];
