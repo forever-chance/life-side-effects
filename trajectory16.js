@@ -143,3 +143,30 @@ function backgroundJobSearch78(){
  }
 }
 function toggleSearch16(){const x=path16();x.search=!x.search;if(x.search)x.searchView78={...x.view};s.jobSearch.enabled=x.search;}
+/* 279.1.4: при открытии игры saves.js восстанавливает персонажа раньше, чем unis2791.js строит программы вузов 279.1
+   (вузы стоят после continue274.js). Пока их нет, экран для персонажа, у которого есть такая программа (учёба, заявка,
+   перевод, диплом, учёба близких), не рисуется: отрисовка падала на программе, которой ещё нет («reading 'fee'», около
+   43 ошибок), и обрывала остаток тех скриптов, что рисуют в конце (обёртки log в life23.js, show в readability20.js,
+   monthlyFinance в family231.js не ставились). Первый экран рисует bootstrap61.js уже с вузами — плата за учёбу в бюджете
+   сразу верная. Без unis2791.js — нарисует как раньше.
+   279.1.4: так же и с программами до 279.1, которые строят поздние сценарии: учитель по предмету (teaching26.js),
+   направление внутри программы (careers45.js), подготовка к профессии (careers68.js), — «reading 'fee'» от 11 до 41 раза
+   было и до 279.1. Пока программы учёбы, перевода или любой заявки героя нет (prog16), экран не рисуется; как только её
+   построили — рисуется снова. Найденные программы запоминаются: до вузов 279.1 программы только добавляются. */
+{
+ const renderBase27914=render;let seen27914=null,waits27914=false,skipped27914=false,found27914=new Set();
+ const missing27914=()=>{
+  const x=s.path16;if(!x||typeof x!=='object')return false;
+  const ids=[];if(x.study&&x.study.program)ids.push(x.study.program);if(x.transfer&&x.transfer.program)ids.push(x.transfer.program);
+  if(Array.isArray(x.applications))for(const a of x.applications)if(a&&a.program)ids.push(a.program);
+  for(const id of ids){if(found27914.has(id))continue;let p=null;try{p=prog16(id);}catch(e){}if(!p)return true;found27914.add(id);}
+  return false;
+ };
+ const waiting27914=()=>{
+  if(typeof unis2791On!=='undefined'||typeof s==='undefined'||!s||typeof document==='undefined'||document.readyState!=='loading')return false;
+  if(seen27914!==s){seen27914=s;found27914=new Set();try{waits27914=/"(?:profession68-)?[a-z]{2}-n\d+-[a-z]/.test(JSON.stringify(s));}catch(e){waits27914=false;}}
+  return waits27914||missing27914();
+ };
+ render=function(...args){if(waiting27914()){skipped27914=true;return;}return renderBase27914.apply(this,args);};
+ if(typeof document!=='undefined'&&document.addEventListener)document.addEventListener('DOMContentLoaded',()=>{if(skipped27914&&typeof unis2791On==='undefined'&&typeof s!=='undefined'&&s)render();});
+}
