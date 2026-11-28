@@ -246,7 +246,8 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     const r = await pg.evaluate(() => {
       s.age = 30; s.cash = 1e8; s.illness = null;
       const ok = startEnterprise152('services', 'Тестовая мастерская', 'hair'); const b = s.enterprise152;
-      const W = c().wage / 12, task = () => s.clock.tasks.find(t => t.kind === 'business263' && t.business263 === b.id);
+      // 276: часы своего дела — обязательство недели (week276), а не дело в расписании.
+      const W = c().wage / 12, task = () => s.clock.tasks.find(t => t.kind === 'business263' && t.business263 === b.id) || (typeof week276 === 'function' ? week276().lines.find(l => l.key === 'business:' + b.id) || null : null);
       const out = { ok, mode: b.mode263, fit: b.fit263, selfHours: task()?.hours, wage: enterpriseWage155(b), W };
       setBusinessMode263(b.id, 'partial'); out.partialHours = task()?.hours;
       setBusinessMode263(b.id, 'manager'); out.managerHours = task()?.hours;
@@ -268,7 +269,7 @@ const check = (name, ok, info) => { results.push({ name, ok: !!ok }); console.lo
     m = await pg.evaluate(modal);
     check('своё дело: дело из старого сохранения спрашивает режим', /Дело теперь требует вашего времени/.test(m.text) && m.buttons.some(b => /^Сам/.test(b)), m);
     await pg.evaluate(click('/^Сам/'));
-    check('своё дело: выбор режима из окна ставит 35 ч/нед.', await pg.evaluate(() => s.enterprise152.mode263 === 'self' && s.clock.tasks.find(t => t.kind === 'business263').hours === 35 && !s.pending.length), null);
+    check('своё дело: выбор режима из окна ставит 35 ч/нед.', await pg.evaluate(() => s.enterprise152.mode263 === 'self' && (s.clock.tasks.find(t => t.kind === 'business263') || (typeof week276 === 'function' ? week276().lines.find(l => l.area === 'business') : null))?.hours === 35 && !s.pending.length), null);
     check('своё дело: без ошибок страницы', !errors.length, errors);
     await ctx.close();
   }
