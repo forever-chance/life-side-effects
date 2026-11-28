@@ -33,17 +33,29 @@ const check = (ok, label, extra = '') => { ok ? pass++ : fail++; console.log((ok
 const ORG = new Function(fs.readFileSync(DATA, 'utf8') + ';return org271Data;')();
 const ALL = ['nl', 'rs', 'ru', 'us', 'br', 'jp', 'fr', 'es', 'de', 'uk', 'ca', 'kr', 'cn', 'mx', 'it', 'au', 'tr', 'za', 'th', 'no', 'in', 'id', 'eg', 'ma', 'pl'];
 const fitsTags = (root, tags) => root[1].includes('any') || root[1].some(t => tags.includes(t));
+// 271.1: корень подходит к типу, если привязан к нему в данных (row[5] — номера в typeNames страны) или, как в 271, по тегам;
+// нумерованный тип — «Школа № 57» вместо «тип «корень»» (отдельный тест — verify2711_roots.js).
+const boundTo = (cc, root, typeName) => { const c = ORG.countries[cc]; return !!c.typeNames && (root[5] || []).some(k => c.typeNames[k] === typeName); };
 function orgCheck(cc, field, employer) {
-  // «Тип «Корень»»: тип из сферы, корень страны, подходящий к типу по тегам
+  // «Тип «Корень»»: тип из сферы, корень страны, привязанный или подходящий к типу по тегам
+  const c = ORG.countries[cc];
+  const num = /^(.+) № (\d+)$/.exec(employer || '');
+  if (num) return (c.types[field] || []).map(i => ORG.types[i]).some(t => t[3] && t[0] === num[1] + ' № N') ? '' : 'нумерованный тип «' + num[1] + '» не из сферы ' + field;
   const m = /^(.+) «(.+)»$/.exec(employer || '');
   if (!m) return 'не «тип «корень»»';
-  const c = ORG.countries[cc];
   const types = (c.types[field] || []).map(i => ORG.types[i]).filter(t => t[0] === m[1]);
   if (!types.length) return 'тип «' + m[1] + '» не из сферы ' + field;
   const root = c.roots.find(r => r[0] === m[2]);
   if (!root) return 'корень «' + m[2] + '» не из страны ' + cc;
-  if (!types.some(t => fitsTags(root, t[2]))) return 'корень «' + m[2] + '» не подходит к типу «' + m[1] + '»';
+  if (!types.some(t => fitsTags(root, t[2]) || boundTo(cc, root, m[1]))) return 'корень «' + m[2] + '» не подходит к типу «' + m[1] + '»';
   return '';
+}
+// Подходит ли корень варианту своего дела: привязан к нему (если корней у варианта хватает) или, как в 271, по тегам.
+const bizId = (kind, spec) => !spec ? null : /^BZ\d+$/.test(spec) ? spec : kind + ':' + spec;
+function bizRootOk(cc, kind, spec, root) {
+  const c = ORG.countries[cc], id = bizId(kind, spec), want = spec && ORG.specialtyTags[spec] ? ORG.specialtyTags[spec] : ORG.kindTags[kind];
+  if (fitsTags(root, want)) return true;
+  return !!(id && c.bizOptions && (root[6] || []).some(k => ORG.bizIds[k] === id));
 }
 
 async function addFiles(pg, mine) {
@@ -163,7 +175,7 @@ async function life(pg, cfg) {
     check(!!all && Object.keys(all).length >= 150 && sizes.every(n => n >= 8 && n <= CAP), `все города 25 стран: 8–${CAP} работодателей`, all ? `${Object.keys(all).length} городов, от ${Math.min(...sizes)} до ${Math.max(...sizes)}` : 'нет функции');
     const cap = await pg.evaluate(() => typeof orgCityMax271 === 'number' ? orgCityMax271 : null);
     check(cap === CAP, `потолок организаций на город — ${CAP}` + (CAP === 15 ? ' (ТЗ: 8–15)' : ' (ORG271_CAP)'), String(cap));
-    check(!!all && Object.entries(all).every(([k, l]) => l.every(n => /^[А-ЯЁ][^A-Za-z]*«[^«»A-Za-z]+»$/.test(n))), 'названия работодателей — кириллица, «тип «корень»»');
+    check(!!all && Object.entries(all).every(([k, l]) => l.every(n => /^[А-ЯЁ][^A-Za-z]*«[^«»A-Za-z]+( [IVX]+)?»$/.test(n) || /^[А-ЯЁ][^A-Za-z№]* № \d+$/.test(n))), 'названия работодателей — кириллица, «тип «корень»» или «тип № N»');
 
     // ---------- 2. Компания, замена вакансии, окно вакансии, сектора locality95 ----------
     const c = await pg.evaluate(() => {
@@ -277,8 +289,9 @@ async function life(pg, cfg) {
       const want = row.spec && ORG.specialtyTags[row.spec] ? ORG.specialtyTags[row.spec] : ORG.kindTags[row.kind];
       if (JSON.stringify(want) !== JSON.stringify(row.tags)) wrongTags.push(row.cc + '/' + row.kind + '/' + row.spec);
       const roots = ORG.countries[row.cc].roots;
-      for (const n of new Set([...row.shown, ...row.all])) { const root = roots.find(x => x[0] === n); if (!root || !fitsTags(root, want)) bad.push(row.cc + '/' + row.kind + (row.spec ? '/' + row.spec : '') + ': ' + n); }
-      if (new Set(row.shown.slice(0, 3)).size < 3) short.push(row.cc + '/' + row.kind + (row.spec ? '/' + row.spec : '') + ': ' + row.shown.slice(0, 3).join(','));
+      for (const n of new Set([...row.shown, ...row.all])) { const root = roots.find(x => x[0] === n); if (!root || !bizRootOk(row.cc, row.kind, row.spec, root)) bad.push(row.cc + '/' + row.kind + (row.spec ? '/' + row.spec : '') + ': ' + n); }
+      // вид без специальности — запасной путь по тегам: три названия, если подходящих корней в стране три и больше (it: leisure253 — один)
+      if (new Set(row.shown.slice(0, 3)).size < 3 && !(!row.spec && roots.filter(x => fitsTags(x, want)).length < 3)) short.push(row.cc + '/' + row.kind + (row.spec ? '/' + row.spec : '') + ': ' + row.shown.slice(0, 3).join(','));
       if (row.ex.some(n => row.all.slice(0, 2).includes(n))) bad.push(row.cc + '/' + row.kind + ': занятое название снова предложено');
     }
     const kindRows = (r.rows || []).filter(x => !x.spec);
@@ -336,7 +349,7 @@ async function life(pg, cfg) {
       return out;
     }, kind);
     const spec = r.specialty[0], want = ORG.specialtyTags[spec] || ORG.kindTags[kind], roots = ORG.countries[cc].roots;
-    const fit = n => { const root = roots.find(x => x[0] === n); return !!root && fitsTags(root, want); };
+    const fit = n => { const root = roots.find(x => x[0] === n); return !!root && bizRootOk(cc, kind, spec, root); };
     check(r.first.picker && r.first.names.length === 3 && r.first.more && r.first.names.every(fit), `${cc} · ${kind}/${spec}: три названия по тегам и «Другие варианты»`, r.first.names.join(', '));
     check(r.first.value === r.first.names[0] && r.first.pressed.join() === r.first.names[0], `${cc} · ${kind}: в поле — первое из предложенных`, r.first.value);
     check(r.second.value === r.first.names[1] && r.second.pressed.join() === r.first.names[1], `${cc} · ${kind}: выбор подставляет название в поле`, r.second.value);
@@ -344,7 +357,7 @@ async function life(pg, cfg) {
     check(r.own.pressed.length === 0 && r.opened && r.opened.title === 'Своё дело на углу' && r.opened.specialty === spec, `${cc} · ${kind}: своё название открывает дело`, JSON.stringify(r.opened));
     check(r.secondOpening.picker && !r.secondOpening.names.includes('Своё дело на углу') && r.titles.includes(r.secondOpening.value) && r.titles.length === 2, `${cc} · ${kind}: второе дело — с готовым названием`, r.titles.join(' · '));
     check(r.rename.value !== null && !r.rename.picker, `${cc} · ${kind}: в переименовании выбора нет`);
-    if (cc === 'ru') check(r.school && r.school.names.length === 3 && r.school.value === r.school.names[0] && r.school.names.every(n => { const root = roots.find(x => x[0] === n); return root && fitsTags(root, ORG.specialtyTags.school196 || ORG.kindTags.services); }),
+    if (cc === 'ru') check(r.school && r.school.names.length === 3 && r.school.value === r.school.names[0] && r.school.names.every(n => { const root = roots.find(x => x[0] === n); return root && bizRootOk('ru', 'services', 'school196', root); }),
       'профессиональная школа: тот же выбор названия', r.school ? r.school.names.join(', ') : 'нет окна');
     check(errors.length === 0, `${cc} · ${kind}: без ошибок страницы`, errors.slice(0, 2).join(' | '));
     await ctx.close();
@@ -508,14 +521,14 @@ async function life(pg, cfg) {
           const all = orgRoster271(cc, city).all;
           for (const p of professions16) {
             const name = employerFor271(cc, city, p.id), e = all.find(e => e.name === name), m = orgMiss271(orgPrefs271(p), e);
-            c.tot++; if (m === L.own) c.own++; else if (m <= L.near) c.near++; else { c.off++; const k = p.title + ' → ' + e.type; off[k] = (off[k] || 0) + 1; }
+            c.tot++; if (m <= L.own) c.own++; else if (m <= L.near) c.near++; else { c.off++; const k = p.title + ' → ' + e.type; off[k] = (off[k] || 0) + 1; }
           }
         }
         out.code = { ...c, off: c.off, table: Object.entries(off).sort((a, b) => b[1] - a[1]) };
       }
       return out;
     }, OWN);
-    const typeOf = name => (/^(.+) «/.exec(name || '') || [])[1] || '';
+    const typeOf = name => (/^(.+) «/.exec(name || '') || /^(.+) № \d+$/.exec(name || '') || [])[1] || '';
     const fieldTypes = (cc, field) => new Set((ORG.countries[cc].types[field] || []).map(i => ORG.types[i][0]));
     let hit = 0, inconsistent = [];
     const offTab = {};
@@ -532,7 +545,7 @@ async function life(pg, cfg) {
     if (!ORG.fixture && CAP === 15) check(share >= 0.5, 'профессии, чьё название называет место, — у себя хотя бы в половине случаев', share.toFixed(3));
     else console.log('     (у себя — ' + share.toFixed(3) + '; порог только для настоящих данных и потолка 15)');
     console.log('     не у себя (профессии, чьё название называет место), городов из ' + (r ? new Set(r.rows.map(x => x.cc + x.city)).size : 0) + ':');
-    for (const [k, n] of Object.entries(offTab).sort((a, b) => b[1] - a[1]).slice(0, 14)) console.log('       ' + k + ' · ' + n);
+    for (const [k, n] of Object.entries(offTab).sort((a, b) => b[1] - a[1]).slice(0, 40)) console.log('       ' + k + ' · ' + n);
     if (r && r.code) {
       const c = r.code, pc = n => (100 * n / c.tot).toFixed(1) + ' %';
       console.log(`     по мере employers271.js, все профессии × все города: у себя ${pc(c.own)}, рядом ${pc(c.near)}, не у себя ${pc(c.off)}`);
