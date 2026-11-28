@@ -1,0 +1,67 @@
+--- /tmp/claude-0/-home-user-life-side-effects/673b65e8-1bde-512a-aa02-ceb3dd19767c/scratchpad/dry276/time276.js	2026-11-27 22:22:55.071461275 +0000
++++ tree/time276.js	2026-11-27 23:13:11.918740834 +0000
+@@ -165,6 +165,54 @@
+  return d;
+ };
+ 
++/* 276: окно программы и предложения (windows273.js, study2733.js) берут срок и «всего» из studyLoad273 — копии прежней
++   формулы monthPath16 (свободные часы / (планы + часы программы), не меньше 0,25). С 276 темп учёбы — studyPace276:
++   нехватку первыми отдают планы, клубы и своё дело («Чем жертвовать первым»), учёбе — 1 − 0,75 × доля её недостающих
++   часов, заочно вдвое; оценки за квартал — 1 − 8 × доля (studyGrade276). Окно считает по той же неделе. */
++function wrapStudyLoad276(){
++ if(typeof studyLoad273!=='function'||studyLoad273.time276)return;
++ const loadBase276=studyLoad273;
++ studyLoad273=function(p,...rest){
++  const out=loadBase276.call(this,p,...rest);
++  if(!p||!s?.clock||typeof path16!=='function')return out;
++  const x=path16(),old=x.study,mine=old&&old.program===p.id&&old.status!=='paused';
++  try{
++   if(!mine)x.study={id:'hours273',program:p.id,status:'active',payer:'self',progress:0,grades:70,badTerms:0,startedAt:s.clock.ticks};
++   const f=squeeze276(week276()).f.study||0;
++   out.pace=(1-.75*f)*(x.study.partTime276?.5:1);
++   out.falls=1-8*f<0;
++   out.f276=f;
++  }catch(e){console.error(e);}finally{x.study=old;}
++  out.months=Math.max(1,Math.ceil(out.left/out.pace-1e-9));
++  return out;
++ };
++ studyLoad273.time276=true;
++}
++/* 276: «Моя учёба» (study2733.js) — те же прежние формулы: темп studyPace2733 (capacity / (планы + часы)) и оценки
++   «+1, если capacity() > totalHours(), иначе −3». Темп — как в окне программы (studyLoad273), оценки к ближайшей
++   проверке — как studyGrade276 по нынешней неделе: +1 − 8 × доля недостающих учёбе часов, не ниже −4. */
++function wrapStudyTop276(){
++ if(typeof studyPace2733==='function'&&!studyPace2733.time276){studyPace2733=function(p){return studyLoad273(p).pace;};studyPace2733.time276=true;}
++ if(typeof studyTop2733!=='function'||studyTop2733.time276)return;
++ const topBase276=studyTop2733;
++ studyTop2733=function(t,p,...rest){
++  const rows=topBase276.call(this,t,p,...rest);
++  try{
++   const r=rows.find(r=>r.label==='Оценки');
++   if(r&&t&&/ → \d+ /.test(r.value)){
++    const f=squeeze276(week276()).f.study||0,d=Math.max(-4,Math.round((1-8*f)*10)/10);
++    r.value=r.value.replace(/ → \d+ /,' → '+Math.max(0,Math.min(100,Math.round(t.grades+d)))+' ');
++   }
++  }catch(e){console.error(e);}
++  return rows;
++ };
++ studyTop2733.time276=true;
++}
++function wrapStudy276(){wrapStudyLoad276();wrapStudyTop276();}
++// Порядок подключения не важен: если windows273.js и study2733.js подключены позже, обёртки встают, когда загружены все скрипты.
++wrapStudy276();
++if(typeof document!=='undefined'&&document.readyState==='loading')document.addEventListener('DOMContentLoaded',wrapStudy276);
++
+ // ---------- журнал недели ----------
+ function lineLabelWork276(q){
+  const j=s.job,f=typeof formats16!=='undefined'&&j.format?formats16[j.format]:'';
+@@ -359,6 +407,9 @@
+ }
+ function taskPace276(t,planPace,custody,restPace=1){
+  if((t.wait276??-1)>s.clock.ticks)return 0;
++ /* 276: календарные дела (calendarKinds68 в safeguards68.js: разрешения, переезд, продления) идут по календарю — прогресс
++    им ставит calendarMonth68 (месяцев с подачи). Прибавка ещё и здесь закрывала разрешение на 3 мес. за 2 месяца. */
++ if(typeof calendarKinds68!=='undefined'&&calendarKinds68.includes(t.kind)&&Number.isFinite(t.calendarStart68))return 0;
+  if(t.kind==='rest')return restPace;
+  if(!(t.hours>0)||time276.always.has(t.kind))return 1;
+  return custody?0:planPace;

@@ -1,0 +1,1792 @@
+{
+ "ru": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ014",
+   "name": "Баня",
+   "kind": "service253"
+  },
+  {
+   "id": "BZ015",
+   "name": "Санаторий",
+   "kind": "lodging253"
+  },
+  {
+   "id": "BZ016",
+   "name": "Блинная",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ017",
+   "name": "Антикафе",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ018",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "rs": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ008",
+   "name": "Кафана",
+   "kind": "mixed253"
+  },
+  {
+   "id": "BZ009",
+   "name": "Малиновая ферма",
+   "kind": "farm253"
+  },
+  {
+   "id": "BZ010",
+   "name": "Свадебный салон",
+   "kind": "service253"
+  },
+  {
+   "id": "BZ011",
+   "name": "Винодельня",
+   "kind": "farm253"
+  },
+  {
+   "id": "BZ012",
+   "name": "Котокафе",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ013",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "pl": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ053",
+   "name": "Пирогарня",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ054",
+   "name": "Хлебопекарня",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ055",
+   "name": "Школа народных танцев",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ056",
+   "name": "Сыроварня",
+   "kind": "production253"
+  },
+  {
+   "id": "BZ057",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "tr": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ058",
+   "name": "Чайный дом",
+   "kind": "mixed253"
+  },
+  {
+   "id": "BZ059",
+   "name": "Хаммам",
+   "kind": "service253"
+  },
+  {
+   "id": "BZ060",
+   "name": "Кебабная",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ061",
+   "name": "Магазин специй",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ062",
+   "name": "Ювелирный магазин",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ063",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "eg": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ136",
+   "name": "Прокат лодок",
+   "kind": "rental253"
+  },
+  {
+   "id": "BZ137",
+   "name": "Ювелирная мастерская",
+   "kind": "craft253"
+  },
+  {
+   "id": "BZ138",
+   "name": "Дайвинг-центр",
+   "kind": "mixed253"
+  },
+  {
+   "id": "BZ139",
+   "name": "Магазин специй",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ140",
+   "name": "Рыбный ресторан",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ141",
+   "name": "Бюро экскурсий по пустыне",
+   "kind": "tourism253"
+  },
+  {
+   "id": "BZ142",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "de": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ030",
+   "name": "Крафтовая пивоварня",
+   "kind": "production253"
+  },
+  {
+   "id": "BZ031",
+   "name": "Мастерская часов",
+   "kind": "craft253"
+  },
+  {
+   "id": "BZ032",
+   "name": "Пивной ресторан",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ033",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "fr": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ025",
+   "name": "Сырная лавка",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ026",
+   "name": "Парфюмерное ателье",
+   "kind": "craft253"
+  },
+  {
+   "id": "BZ027",
+   "name": "Винодельня",
+   "kind": "farm253"
+  },
+  {
+   "id": "BZ028",
+   "name": "Кондитерская",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ029",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "es": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ034",
+   "name": "Тапас-бар",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ035",
+   "name": "Школа фламенко",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ036",
+   "name": "Школа серфинга",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ037",
+   "name": "Рыбный ресторан",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ038",
+   "name": "Независимый театр",
+   "kind": "culture253"
+  },
+  {
+   "id": "BZ039",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "it": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ040",
+   "name": "Винодельня",
+   "kind": "farm253"
+  },
+  {
+   "id": "BZ041",
+   "name": "Реставрационная мастерская",
+   "kind": "craft253"
+  },
+  {
+   "id": "BZ042",
+   "name": "Пиццерия",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ043",
+   "name": "Эспрессо-бар",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ044",
+   "name": "Ювелирное ателье",
+   "kind": "craft253"
+  },
+  {
+   "id": "BZ045",
+   "name": "Мастерская обуви",
+   "kind": "craft253"
+  },
+  {
+   "id": "BZ046",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "nl": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ001",
+   "name": "Велопрокат",
+   "kind": "rental253"
+  },
+  {
+   "id": "BZ002",
+   "name": "Сырная лавка",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ003",
+   "name": "Реставрационная мастерская",
+   "kind": "craft253"
+  },
+  {
+   "id": "BZ004",
+   "name": "Школа парусного спорта",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ005",
+   "name": "Магазин виниловых пластинок",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ006",
+   "name": "Прокат лодок",
+   "kind": "rental253"
+  },
+  {
+   "id": "BZ007",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "no": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ047",
+   "name": "Прокат каяков",
+   "kind": "rental253"
+  },
+  {
+   "id": "BZ048",
+   "name": "Школа лыжного спорта",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ049",
+   "name": "Рыбный ресторан",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ050",
+   "name": "Овечья ферма",
+   "kind": "farm253"
+  },
+  {
+   "id": "BZ051",
+   "name": "Кемпинг",
+   "kind": "lodging253"
+  },
+  {
+   "id": "BZ052",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "us": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ064",
+   "name": "Американский дайнер",
+   "kind": "mixed253"
+  },
+  {
+   "id": "BZ065",
+   "name": "Магазин комиксов",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ066",
+   "name": "Кафе на колесах",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ067",
+   "name": "Мотель",
+   "kind": "lodging253"
+  },
+  {
+   "id": "BZ068",
+   "name": "Студия татуировки",
+   "kind": "creative253"
+  },
+  {
+   "id": "BZ069",
+   "name": "Джаз-бар",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ070",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "uk": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ019",
+   "name": "Паб",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ020",
+   "name": "Чайная",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ021",
+   "name": "Букинистический магазин",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ022",
+   "name": "Школа верховой езды",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ023",
+   "name": "Камерный театр",
+   "kind": "culture253"
+  },
+  {
+   "id": "BZ024",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "ca": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ071",
+   "name": "Кленовая ферма",
+   "kind": "farm253"
+  },
+  {
+   "id": "BZ072",
+   "name": "Школа лыжного спорта",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ073",
+   "name": "Сидродельня",
+   "kind": "production253"
+  },
+  {
+   "id": "BZ074",
+   "name": "Магазин комиксов",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ075",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "au": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ125",
+   "name": "Школа серфинга",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ126",
+   "name": "Овечья ферма",
+   "kind": "farm253"
+  },
+  {
+   "id": "BZ127",
+   "name": "Винодельня",
+   "kind": "farm253"
+  },
+  {
+   "id": "BZ128",
+   "name": "Школа дайвинга",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ129",
+   "name": "Студия керамики",
+   "kind": "creative253"
+  },
+  {
+   "id": "BZ130",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "za": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ131",
+   "name": "Сафари-лодж",
+   "kind": "lodging253"
+  },
+  {
+   "id": "BZ132",
+   "name": "Винодельня",
+   "kind": "farm253"
+  },
+  {
+   "id": "BZ133",
+   "name": "Крафтовая пивоварня",
+   "kind": "production253"
+  },
+  {
+   "id": "BZ134",
+   "name": "Школа серфинга",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ135",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "br": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ076",
+   "name": "Мясной ресторан",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ077",
+   "name": "Мастерская карнавальных костюмов",
+   "kind": "craft253"
+  },
+  {
+   "id": "BZ078",
+   "name": "Школа самбы",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ079",
+   "name": "Школа серфинга",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ080",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "mx": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ081",
+   "name": "Такерия",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ082",
+   "name": "Школа танцев",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ083",
+   "name": "Магазин специй",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ084",
+   "name": "Кондитерская",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ085",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "ma": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ143",
+   "name": "Риад",
+   "kind": "lodging253"
+  },
+  {
+   "id": "BZ144",
+   "name": "Чайный дом",
+   "kind": "mixed253"
+  },
+  {
+   "id": "BZ145",
+   "name": "Бюро экскурсий по пустыне",
+   "kind": "tourism253"
+  },
+  {
+   "id": "BZ146",
+   "name": "Хаммам",
+   "kind": "service253"
+  },
+  {
+   "id": "BZ147",
+   "name": "Школа серфинга",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ148",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "in": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ112",
+   "name": "Свадебный салон",
+   "kind": "service253"
+  },
+  {
+   "id": "BZ113",
+   "name": "Чайная закусочная",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ114",
+   "name": "Магазин специй",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ115",
+   "name": "Школа индийского танца",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ116",
+   "name": "Магазин благовоний",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ117",
+   "name": "Школа йоги",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ118",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "jp": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ086",
+   "name": "Раменная",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ087",
+   "name": "Манга-кафе",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ088",
+   "name": "Чайный дом",
+   "kind": "mixed253"
+  },
+  {
+   "id": "BZ089",
+   "name": "Суши-бар",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ090",
+   "name": "Студия каллиграфии",
+   "kind": "creative253"
+  },
+  {
+   "id": "BZ091",
+   "name": "Караоке",
+   "kind": "mixed253"
+  },
+  {
+   "id": "BZ092",
+   "name": "Общественная баня",
+   "kind": "service253"
+  },
+  {
+   "id": "BZ093",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "kr": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ094",
+   "name": "Караоке",
+   "kind": "mixed253"
+  },
+  {
+   "id": "BZ095",
+   "name": "Магазин косметики",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ096",
+   "name": "Студия хореографии",
+   "kind": "creative253"
+  },
+  {
+   "id": "BZ097",
+   "name": "Игровой компьютерный клуб",
+   "kind": "mixed253"
+  },
+  {
+   "id": "BZ098",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "cn": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ099",
+   "name": "Чайный дом",
+   "kind": "mixed253"
+  },
+  {
+   "id": "BZ100",
+   "name": "Мастерская фарфора",
+   "kind": "craft253"
+  },
+  {
+   "id": "BZ101",
+   "name": "Лапшичная",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ102",
+   "name": "Школа каллиграфии",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ103",
+   "name": "Магазин настольных игр",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ104",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "th": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ105",
+   "name": "Дайвинг-центр",
+   "kind": "mixed253"
+  },
+  {
+   "id": "BZ106",
+   "name": "Ресторан уличной еды",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ107",
+   "name": "Школа тайских танцев",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ108",
+   "name": "Салон тайского массажа",
+   "kind": "service253"
+  },
+  {
+   "id": "BZ109",
+   "name": "Магазин специй",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ110",
+   "name": "Пляжный ресторан",
+   "kind": "food253"
+  },
+  {
+   "id": "BZ111",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ],
+ "id": [
+  {
+   "id": "studio:photo",
+   "name": "Фотостудия"
+  },
+  {
+   "id": "studio:design",
+   "name": "Студия дизайна"
+  },
+  {
+   "id": "studio:publishing",
+   "name": "Малое издательство"
+  },
+  {
+   "id": "services:hair",
+   "name": "Парикмахерская"
+  },
+  {
+   "id": "services:grooming",
+   "name": "Салон груминга"
+  },
+  {
+   "id": "services:repair",
+   "name": "Ремонтная мастерская"
+  },
+  {
+   "id": "services:school196",
+   "name": "Профессиональная школа"
+  },
+  {
+   "id": "shop:books",
+   "name": "Книжный магазин"
+  },
+  {
+   "id": "shop:flowers",
+   "name": "Цветочная лавка"
+  },
+  {
+   "id": "shop:grocery",
+   "name": "Продуктовый магазин"
+  },
+  {
+   "id": "BZ119",
+   "name": "Мастерская батика",
+   "kind": "craft253"
+  },
+  {
+   "id": "BZ120",
+   "name": "Школа серфинга",
+   "kind": "leisure253"
+  },
+  {
+   "id": "BZ121",
+   "name": "Магазин специй",
+   "kind": "trade253"
+  },
+  {
+   "id": "BZ122",
+   "name": "Экскурсионное бюро",
+   "kind": "tourism253"
+  },
+  {
+   "id": "BZ123",
+   "name": "Студия традиционного танца",
+   "kind": "creative253"
+  },
+  {
+   "id": "BZ124",
+   "name": "Кинотеатр",
+   "kind": "culture253"
+  }
+ ]
+}

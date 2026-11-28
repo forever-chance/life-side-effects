@@ -1,0 +1,45 @@
+--- /tmp/claude-0/-home-user-life-side-effects/673b65e8-1bde-512a-aa02-ceb3dd19767c/scratchpad/dry276/tools/verify273_card.js	2026-11-27 22:23:00.526671759 +0000
++++ tree/tools/verify273_card.js	2026-11-27 23:07:04.342910117 +0000
+@@ -341,13 +341,26 @@
+         if (__v.apply) { applyJob16(__v.apply); const a = path16().jobApplications.at(-1); jobDetails16(a.id, true); x.busy.status = document.querySelector('#modal .status273')?.textContent || ''; __close();
+           const k = s.clock.tasks.find(t => t.application === a.id); __month(1); x.busy.progress = k ? k.progress : null; x.busy.after = a.status; } }
+       finally { capacity = cap; } __close(); }
+-    // Программа при перегруженной неделе: срок и «всего» — по темпу monthPath16, а не по каталогу.
+-    { __restore(); const p = prog16(__v.program), cap = capacity; capacity = () => 0;
+-      try { programDetails16(p.id); const old = path16().study; path16().study = { id: 't', program: p.id, status: 'active', payer: 'self', progress: 0, grades: 70 };
+-        let pace; try { pace = Math.max(.25, Math.min(1, capacity() / Math.max(1, totalHours() + (p.hours || 0)))); } finally { path16().study = old; }
++    // Программа при перегруженной неделе: срок и «всего» — по темпу monthPath16, а не по каталогу. 276: темп учёбы —
++    // studyPace276 (1 − 0,75 × доля часов, которых учёбе не досталось после планов, клубов и своего дела), capacity()
++    // его больше не задаёт. Неделя без места для учёбы: бюджет — обязательства и здоровье, плюс половина часов программы.
++    { __restore(); const p = prog16(__v.program), wb = weekBudget29;
++      try { const L0 = week276(), h = typeof studyHours273 === 'function' ? studyHours273(p) : studyHours276(p); weekBudget29 = () => L0.commitments + L0.health + h / 2;
++        programDetails16(p.id); const old = path16().study; path16().study = { id: 't', program: p.id, status: 'active', payer: 'self', progress: 0, grades: 70 };
++        let pace, f; try { f = squeeze276(week276()).f.study || 0; pace = 1 - .75 * f; } finally { path16().study = old; }
+         const months = Math.ceil(p.months / pace - 1e-9);
+-        x.slow = { get: __top()['Получите'] || '', cost: __top()['Цена'] || '', want: money(tuition16(p, null) * months), months, need: __need().map(n => n.text) }; }
+-      finally { capacity = cap; } __close(); }
++        x.slow = { get: __top()['Получите'] || '', cost: __top()['Цена'] || '', want: money(tuition16(p, null) * months), months, f: +f.toFixed(3), need: __need().map(n => n.text) }; }
++      finally { weekBudget29 = wb; } __close(); }
++    // 276: настоящая учёба в перегруженной неделе (owner): срок в окне — тот, что выйдет после зачисления.
++    if (name === 'owner') { __restore(); const p = prog16(__v.program), wb = weekBudget29; s.cash = Math.max(s.cash, 1e6);
++      if (admission16(p).why.some(w => /сертификат/.test(w))) path16().diplomas.push({ id: 'cert-verify273', field: p.field, level: 'certificate', track45: p.track45 || null, program46: 'verify', profileSchema46: 1, title: 'verify', university: 'verify', country: s.country, year: s.year, grade: 80, quality: 50, employment: 50 });
++      apply16(p.id); const a = path16().applications.at(-1); if (a) { a.roll = 0; for (let i = 0; i < 8 && a.status === 'submitted'; i++) __month(1); acceptStudy16(a.id); }
++      try { const L0 = week276(), h = typeof studyHours273 === 'function' ? studyHours273(p) : studyHours276(p); weekBudget29 = () => L0.commitments + L0.health + h / 2;
++        openDecision24('study', a.id); const card = { get: __top()['Получите'] || '', cost: __top()['Цена'] || '' }; __close();
++        forceRun276(() => studyStart16(a.id, 'self')); const st = path16().study, p0 = st?.progress || 0; __month(3); const pace = st ? (st.progress - p0) / 3 : null;
++        const months = pace ? Math.ceil(p.months / pace - 1e-9) : null;
++        x.realSlow = { card, started: !!st && st.program === p.id, pace: pace && +pace.toFixed(3), months, wantTotal: months ? money(tuition16(p, null) * months) : null }; }
++      finally { weekBudget29 = wb; } __close(); }
+     // Закрытое приглашение: статус наверху, главная кнопка «Открыть поездку» (если поездка есть), у серых кнопок причина,
+     // нулевой цены нет.
+     // На сохранении — прошлые приглашения из «Событий близких», на новой жизни — своё, закрытое по сроку.
+@@ -520,7 +533,8 @@
+   else note(`${name}: вакансий с нехваткой профильной подготовки нет`);
+   check(`${name}: нет свободных часов — окно вакансии не обещает дату ответа и ведёт к нагрузке`, /ответа не будет/.test(e.busy.note) && e.busy.need.some(n => /Свободного времени/.test(n.text) && n.fix), e.busy);
+   if (e.busy.status !== undefined) check(`${name}: нет свободных часов — отклик без даты, и резюме правда не двигается`, /ответа не будет/.test(e.busy.status) && e.busy.progress === 0 && e.busy.after === 'submitted', e.busy);
+-  check(`${name}: перегруженная неделя — срок и «всего» программы по темпу учёбы, строка про время`, e.slow.get.includes(spanOf(e.slow.months)) && e.slow.cost.includes(e.slow.want) && e.slow.need.some(t => /^Свободного времени — \d+ ч\/нед\.$/.test(t)), e.slow);
++  check(`${name}: перегруженная неделя — срок и «всего» программы по темпу учёбы, строка про время`, e.slow.f > 0 && e.slow.get.includes(spanOf(e.slow.months)) && e.slow.cost.includes(e.slow.want) && e.slow.need.some(t => /^Свободного времени — \d+ ч\/нед\.$/.test(t)), e.slow);
++  if (e.realSlow) check(`${name}: перегруженная неделя после настоящего зачисления — учёба идёт так, как обещало окно (срок и «всего»)`, e.realSlow.started && e.realSlow.pace < 1 && e.realSlow.card.get.includes(spanOf(e.realSlow.months)) && e.realSlow.card.cost.includes(e.realSlow.wantTotal), e.realSlow);
+   if (e.realPace) check(`${name}: учёба после настоящего зачисления идёт так, как обещало окно (срок и «всего»)`, e.realPace.started && e.realPace.card.get.includes(spanOf(e.realPace.months)) && e.realPace.card.cost.includes(e.realPace.wantTotal), e.realPace);
+   if (e.closedInvite) check(`${name}: закрытое приглашение — статус наверху, нет нулевой цены, у серых кнопок причина`, e.closedInvite.mainOk && /закрыто|завершена|запланирована|отказались/.test(e.closedInvite.status) && !/^0\s/.test(e.closedInvite.price) && e.closedInvite.grey.every(g => g.why || g.hint), e.closedInvite);
+   if (e.kidInvite) check(`${name}: семейная поездка ребёнка — окно без карточки, «Поехать с …» и «Остаться дома» на виду`, !e.kidInvite.card && e.kidInvite.buttons.some(b => /^Поехать с /.test(b.label) && !b.hidden && !b.disabled) && e.kidInvite.buttons.some(b => b.label === 'Остаться дома' && !b.hidden) && e.kidInviteDecision.every(b => !b.hidden), e.kidInvite);

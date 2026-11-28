@@ -1,0 +1,48 @@
+--- /tmp/claude-0/-home-user-life-side-effects/673b65e8-1bde-512a-aa02-ceb3dd19767c/scratchpad/dry276/tools/verify273_card.js	2026-11-27 22:23:00.526671759 +0000
++++ /tmp/claude-0/-home-user-life-side-effects/673b65e8-1bde-512a-aa02-ceb3dd19767c/scratchpad/b276/integ/card-busy/copy/tools/verify273_card.js	2026-11-27 22:54:29.311973191 +0000
+@@ -336,8 +336,16 @@
+         x.profile = { vac: v.id, button: !!b, tasks: s.clock.tasks.filter(t => t.kind === 'profilePractice46').length - n0, back: __title() }; __close(); } }
+     // Нет свободных часов (capacity() = 0, как у перегруженной недели): окно не обещает дату ответа, а говорит, что резюме
+     // стоит, и даёт кнопку к нагрузке. Настоящий ход месяца подтверждает: резюме не двигается.
+-    { __restore(); const cap = capacity; capacity = () => 0;
+-      try { jobDetails16(__v.apply || __v.vacancy); x.busy = { note: __topNotes()['Цена'] || '', need: __need() }; __close();
++    // 276: темп дел — из недели (week276), а не из capacity(); неделю перегружаем по-настоящему: работа 60 ч в другом районе
++    // и очная учёба. Отклики в 276 идут при любой нагрузке — окно должно обещать то, что сделает месяц.
++    { __restore(); const cap = capacity, w276 = typeof week276 === 'function';
++      if (!w276) capacity = () => 0;
++      else { const pr = professions16.find(p => p.id === 'accountant') || professions16[0], area = s.housing.area === 'center' ? 'suburb' : 'center';
++        s.job = { ...(s.job || {}), title: pr.title, employer: 'Контур', professionId: pr.id, salary: c().wage, tenure: 2, format: 'far', language: country16[s.country][0], allowedCountries: [s.country], workplace: { country: s.country, city: residenceCity(), area }, hours28: 60, fullHours28: 40, fraction28: 1.5 };
++        s.workHours = 60; s.hoursJob = s.job.title;
++        if (!path16().study) { const q = programs16.find(q => q.country === s.country && q.city === residenceCity() && q.level === 'bachelor') || programs16.find(q => q.country === s.country && q.level === 'bachelor');
++          path16().applications.push({ id: 'app-busy276', program: q.id, status: 'enrolled' }); path16().study = { id: 'study-busy276', application: 'app-busy276', program: q.id, progress: 0, payer: 'self', status: 'active', research: 0, grades: 60, badTerms: 0 }; } }
++      try { jobDetails16(__v.apply || __v.vacancy); x.busy = { w276, free: w276 ? +week276().free.toFixed(1) : capacity() - totalHours(), next: typeof inMonth273 === 'function' ? inMonth273(s.clock.ticks + 1) : '', note: __topNotes()['Цена'] || '', need: __need() }; __close();
+         if (__v.apply) { applyJob16(__v.apply); const a = path16().jobApplications.at(-1); jobDetails16(a.id, true); x.busy.status = document.querySelector('#modal .status273')?.textContent || ''; __close();
+           const k = s.clock.tasks.find(t => t.application === a.id); __month(1); x.busy.progress = k ? k.progress : null; x.busy.after = a.status; } }
+       finally { capacity = cap; } __close(); }
+@@ -518,8 +526,15 @@
+   check(`${name}: вакансии — каждая строка «Не хватает» кнопка или с датой, строка без кнопки не похожа на кнопку`, e.vacNeed.length > 0 && e.vacNeed.every(r => r.button || r.small && !r.looksButton), e.vacNeed.filter(r => !(r.button || r.small && !r.looksButton)));
+   if (e.profile) check(`${name}: профильная подготовка — кнопка строки ставит практику профиля и возвращает к вакансии`, e.profile.button && e.profile.tasks === 1 && e.profile.back !== '(закрыто)', e.profile);
+   else note(`${name}: вакансий с нехваткой профильной подготовки нет`);
+-  check(`${name}: нет свободных часов — окно вакансии не обещает дату ответа и ведёт к нагрузке`, /ответа не будет/.test(e.busy.note) && e.busy.need.some(n => /Свободного времени/.test(n.text) && n.fix), e.busy);
+-  if (e.busy.status !== undefined) check(`${name}: нет свободных часов — отклик без даты, и резюме правда не двигается`, /ответа не будет/.test(e.busy.status) && e.busy.progress === 0 && e.busy.after === 'submitted', e.busy);
++  // 276: отклики идут при любой нагрузке (time276.always) — окно обещает ответ через месяц и не зовёт в «Нагрузку»;
++  // без time276.js — прежнее: ответа не будет, пока нет свободных часов.
++  if (e.busy.w276) {
++    check(`${name}: перегруженная неделя — окно вакансии обещает ответ через месяц, без строки «Свободного времени»`, e.busy.free < 0 && e.busy.note.includes('ответ примерно ' + e.busy.next) && !e.busy.need.some(n => /Свободного времени/.test(n.text)), e.busy);
++    if (e.busy.status !== undefined) check(`${name}: перегруженная неделя — резюме идёт так, как обещало окно (ответ через месяц)`, e.busy.status.includes('ответ примерно ' + e.busy.next) && e.busy.progress >= 1 && e.busy.after !== 'submitted', e.busy);
++  } else {
++    check(`${name}: нет свободных часов — окно вакансии не обещает дату ответа и ведёт к нагрузке`, /ответа не будет/.test(e.busy.note) && e.busy.need.some(n => /Свободного времени/.test(n.text) && n.fix), e.busy);
++    if (e.busy.status !== undefined) check(`${name}: нет свободных часов — отклик без даты, и резюме правда не двигается`, /ответа не будет/.test(e.busy.status) && e.busy.progress === 0 && e.busy.after === 'submitted', e.busy);
++  }
+   check(`${name}: перегруженная неделя — срок и «всего» программы по темпу учёбы, строка про время`, e.slow.get.includes(spanOf(e.slow.months)) && e.slow.cost.includes(e.slow.want) && e.slow.need.some(t => /^Свободного времени — \d+ ч\/нед\.$/.test(t)), e.slow);
+   if (e.realPace) check(`${name}: учёба после настоящего зачисления идёт так, как обещало окно (срок и «всего»)`, e.realPace.started && e.realPace.card.get.includes(spanOf(e.realPace.months)) && e.realPace.card.cost.includes(e.realPace.wantTotal), e.realPace);
+   if (e.closedInvite) check(`${name}: закрытое приглашение — статус наверху, нет нулевой цены, у серых кнопок причина`, e.closedInvite.mainOk && /закрыто|завершена|запланирована|отказались/.test(e.closedInvite.status) && !/^0\s/.test(e.closedInvite.price) && e.closedInvite.grey.every(g => g.why || g.hint), e.closedInvite);
+@@ -558,7 +573,7 @@
+     const order = [...INDEX.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
+     const w273 = order.indexOf('windows273.js'), b61 = order.indexOf('bootstrap61.js');
+     const after = order.slice(w273 + 1, b61);
+-    check('windows273.js подключён последним перед bootstrap61.js (после него — только окна шагов 273.x/275.x)', BASE || w273 >= 0 && w273 < b61 && after.every(f => /^[a-z]+27[35]\d+\.js$/.test(f)), order.slice(w273, b61 + 1));
++    check('windows273.js подключён последним перед bootstrap61.js (после него — только окна шагов 273.x/275.x)', BASE || w273 >= 0 && w273 < b61 && after.every((f, i) => /^[a-z]+27[35]\d+\.js$/.test(f) || f === 'time276.js' && i === after.length - 1), order.slice(w273, b61 + 1));
+   } finally { await browser.close(); }
+   console.log(`\n${pass}/${pass + fail}` + (BASE ? ' (BASE=1: без windows273.js)' : ''));
+   process.exit(fail ? 1 : 0);
