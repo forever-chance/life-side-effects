@@ -31,9 +31,9 @@
 // 6. Решения владелицы после исправлений: пока неделя не сходится, отдых снимает усталость только до границы
 //    (fatigueFloor276: растёт с нехваткой, не выше 45); пока неделя не сходится, здоровье теряет понемногу, тем больше,
 //    чем дольше (strainMonth276), — вместо прежнего «ничего при 70–80, сразу −1 выше 80» (clock.js). Неделя сошлась, а
-//    усталость ещё выше 80 — прежнее −1, но после перегрузки не больше, чем она стоила (strainLoss80_276): облегчить
-//    неделю не дороже, чем оставить. «Не сходится» везде с получаса нехватки (time276.shortMin) — как «не хватает 1 ч»
-//    на экране.
+//    усталость ещё выше 80 — как месяц перегрузки (strainLoss80_276; 276: решение владелицы 28.11 — и при счёте 0
+//    это −0,3, а не прежнее −1, дальше как strainLoss276, не больше max): облегчить неделю не дороже, чем оставить.
+//    «Не сходится» везде с получаса нехватки (time276.shortMin) — как «не хватает 1 ч» на экране.
 // 7. Решения владелицы по проверке баланса (27.11): потеря здоровья зависит не только от усталости, но и от самой
 //    нехватки часов (strainShare276) — отдых в расписании её смягчает, но не отменяет; отдых, закончившийся в неделе с
 //    нехваткой или вскоре после долгой перегрузки, прибавляет здоровью меньше (restHealth276), и восстановление здоровья
@@ -41,7 +41,7 @@
 //    после 12 месяцев без нехватки — новая перегрузка и новая запись в «Истории».
 // 8. Вторая проверка баланса (27.11): пока усталость ниже 70, доля перегрузки не больше strain.soft (0,75) при любой
 //    нехватке — отдых в расписании смягчает потерю здоровья всегда, а не только пока не хватает меньше 12 ч; доля
-//    считается по усталости в тот же момент, что и прежнее −1 выше 80 (до отдыха этого месяца), — облегчить неделю не
+//    считается по усталости в тот же момент, что и потеря выше 80 (strainLoss80_276, до отдыха этого месяца), — облегчить неделю не
 //    дороже и в месяц, когда кончается отдых. Полчаса — граница везде: и для настроения, и для того, кто отдаёт часы
 //    (squeeze276). На экране одно число нехватки — с отдыхом, и если часть его — отдых, это сказано: «не хватает 3 ч,
 //    из них 2 ч — отдых»; запись «Неделя не помещается» — только когда неделя не сходится и без отдыха. Окно «Неделя не
@@ -75,8 +75,8 @@ const time276={
  // нехватке смягчает потерю хотя бы на 1 − soft. Счёт месяцев растёт на эту долю и не дальше того, где потеря уже max
  // (strainTop276). Месяц без нехватки снимает decay со счёта; после gap месяцев без
  // неё новая перегрузка — снова запись в «Истории» (когда потеря за месяц дойдёт до note). Это вместо прежнего: при
- // усталости 70–80 — ничего, выше 80 — сразу −1 в месяц (clock.js; при неделе, которая сходится, оно остаётся, но после
- // перегрузки не больше strainLoss276). Отдых, закончившийся в неделе с нехваткой, прибавляет здоровью меньше: долю
+ // усталости 70–80 — ничего, выше 80 — сразу −1 в месяц (clock.js; 276: при неделе, которая сходится, вместо −1 —
+ // strainLoss276 по счёту, не меньше месяца перегрузки, strainLoss80_276). Отдых, закончившийся в неделе с нехваткой, прибавляет здоровью меньше: долю
  // 1 − нехватка / hours, а пока перегрузка помнится — не больше 1 − счёт / strainTop276 (restHealth276); восстановление
  // здоровья ниже потолка — медленнее на долю 0,5 × нехватка / hours, как при переутомлении (healthBlockers259).
  // Подобрано прогоном calibrate_death (RNG=1, одни и те же сиды): цель владелицы — перегруженный работник (работа 40 ч
@@ -173,6 +173,54 @@ programDetailData20=function(p,...rest){
  try{for(const g of d?.sections||[])for(const r of g.rows||[])if(r.label==='Нагрузка')r.value=Math.round(studyHours276(p))+' ч/нед.';}catch(e){}
  return d;
 };
+
+/* 276: окно программы и предложения (windows273.js, study2733.js) берут срок и «всего» из studyLoad273 — копии прежней
+   формулы monthPath16 (свободные часы / (планы + часы программы), не меньше 0,25). С 276 темп учёбы — studyPace276:
+   нехватку первыми отдают планы, клубы и своё дело («Чем жертвовать первым»), учёбе — 1 − 0,75 × доля её недостающих
+   часов, заочно вдвое; оценки за квартал — 1 − 8 × доля (studyGrade276). Окно считает по той же неделе. */
+function wrapStudyLoad276(){
+ if(typeof studyLoad273!=='function'||studyLoad273.time276)return;
+ const loadBase276=studyLoad273;
+ studyLoad273=function(p,...rest){
+  const out=loadBase276.call(this,p,...rest);
+  if(!p||!s?.clock||typeof path16!=='function')return out;
+  const x=path16(),old=x.study,mine=old&&old.program===p.id&&old.status!=='paused';
+  try{
+   if(!mine)x.study={id:'hours273',program:p.id,status:'active',payer:'self',progress:0,grades:70,badTerms:0,startedAt:s.clock.ticks};
+   const f=squeeze276(week276()).f.study||0;
+   out.pace=(1-.75*f)*(x.study.partTime276?.5:1);
+   out.falls=1-8*f<0;
+   out.f276=f;
+  }catch(e){console.error(e);}finally{x.study=old;}
+  out.months=Math.max(1,Math.ceil(out.left/out.pace-1e-9));
+  return out;
+ };
+ studyLoad273.time276=true;
+}
+/* 276: «Моя учёба» (study2733.js) — те же прежние формулы: темп studyPace2733 (capacity / (планы + часы)) и оценки
+   «+1, если capacity() > totalHours(), иначе −3». Темп — как в окне программы (studyLoad273), оценки к ближайшей
+   проверке — как studyGrade276 по нынешней неделе: +1 − 8 × доля недостающих учёбе часов, не ниже −4. */
+function wrapStudyTop276(){
+ if(typeof studyPace2733==='function'&&!studyPace2733.time276){studyPace2733=function(p){return studyLoad273(p).pace;};studyPace2733.time276=true;}
+ if(typeof studyTop2733!=='function'||studyTop2733.time276)return;
+ const topBase276=studyTop2733;
+ studyTop2733=function(t,p,...rest){
+  const rows=topBase276.call(this,t,p,...rest);
+  try{
+   const r=rows.find(r=>r.label==='Оценки');
+   if(r&&t&&/ → \d+ /.test(r.value)){
+    const f=squeeze276(week276()).f.study||0,d=Math.max(-4,Math.round((1-8*f)*10)/10);
+    r.value=r.value.replace(/ → \d+ /,' → '+Math.max(0,Math.min(100,Math.round(t.grades+d)))+' ');
+   }
+  }catch(e){console.error(e);}
+  return rows;
+ };
+ studyTop2733.time276=true;
+}
+function wrapStudy276(){wrapStudyLoad276();wrapStudyTop276();}
+// Порядок подключения не важен: если windows273.js и study2733.js подключены позже, обёртки встают, когда загружены все скрипты.
+wrapStudy276();
+if(typeof document!=='undefined'&&document.readyState==='loading')document.addEventListener('DOMContentLoaded',wrapStudy276);
 
 // ---------- журнал недели ----------
 function lineLabelWork276(q){
@@ -379,6 +427,9 @@ function monthWeek276(){
 }
 function taskPace276(t,planPace,custody,restPace=1){
  if((t.wait276??-1)>s.clock.ticks)return 0;
+ /* 276: календарные дела (calendarKinds68 в safeguards68.js: разрешения, переезд, продления) идут по календарю — прогресс
+    им ставит calendarMonth68 (месяцев с подачи). Прибавка ещё и здесь закрывала разрешение на 3 мес. за 2 месяца. */
+ if(typeof calendarKinds68!=='undefined'&&calendarKinds68.includes(t.kind)&&Number.isFinite(t.calendarStart68))return 0;
  if(t.kind==='rest')return restPace;
  if(!(t.hours>0)||time276.always.has(t.kind))return 1;
  return custody?0:planPace;
@@ -534,12 +585,12 @@ function strainLoss276(k){const S=time276.strain;return k>0?Math.min(S.max,S.bas
 // Месяц, с которого потеря уже max: дальше счёт не растёт — после долгой перегрузки и нескольких спокойных лет
 // новая начинается мягче, а не сразу с max.
 function strainTop276(){const S=time276.strain;return S.grow>0&&S.max>S.base?Math.ceil(1+12*(S.max-S.base)/S.grow-1e-9):1;}
-// Неделя сошлась, а усталость ещё выше 80: прежнее −1 в месяц (clock.js), но сразу после перегрузки — не больше, чем
-// она стоила в этом месяце. Иначе облегчить неделю без отдыха стоило бы здоровья больше, чем оставить перегрузку.
-// Пока неделя не сходится — 0: здоровье считает strainMonth276. Без перегрузки до этого (счёт 0) — прежнее −1, как
-// решила владелица («пока счётчик перегрузки > 0»): первый месяц перегрузки при усталости выше 80 стоит −0,3, а неделя,
-// которая сходится, — −1 (вопрос к владелице в отчёте 276).
-function strainLoss80_276(short){if(short)return 0;const k=timeState276().strain||0;return k>0?Math.min(1,strainLoss276(k)):1;}
+// Неделя сошлась, а усталость ещё выше 80: вместо прежнего −1 в месяц (clock.js) — столько, сколько стоил бы месяц
+// перегрузки (strainLoss276), не больше max. Иначе облегчить неделю без отдыха стоило бы здоровья больше, чем оставить
+// перегрузку. Пока неделя не сходится — 0: здоровье считает strainMonth276.
+// 276: решение владелицы 28.11 — и без перегрузки до этого (счёт 0) это −0,3, как первый месяц перегрузки, а не −1;
+// прежнее −1 больше не действует нигде.
+function strainLoss80_276(short){if(short)return 0;const k=timeState276().strain||0;return strainLoss276(Math.max(1,k));}
 // Потеря за последний месяц — когда она уже заметна (от strain.note), для «Ожидают ответа».
 function strainNow276(){const m=monthAny276();return m&&m.strainPen>=time276.strain.note-1e-9?m.strainPen:0;}
 function afterMonth276(){
@@ -1022,6 +1073,28 @@ if(typeof acceptCreative47==='function'){
   if(a?.status==='offered'&&a.offer?.hours>0&&!gate276({label:'Заказ · '+a.offer.title,hours:a.offer.hours,area:'plans',go:()=>acceptCreative47(id,...args)}))return false;
   return creativeBase276.call(this,id,...args);
  };
+}
+
+/* 276: окна 273.x (windows273.js: taskPace273, taskMonths273, taskLeft273, freeNeed273) считали сроки дел по прежнему
+   темпу clock.js — min(1, capacity()/totalHours()), ×0,65 при усталости выше 75 — один на все дела. С 276 у каждого
+   дела свой темп (taskPace276): отклики, собеседования, заявки, стипендии, переговоры и документы (time276.always) и дела
+   на 0 ч идут при любой нагрузке, отдых при нехватке медленнее, прочие планы — по доле часов, что остаётся планам.
+   Без этого окно вакансии при перегрузке писало «ответа не будет» и звало в «Нагрузку», а ответ приходил через месяц. */
+function windowPace276(t){
+ const L=week276(),sq=squeeze276(L),sqF=squeeze276(L,null,{noRest:true});
+ const plan=Math.max(0,1-(sq.f.plans||0))*((s.clock.fatigue||0)>75?.65:1);
+ return taskPace276({...t,wait276:undefined},plan,L.custody,Math.max(.25,1-sqF.missing/12));
+}
+if(typeof taskLeft273==='function'){
+ taskLeft273=function(t){
+  const p=windowPace276(t),left=Math.max(0,(t.duration||1)-(t.progress||0)),wait=Math.max(0,(t.wait276??-1)-s.clock.ticks-1);
+  return p>0?wait+Math.max(1,Math.ceil(left/p-1e-9)):Infinity;
+ };
+ // Сроки ещё не поданных шагов (taskMonths273 с готовыми месяцами) и строка «Свободного времени — 0 ч» (freeNeed273)
+ // во всех окнах 273.x — только у откликов и заявок: резюме и собеседование, приём, стипендия, разговор о прибавке,
+ // оплата учёбы компанией. В 276 они идут при любой нагрузке.
+ taskMonths273=function(left){return Math.max(1,Math.ceil((+left||0)-1e-9));};
+ freeNeed273=function(){return null;};
 }
 
 if(s){migrateBusiness276();save();}

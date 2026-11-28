@@ -336,18 +336,39 @@ async function extraChecks(pg, name) {
         x.profile = { vac: v.id, button: !!b, tasks: s.clock.tasks.filter(t => t.kind === 'profilePractice46').length - n0, back: __title() }; __close(); } }
     // Нет свободных часов (capacity() = 0, как у перегруженной недели): окно не обещает дату ответа, а говорит, что резюме
     // стоит, и даёт кнопку к нагрузке. Настоящий ход месяца подтверждает: резюме не двигается.
-    { __restore(); const cap = capacity; capacity = () => 0;
-      try { jobDetails16(__v.apply || __v.vacancy); x.busy = { note: __topNotes()['Цена'] || '', need: __need() }; __close();
+    // 276: темп дел — из недели (week276), а не из capacity(); неделю перегружаем по-настоящему: работа 60 ч в другом районе
+    // и очная учёба. Отклики в 276 идут при любой нагрузке — окно должно обещать то, что сделает месяц.
+    { __restore(); const cap = capacity, w276 = typeof week276 === 'function';
+      if (!w276) capacity = () => 0;
+      else { const pr = professions16.find(p => p.id === 'accountant') || professions16[0], area = s.housing.area === 'center' ? 'suburb' : 'center';
+        s.job = { ...(s.job || {}), title: pr.title, employer: 'Контур', professionId: pr.id, salary: c().wage, tenure: 2, format: 'far', language: country16[s.country][0], allowedCountries: [s.country], workplace: { country: s.country, city: residenceCity(), area }, hours28: 60, fullHours28: 40, fraction28: 1.5 };
+        s.workHours = 60; s.hoursJob = s.job.title;
+        if (!path16().study) { const q = programs16.find(q => q.country === s.country && q.city === residenceCity() && q.level === 'bachelor') || programs16.find(q => q.country === s.country && q.level === 'bachelor');
+          path16().applications.push({ id: 'app-busy276', program: q.id, status: 'enrolled' }); path16().study = { id: 'study-busy276', application: 'app-busy276', program: q.id, progress: 0, payer: 'self', status: 'active', research: 0, grades: 60, badTerms: 0 }; } }
+      try { jobDetails16(__v.apply || __v.vacancy); x.busy = { w276, free: w276 ? +week276().free.toFixed(1) : capacity() - totalHours(), next: typeof inMonth273 === 'function' ? inMonth273(s.clock.ticks + 1) : '', note: __topNotes()['Цена'] || '', need: __need() }; __close();
         if (__v.apply) { applyJob16(__v.apply); const a = path16().jobApplications.at(-1); jobDetails16(a.id, true); x.busy.status = document.querySelector('#modal .status273')?.textContent || ''; __close();
           const k = s.clock.tasks.find(t => t.application === a.id); __month(1); x.busy.progress = k ? k.progress : null; x.busy.after = a.status; } }
       finally { capacity = cap; } __close(); }
-    // Программа при перегруженной неделе: срок и «всего» — по темпу monthPath16, а не по каталогу.
-    { __restore(); const p = prog16(__v.program), cap = capacity; capacity = () => 0;
-      try { programDetails16(p.id); const old = path16().study; path16().study = { id: 't', program: p.id, status: 'active', payer: 'self', progress: 0, grades: 70 };
-        let pace; try { pace = Math.max(.25, Math.min(1, capacity() / Math.max(1, totalHours() + (p.hours || 0)))); } finally { path16().study = old; }
+    // Программа при перегруженной неделе: срок и «всего» — по темпу monthPath16, а не по каталогу. 276: темп учёбы —
+    // studyPace276 (1 − 0,75 × доля часов, которых учёбе не досталось после планов, клубов и своего дела), capacity()
+    // его больше не задаёт. Неделя без места для учёбы: бюджет — обязательства и здоровье, плюс половина часов программы.
+    { __restore(); const p = prog16(__v.program), wb = weekBudget29;
+      try { const L0 = week276(), h = typeof studyHours273 === 'function' ? studyHours273(p) : studyHours276(p); weekBudget29 = () => L0.commitments + L0.health + h / 2;
+        programDetails16(p.id); const old = path16().study; path16().study = { id: 't', program: p.id, status: 'active', payer: 'self', progress: 0, grades: 70 };
+        let pace, f; try { f = squeeze276(week276()).f.study || 0; pace = 1 - .75 * f; } finally { path16().study = old; }
         const months = Math.ceil(p.months / pace - 1e-9);
-        x.slow = { get: __top()['Получите'] || '', cost: __top()['Цена'] || '', want: money(tuition16(p, null) * months), months, need: __need().map(n => n.text) }; }
-      finally { capacity = cap; } __close(); }
+        x.slow = { get: __top()['Получите'] || '', cost: __top()['Цена'] || '', want: money(tuition16(p, null) * months), months, f: +f.toFixed(3), need: __need().map(n => n.text) }; }
+      finally { weekBudget29 = wb; } __close(); }
+    // 276: настоящая учёба в перегруженной неделе (owner): срок в окне — тот, что выйдет после зачисления.
+    if (name === 'owner') { __restore(); const p = prog16(__v.program), wb = weekBudget29; s.cash = Math.max(s.cash, 1e6);
+      if (admission16(p).why.some(w => /сертификат/.test(w))) path16().diplomas.push({ id: 'cert-verify273', field: p.field, level: 'certificate', track45: p.track45 || null, program46: 'verify', profileSchema46: 1, title: 'verify', university: 'verify', country: s.country, year: s.year, grade: 80, quality: 50, employment: 50 });
+      apply16(p.id); const a = path16().applications.at(-1); if (a) { a.roll = 0; for (let i = 0; i < 8 && a.status === 'submitted'; i++) __month(1); acceptStudy16(a.id); }
+      try { const L0 = week276(), h = typeof studyHours273 === 'function' ? studyHours273(p) : studyHours276(p); weekBudget29 = () => L0.commitments + L0.health + h / 2;
+        openDecision24('study', a.id); const card = { get: __top()['Получите'] || '', cost: __top()['Цена'] || '' }; __close();
+        forceRun276(() => studyStart16(a.id, 'self')); const st = path16().study, p0 = st?.progress || 0; __month(3); const pace = st ? (st.progress - p0) / 3 : null;
+        const months = pace ? Math.ceil(p.months / pace - 1e-9) : null;
+        x.realSlow = { card, started: !!st && st.program === p.id, pace: pace && +pace.toFixed(3), months, wantTotal: months ? money(tuition16(p, null) * months) : null }; }
+      finally { weekBudget29 = wb; } __close(); }
     // Закрытое приглашение: статус наверху, главная кнопка «Открыть поездку» (если поездка есть), у серых кнопок причина,
     // нулевой цены нет.
     // На сохранении — прошлые приглашения из «Событий близких», на новой жизни — своё, закрытое по сроку.
@@ -518,9 +539,17 @@ function compare(name, out) {
   check(`${name}: вакансии — каждая строка «Не хватает» кнопка или с датой, строка без кнопки не похожа на кнопку`, e.vacNeed.length > 0 && e.vacNeed.every(r => r.button || r.small && !r.looksButton), e.vacNeed.filter(r => !(r.button || r.small && !r.looksButton)));
   if (e.profile) check(`${name}: профильная подготовка — кнопка строки ставит практику профиля и возвращает к вакансии`, e.profile.button && e.profile.tasks === 1 && e.profile.back !== '(закрыто)', e.profile);
   else note(`${name}: вакансий с нехваткой профильной подготовки нет`);
-  check(`${name}: нет свободных часов — окно вакансии не обещает дату ответа и ведёт к нагрузке`, /ответа не будет/.test(e.busy.note) && e.busy.need.some(n => /Свободного времени/.test(n.text) && n.fix), e.busy);
-  if (e.busy.status !== undefined) check(`${name}: нет свободных часов — отклик без даты, и резюме правда не двигается`, /ответа не будет/.test(e.busy.status) && e.busy.progress === 0 && e.busy.after === 'submitted', e.busy);
-  check(`${name}: перегруженная неделя — срок и «всего» программы по темпу учёбы, строка про время`, e.slow.get.includes(spanOf(e.slow.months)) && e.slow.cost.includes(e.slow.want) && e.slow.need.some(t => /^Свободного времени — \d+ ч\/нед\.$/.test(t)), e.slow);
+  // 276: отклики идут при любой нагрузке (time276.always) — окно обещает ответ через месяц и не зовёт в «Нагрузку»;
+  // без time276.js — прежнее: ответа не будет, пока нет свободных часов.
+  if (e.busy.w276) {
+    check(`${name}: перегруженная неделя — окно вакансии обещает ответ через месяц, без строки «Свободного времени»`, e.busy.free < 0 && e.busy.note.includes('ответ примерно ' + e.busy.next) && !e.busy.need.some(n => /Свободного времени/.test(n.text)), e.busy);
+    if (e.busy.status !== undefined) check(`${name}: перегруженная неделя — резюме идёт так, как обещало окно (ответ через месяц)`, e.busy.status.includes('ответ примерно ' + e.busy.next) && e.busy.progress >= 1 && e.busy.after !== 'submitted', e.busy);
+  } else {
+    check(`${name}: нет свободных часов — окно вакансии не обещает дату ответа и ведёт к нагрузке`, /ответа не будет/.test(e.busy.note) && e.busy.need.some(n => /Свободного времени/.test(n.text) && n.fix), e.busy);
+    if (e.busy.status !== undefined) check(`${name}: нет свободных часов — отклик без даты, и резюме правда не двигается`, /ответа не будет/.test(e.busy.status) && e.busy.progress === 0 && e.busy.after === 'submitted', e.busy);
+  }
+  check(`${name}: перегруженная неделя — срок и «всего» программы по темпу учёбы, строка про время`, e.slow.f > 0 && e.slow.get.includes(spanOf(e.slow.months)) && e.slow.cost.includes(e.slow.want) && e.slow.need.some(t => /^Свободного времени — \d+ ч\/нед\.$/.test(t)), e.slow);
+  if (e.realSlow) check(`${name}: перегруженная неделя после настоящего зачисления — учёба идёт так, как обещало окно (срок и «всего»)`, e.realSlow.started && e.realSlow.pace < 1 && e.realSlow.card.get.includes(spanOf(e.realSlow.months)) && e.realSlow.card.cost.includes(e.realSlow.wantTotal), e.realSlow);
   if (e.realPace) check(`${name}: учёба после настоящего зачисления идёт так, как обещало окно (срок и «всего»)`, e.realPace.started && e.realPace.card.get.includes(spanOf(e.realPace.months)) && e.realPace.card.cost.includes(e.realPace.wantTotal), e.realPace);
   if (e.closedInvite) check(`${name}: закрытое приглашение — статус наверху, нет нулевой цены, у серых кнопок причина`, e.closedInvite.mainOk && /закрыто|завершена|запланирована|отказались/.test(e.closedInvite.status) && !/^0\s/.test(e.closedInvite.price) && e.closedInvite.grey.every(g => g.why || g.hint), e.closedInvite);
   if (e.kidInvite) check(`${name}: семейная поездка ребёнка — окно без карточки, «Поехать с …» и «Остаться дома» на виду`, !e.kidInvite.card && e.kidInvite.buttons.some(b => /^Поехать с /.test(b.label) && !b.hidden && !b.disabled) && e.kidInvite.buttons.some(b => b.label === 'Остаться дома' && !b.hidden) && e.kidInviteDecision.every(b => !b.hidden), e.kidInvite);
@@ -556,10 +585,12 @@ function compare(name, out) {
     // карточку поездки (tripCard273, rescheduleWhy273) — стоит после people2731.js, до work2732.js и study2733.js.
     // 275.4: fixes2754.js (решения, поиск, менторство; окон 273 не меняет) — последним перед bootstrap61.js.
     // 279.1.3: langs27913-hints.js — подсказки о местных языках поверх study2733.js и windows273.js (langNeed273).
+    // 276: time276.js — последним: правила недели поверх итоговых обёрток месяца и окон 273.x/275.x, заменяет сроки окон
+    // windows273 (taskLeft273, taskMonths273, freeNeed273) и обёртывает studyLoad273.
     const order = [...INDEX.matchAll(/<script src="([^"?]+)/g)].map(m => m[1]);
     const w273 = order.indexOf('windows273.js'), b61 = order.indexOf('bootstrap61.js');
     const after = order.slice(w273 + 1, b61);
-    check('windows273.js подключён последним перед bootstrap61.js (после него — только окна шагов 273.x/275.x)', BASE || w273 >= 0 && w273 < b61 && after.every(f => /^[a-z]+27[35]\d+\.js$/.test(f) || f === 'langs27913-hints.js'), order.slice(w273, b61 + 1));
+    check('windows273.js подключён последним перед bootstrap61.js (после него — только окна шагов 273.x/275.x)', BASE || w273 >= 0 && w273 < b61 && after.every((f, i) => /^[a-z]+27[35]\d+\.js$/.test(f) || f === 'langs27913-hints.js' || f === 'time276.js' && i === after.length - 1), order.slice(w273, b61 + 1));
   } finally { await browser.close(); }
   console.log(`\n${pass}/${pass + fail}` + (BASE ? ' (BASE=1: без windows273.js)' : ''));
   process.exit(fail ? 1 : 0);

@@ -330,8 +330,12 @@ async function extraChecks(pg, name, base) {
         // «Моя учёба»: родители перестали платить (доверие 20) — без «0 ₽»; кредит на всю учёбу — одной фразой; темп 0,97 — не «в 1 раза».
         studyStart16(__v.app, 'family'); parent.inner.trust = 20; openPath16('education'); await wait(10); fx.panelFamily0 = __top()['Цена'] || null;
         __restore(); studyStart16(__v.app, 'loan'); openPath16('education'); await wait(10); fx.panelLoan = __top()['Цена'] || null;
-        __restore(); studyStart16(__v.app, 'self'); { const extra = Math.max(0, capacity() / .97 - totalHours() - (p.hours || 0)); s.clock.tasks.push({ id: 'verify-slow', kind: 'verifySlow', label: 'Проверка', duration: 12, progress: 0, hours: extra, state: 'running' }); fx.pace = capacity() / Math.max(1, totalHours() + (p.hours || 0)); }
-        openPath16('education'); await wait(10); fx.panelSlow = __top()['Осталось'] || null;
+        // 276: планы учёбу не замедляют (нехватку первыми отдают планы, клубы и своё дело) — темп 0,97 даёт неделя, где
+        // учёбе не хватает 4% её часов (studyPace276: 1 − 0,75 × доля): бюджет недели урезан ровно настолько.
+        __restore(); studyStart16(__v.app, 'self'); const wb = weekBudget29;
+        try { let lo = 0, hi = 200; for (let i = 0; i < 40; i++) { const mid = (lo + hi) / 2; weekBudget29 = () => wb() - mid; if ((squeeze276(week276()).f.study || 0) < .04) lo = mid; else hi = mid; }
+          weekBudget29 = () => wb() - hi; fx.pace = 1 - .75 * (squeeze276(week276()).f.study || 0);
+          openPath16('education'); await wait(10); fx.panelSlow = __top()['Осталось'] || null; } finally { weekBudget29 = wb; }
         // Отказ от места — «Что изменится», как у увольнения в 273.2.
         __restore(); openDecision24('study', __v.app); await wait(20); __press('Принять предложение'); await wait(10);
         { const b = __find('Отказаться от места'); if (b) b.click(); await wait(20); fx.decline = { h2: __title(), title: document.querySelector('#modal .title273')?.textContent || '', area: document.querySelector('#modal .eyebrow')?.textContent || '', top: __top(), btns: __modalBtns().map(__lbl) }; __close(); }
