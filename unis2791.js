@@ -56,6 +56,14 @@
 //   программы на испанском с теми же id, рядом копии «…-cat», «…-glg», «…-eus» («· на каталанском»). Институт бизнеса
 //   Кастельяна (Мадрид; источник называет основным английский) — 'en+es', как другие такие заведения 279.1.2. В «О вузе»
 //   у заведений Валенсии — «Каталанский здесь называют валенсийским.»
+// • 279.1.4: подготовка к профессии (одна на страну, id вида profession68-es-n11-doctor) — в самом сильном заведении
+//   страны по престижу и названию, при любом открытии игры (hostRank27914). В 279.1–279.1.3 сначала шли заведения города,
+//   где герой жил, когда открылась страница: в Барселоне та же программа была profession68-es-n25-doctor, и учёба, заявка
+//   или предложение на ней не находились, если игру открывали, живя в другом городе. Программы, которые так получались в
+//   других городах (3100 вместе с копиями на других языках), остаются по прежним id в aliasPrograms27914 — с тем же
+//   заведением, городом, языком и ценой; в выбор не попадают, prog16 их находит. Сохранения не переписываются.
+//   Учёба 279.1 на такой программе, которую 279.1.1–279.1.3 не нашли и прежний язык не запомнили (Квебек: в 279.1 —
+//   по-английски), снова идёт на прежнем языке, если героиня знает его, а нынешнего — нет (lostPin27914).
 
 const unis2791On=typeof unis2791Data!=='undefined'&&typeof universities16!=='undefined'&&typeof programs16!=='undefined'&&typeof country16!=='undefined';
 
@@ -178,6 +186,7 @@ function baseProgramme2791(u,field,level){
 // ---------- заведения ----------
 
 const retiredPrograms2791=[];
+const aliasPrograms27914=[]; /* 279.1.4: подготовка к профессии в заведениях, где она бывала в 279.1–279.1.3 (см. buildUnis2791) */
 const unis2791=[];
 function makeUni2791(country,row){
  const [n,city,name,kind,pub,fields,prestige,selectivity,tier,foreigners,english,programs,voc,langs,both]=row;
@@ -197,6 +206,24 @@ function makeUni2791(country,row){
   ...(two.length>1?{langs27912:two}:{}),
   kind2791:kind,public2791:!!pub,stars2791:prestige,select2791:selectivity,tier2791:tier,foreigners2791:!!foreigners,
   levels2791:voc&&!levels.includes('vocational')?['vocational',...levels]:levels,programs2791:programs||''};
+}
+/* 279.1.4: порядок заведений для подготовки к профессии — престиж, потом название; одинаковый при любом открытии игры
+   (сортировка устойчивая, порядок строк — из данных). Город героя — только в показе списков (rankUni2791). */
+function hostRank27914(a,b){return (b.prestige||0)-(a.prestige||0)||String(a.name).localeCompare(String(b.name),'ru');}
+// Подготовка к профессии role в заведении host: программа и её копии на других языках заведения (как в 279.1.1–279.1.3).
+// list — программы заведения (для общей программы и занятых id); canonical — программа страны (подпись в «О вузе»).
+function hostProgrammes27914(host,role,list,canonical){
+ const plain=p=>p.level===role.required&&!p.track45&&!p.subject26&&!p.occupation68;
+ const base=list.find(p=>plain(p)&&!p.english2791&&!p.copy27911&&p.field===role.field)||list.find(p=>plain(p)&&!p.english2791&&!p.copy27911); /* 279.1.1: и не копия */
+ if(!base)return [];
+ const occ=occupationProgramme2791(host,{...base,field:role.field},role),out=[occ];
+ /* 279.1.1: у двуязычного заведения — и на втором языке, как его другие программы; у заведения не на языке страны —
+    ещё и на языке страны: другой такой программы в стране нет (новые id …-en / …-fr, у прежней id и язык заведения) */
+ const local=country16[host.country][0],langs=[...(host.copies27911||[])];
+ const extra=host.lang27911&&host.lang27911!==local&&!langs.includes(local);if(extra)langs.push(local);
+ for(const lang of langs){const c=languageCopies27911([occ],lang);out.push(...c);if(canonical&&c.length&&extra&&lang===local)(host.occCopies27911||=[]).push([local,role.title]);}
+ if(host.langs27912)out.push(...bothCopies27912([occ],host.langs27912,new Set([...list,...out].map(p=>p.id)))); /* 279.1.2: и на втором языке заведения */
+ return out;
 }
 (function buildUnis2791(){
  if(!unis2791On)return;
@@ -219,39 +246,48 @@ function makeUni2791(country,row){
  // Подготовка к профессии с обязательным вузовским дипломом (и к рабочей, если в стране её направлению на этой ступени
  // не учат нигде) — одна на страну, в самом сильном заведении, где учат этому направлению на этой ступени, а если такого
  // нет — в самом сильном заведении этой ступени (так careers68 брал первую программу ступени): путь есть в каждой стране.
+ /* 279.1.4: «самое сильное» — по престижу и названию, без города героя (hostRank27914): в 279.1–279.1.3 сначала шли
+    заведения города, где герой жил при открытии страницы, и id таких программ зависели от него. Программы, которые тогда
+    получались в других городах, остаются по id (aliasPrograms27914, в выбор не попадают) — учёба, заявки, предложения,
+    дипломы и учёба близких в сохранениях находятся, как раньше, с тем же заведением и языком. */
  if(typeof professions16!=='undefined')for(const role of professions16.filter(r=>r.required))for(const country of Object.keys(unis2791Data.countries)){
   if(hasRole.has(country+'|'+role.id))continue;
   const offers=unis2791.filter(u=>u.country===country&&u.levels2791.includes(role.required)),own=offers.filter(u=>u.fields.includes(role.field));
-  const host=(own.length?own:offers).sort(rankUni2791)[0];
+  const ranked=(own.length?own:offers).sort(hostRank27914),host=ranked[0];
   if(!host)continue;
-  const list=byUni.get(host.id),plain=p=>p.level===role.required&&!p.track45&&!p.subject26&&!p.occupation68;
-  const base=list.find(p=>plain(p)&&!p.english2791&&!p.copy27911&&p.field===role.field)||list.find(p=>plain(p)&&!p.english2791&&!p.copy27911); /* 279.1.1: и не копия */
-  if(base){
-   const occ=occupationProgramme2791(host,{...base,field:role.field},role);list.push(occ);hasRole.add(country+'|'+role.id);
-   /* 279.1.1: у двуязычного заведения — и на втором языке, как его другие программы; у заведения не на языке страны —
-      ещё и на языке страны: другой такой программы в стране нет (новые id …-en / …-fr, у прежней id и язык заведения) */
-   const local=country16[country][0],langs=[...(host.copies27911||[])];
-   const extra=host.lang27911&&host.lang27911!==local&&!langs.includes(local);if(extra)langs.push(local);
-   for(const lang of langs){const c=languageCopies27911([occ],lang);list.push(...c);if(c.length&&extra&&lang===local)(host.occCopies27911||=[]).push([local,role.title]);}
-   if(host.langs27912)list.push(...bothCopies27912([occ],host.langs27912,new Set(list.map(p=>p.id)))); /* 279.1.2: и на втором языке заведения */
+  const made=hostProgrammes27914(host,role,byUni.get(host.id),true);
+  if(made.length){byUni.get(host.id).push(...made);hasRole.add(country+'|'+role.id);}
+  // 279.1.4: где была эта программа у героя из другого города страны — первое по тому же порядку заведение его города.
+  const hosts=new Set([host.id]);
+  for(const city of cities[country]||[]){
+   const h=ranked.find(u=>u.city===city);if(!h||hosts.has(h.id))continue;hosts.add(h.id);
+   for(const p of hostProgrammes27914(h,role,byUni.get(h.id),false))aliasPrograms27914.push(Object.assign(p,{alias27914:host.id}));
   }
  }
  // 279.1.1: программа, которая в 279.1 учила на другом языке, помнит его (was27911) — для заявок и учёбы тех лет.
  const uniOf=new Map(unis2791.map(u=>[u.id,u]));
  for(const [id,list] of byUni){const u=uniOf.get(id);if(u.lang27911)for(const p of list){const old=oldLanguage27911(u,p.field);if(!p.copy27911&&p.language!==old)p.was27911=old;}}
  for(const list of byUni.values())programs16.push(...list);
+ /* 279.1.4: копии с id нынешних программ не нужны; прежний язык 279.1 — как у остальных программ заведения */
+ const live=new Set(programs16.map(p=>p.id)),kept=[];
+ for(const p of aliasPrograms27914.splice(0)){
+  if(live.has(p.id))continue;live.add(p.id);kept.push(p);
+  const u=uniOf.get(p.university);if(u&&u.lang27911&&!p.copy27911){const old=oldLanguage27911(u,p.field);if(p.language!==old)p.was27911=old;}
+ }
+ aliasPrograms27914.push(...kept);
 })();
 
 // ---------- поиск по id: Map вместо перебора ----------
 
 const progIndex2791=new Map(),uniIndex2791=new Map();let progCount2791=-1,uniCount2791=-1;
 function progIndexed2791(){
- if(progCount2791!==programs16.length+retiredPrograms2791.length){
+ if(progCount2791!==programs16.length+retiredPrograms2791.length+aliasPrograms27914.length){
   progIndex2791.clear();
   // как programs16.find: побеждает первая запись с таким id
   for(const p of programs16)if(!progIndex2791.has(p.id))progIndex2791.set(p.id,p);
   for(const p of retiredPrograms2791)if(!progIndex2791.has(p.id))progIndex2791.set(p.id,p);
-  progCount2791=programs16.length+retiredPrograms2791.length;
+  for(const p of aliasPrograms27914)if(!progIndex2791.has(p.id))progIndex2791.set(p.id,p); /* 279.1.4 */
+  progCount2791=programs16.length+retiredPrograms2791.length+aliasPrograms27914.length;
  }
  return progIndex2791;
 }
@@ -287,9 +323,25 @@ function langPins27911(life){
  for(const id of activePrograms27911(life)){
   const p=progIndexed2791().get(id);
   if(!p||!p.was27911)continue;
-  if(!had)pins[id]=p.was27911;else if(had[id])pins[id]=had[id];
+  if(!had)pins[id]=p.was27911;else if(had[id])pins[id]=had[id];else if(lostPin27914(life,p))pins[id]=p.was27911; /* 279.1.4 */
  }
  life.unisLang27911={pins};
+}
+/* 279.1.4: подготовка к профессии, id которой в 279.1–279.1.3 зависел от города (см. aliasPrograms27914), в 279.1.1–279.1.3
+   при открытии игры в другом городе не находилась, и прежний язык 279.1 не запоминался (в pins её нет). Учёба, заявка
+   или предложение тех лет снова идут на прежнем языке, если героиня знает его, а нынешнего — нет: так учились в 279.1
+   (англоязычная студентка в Квебеке). Кто подал заявку уже на нынешнем языке, тот его знает (без этого не принимают), —
+   у него язык нынешний. Сборку сохранения не записывают, поэтому отличаем по языкам. */
+function lostPin27914(life,p){
+ if(!p||!p.occupation68||!p.was27911||p.was27911===p.language||p.copy27911)return false;
+ const langs=life&&life.path16&&life.path16.languages&&typeof life.path16.languages==='object'?life.path16.languages:{};
+ const lv=l=>Math.min(6,Math.floor(Number(langs[l])||0));
+ return lv(p.language)<p.minLanguage&&lv(p.was27911)>=p.minLanguage;
+}
+function restorePins27914(life){
+ const pins=life&&life.unisLang27911&&typeof life.unisLang27911==='object'&&life.unisLang27911.pins&&typeof life.unisLang27911.pins==='object'?life.unisLang27911.pins:null;
+ if(!pins)return;
+ for(const id of activePrograms27911(life)){if(pins[id])continue;const p=progIndexed2791().get(id);if(lostPin27914(life,p))pins[id]=p.was27911;}
 }
 const pinned27911=new Map();
 function pinnedProgramme27911(p,lang){
@@ -397,7 +449,7 @@ if(unis2791On){
  // 279.1.1: старое сохранение из прежнего ключа (resume без «Персонажей») — так же, как при чтении.
  if(typeof resume==='function'){
   const resumeBase27911=resume;
-  resume=function(...args){const out=resumeBase27911.apply(this,args);try{if(typeof s!=='undefined'&&s&&typeof s==='object'&&!s.unisLang27911)langPins27911(s);}catch(e){console.error(e);}return out;};
+  resume=function(...args){const out=resumeBase27911.apply(this,args);try{if(typeof s!=='undefined'&&s&&typeof s==='object'){if(!s.unisLang27911)langPins27911(s);else restorePins27914(s);}}catch(e){console.error(e);}return out;}; /* 279.1.4: и прежний язык, который 279.1.1–279.1.3 не запомнили */
  }
  // 279.1.1: новая заявка на программу, где прежний язык уже не действует (прошлая заявка или учёба закончилась), — на
  // нынешнем языке: привязка снимается до подачи, чтобы и при следующем чтении сохранения она не вернулась.
@@ -410,7 +462,7 @@ if(unis2791On){
  }
  // 279.1.1: при обычном открытии игры активного персонажа восстанавливает saves.js при своей загрузке — раньше этой
  // обёртки parseLife. Такой персонаж получает список прежних языков здесь (unis2791.js грузится до bootstrap61.js).
- try{if(typeof s!=='undefined'&&s&&typeof s==='object'&&!s.unisLang27911)langPins27911(s);}catch(e){console.error(e);}
+ try{if(typeof s!=='undefined'&&s&&typeof s==='object'){if(!s.unisLang27911)langPins27911(s);else restorePins27914(s);}}catch(e){console.error(e);} /* 279.1.4: и прежний язык, который 279.1.1–279.1.3 не запомнили */
 }
 
 // ---------- каталог программ: карточка на заведение ----------
